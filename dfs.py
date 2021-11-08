@@ -23,7 +23,8 @@ class Graph():
             if self.graph[node][start_node] == 1:
                 self.count += 1
                 self.paths.append(path)
-
+            self.visited[node] = False
+            return
         for new_node in range(self.V):
             if self.visited[new_node] == False and self.graph[node][new_node] == 1:
                 next_path = path[:]
@@ -31,7 +32,8 @@ class Graph():
                 self.DFS(n-1, new_node, start_node, next_path)
         
         self.visited[node] = False
-        
+        return
+    
     def find_cycles(self, length):
         """
         searches for all closed cycles in graph by iterating 
@@ -41,7 +43,6 @@ class Graph():
         for start_node in range(self.V - (length - 1)):
             self.DFS(length-1, start_node, start_node, path = [start_node])
             self.visited[start_node] = True
-            assert sum(self.visited) == 0 
 
     def cyclic_permutation(iself, path):
        rev_list = list(reversed(path))
