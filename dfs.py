@@ -55,6 +55,17 @@ class Graph():
             cycl_perm = self.cyclic_permutation(p)
             if cycl_perm in self.paths:
                 self.paths.remove(cycl_perm)
+    def get_cycles(self, length):
+        self.find_cycles(length)
+        self.drop_duplicates()
+        return self.paths
+ 
+    def qubits_from_graph(self):
+        triup_adj_graph = np.triu(
+                self.graph, k=1)
+        qbits = np.argwhere(triup_adj_graph == 1)
+        return list(map(tuple, qbits))
+
     # TODO: count degeneracies D in graph
     def num_constrains(self):
         """ C = K - N + 1"""
@@ -63,50 +74,10 @@ class Graph():
     def fully(cls, n):
         """ generates fully connected graph with n nodes"""
         return cls(np.ones((n,n)) - np.identity(n))
-
     @classmethod
     def random(cls, n):
         """generates graph with n nodes and random connections"""
-        return cls(np.random.randint(2, size=(n,n)))
-
-class Cycle_Graph():
-
-    def __init__(self, cycl3, cycl4):
-        
-        self.sets = self.concatenate(
-                cycl3, cycl4)
-
-    def concatenate(self, cycl3, cycl4):
-        return cycl3 + cycl4
-
-    def cycle_adj_matrix(self):
-        N = range(len(self.sets))
-        matrix = [[self.distance(i, j) if i > j else 0 for i in N]
-                for j in N]
-        return matrix
-
-    def distance(self, i, j):
-       """measure the distance between 
-       two closed loops"""
-       cycli = self.get_list_of_neigb_tuples(i)
-       cyclj = self.get_list_of_neigb_tuples(j)
-       #return len(set(cycli) & set(cyclj))
-       intersection = (map(lambda x: ''.join(map(str, x)),(set(cycli) & set(cyclj))))
-       return ','.join(list(intersection))
-
-    def get_list_of_neigb_tuples(self, index):
-        cycle = self.sets[index]
-        cycle = cycle + [cycle[0]]
-        cycle = list(map(tuple, 
-            map(sorted, zip(cycle, cycle[1:]))))
-        return cycle
-
-    def print_matrix(self, matrix):
-        """ from stack overflow 13214809"""
-        s = [[str(e) for e in row] for row in matrix]
-        lens = [max(map(len, col)) for col in zip(*s)]
-        fmt = '\t'.join('{{:{}}}'.format(x) for x in lens)
-        table = [fmt.format(*row) for row in s]
-        print ('\n'.join(table))
-
+        matrix = np.triu(np.random.randint(2, size=(n,n)), k=1)
+        matrix += matrix.transpose()
+        return cls(matrix)
 
