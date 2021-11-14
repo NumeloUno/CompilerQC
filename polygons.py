@@ -8,10 +8,13 @@ class Polygons():
     def __init__(self, logical_graph: Graph):
         self.qbits = logical_graph.qubits_from_graph()
         self.K = len(self.qbits)
+        self.C = logical_graph.num_constrains()
         self.qbit_coord_dict = self.init_coords_for_qbits()
         cycles = (logical_graph.get_cycles(3)
                 + logical_graph.get_cycles(4))
         self.polygons = self.get_all_polygons(cycles)
+    def update_qbit_coords(self, new_qbit_coords):
+        self.qbit_coord_dict = new_qbit_coords
     @classmethod
     def get_polygon_from_cycle(self, cycle):
         cycle = cycle + [cycle[0]]
