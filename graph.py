@@ -74,6 +74,7 @@ class Graph():
     def fully(cls, n):
         """ generates fully connected graph with n nodes"""
         return cls(np.ones((n,n)) - np.identity(n))
+    # TODO: random graph may have no cycles, fix this
     @classmethod
     def random(cls, n):
         """generates graph with n nodes and random connections"""
