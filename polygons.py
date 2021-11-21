@@ -106,7 +106,16 @@ class Polygons():
         ax.set_xticklabels([])
 
         for polygon in polygon_coords:
-            patch = plt.Polygon(polygon, zorder=0, fill=False, lw=1)
+            fill, facecolor = False, None
+            if self.is_unit_square(polygon) == 0:
+                fill, facecolor = True, 'blue'
+            if self.is_unit_triangle(polygon) == 0:
+                fill, facecolor = True, 'red'
+            patch = plt.Polygon(polygon,
+                    zorder=0,
+                    fill=fill,
+                    lw=1,
+                    facecolor = facecolor)
             ax.add_patch(patch)
 
         for qbit, coord in self.qbit_coord_dict.items():
