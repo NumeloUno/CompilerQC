@@ -10,7 +10,8 @@ class MC():
     def __init__(self, polygon_object: Polygons):
         self.energy = Energy(polygon_object)
         self.polygon = polygon_object
-
+        self.factors = [1, 1, 1, 1]
+        
     def generate_new_coord_for_qbit(self, qbit: tuple=None, radius: float=None):
         if qbit is None:
             qbit = random.choice(list(self.polygon.qbit_coord_dict.keys()))
@@ -48,23 +49,27 @@ class MC():
         new_energy = self.energy(self.polygon, factors=self.factors)
         return current_energy, new_energy
 
-    # TODO: thats not metropolis, here you may stuck in local minima
+    def temperature(self):
+        num_of_found_plaqs = self.energy.is_plaquette().count(0)
+        still_to_find = self.polygon.C - num_of_found_plaqs
+        return still_to_find * 0.001
+
     def metropolis(self, current_energy, new_energy):
         delta_energy = new_energy - current_energy
         if delta_energy < 0: 
+            pass
+        elif random.random() < min([1, np.exp(- delta_energy / self.temperature())]):
             pass
         else:
             self.polygon.qbit_coord_dict = self.current_qbit_coords
 
     def apply_contract(self, n_steps):
-        self.factors = [1, 1, 1, 1]
         for i in range(n_steps):
             current_energy, new_energy = self.step('contract')
             self.metropolis(current_energy, new_energy)
 
 
     def apply_swap(self, n_steps):
-        self.factors = [1, 1, 1, 1]
         for i in range(n_steps):
             current_energy, new_energy = self.step('swap')
             self.metropolis(current_energy, new_energy)
