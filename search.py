@@ -1,6 +1,7 @@
 import random
 import itertools
 import numpy as np
+from scipy.special import binom
 from copy import deepcopy
 from polygons import Polygons
 from energy import Energy
@@ -52,24 +53,131 @@ class MC():
     def temperature(self):
         num_of_found_plaqs = self.energy.is_plaquette().count(0)
         still_to_find = self.polygon.C - num_of_found_plaqs
-        return still_to_find * 0.001
+        return still_to_find * 0.001 # this factor seems to have an effect
 
-    def metropolis(self, current_energy, new_energy):
+    def metropolis(self, current_energy, new_energy, temperature=None):
+        if temperature is None:
+            temperature = self.temperature()
         delta_energy = new_energy - current_energy
         if delta_energy < 0: 
             pass
-        elif random.random() < min([1, np.exp(- delta_energy / self.temperature())]):
+        elif random.random() < min([1, np.exp(- delta_energy / temperature)]):
             pass
         else:
             self.polygon.qbit_coord_dict = self.current_qbit_coords
 
-    def apply_contract(self, n_steps):
+    def apply_contract(self, n_steps, temperature=None):
         for i in range(n_steps):
             current_energy, new_energy = self.step('contract')
-            self.metropolis(current_energy, new_energy)
+            self.metropolis(current_energy, new_energy, temperature)
+            if i % 100 == 0:
+                self.polygon.move_center_to_middle()
 
-
-    def apply_swap(self, n_steps):
-        for i in range(n_steps):
+    def apply_swap(self, n_steps, temperature=None):
+        for i in range(1, n_steps):
             current_energy, new_energy = self.step('swap')
-            self.metropolis(current_energy, new_energy)
+            self.metropolis(current_energy, new_energy, temperature)
+            if i % 100 == 0:
+                self.polygon.move_center_to_middle()
+                
+
+
+class Genetic():
+
+    def __init__(self, polygon_object: Polygons):
+        self.polygon_object = polygon_object
+        self.qbit_coord_dict = polygon_object.qbit_coord_dict
+        self.qbits_to_numbers = self.qbits_to_numbers_()
+        
+
+    def qbits_to_numbers_(self):
+        qbits = list(self.qbit_coord_dict.keys())
+        numbers = np.arange(1, len(qbits)+1)
+        return dict(zip(qbits, numbers))
+
+
+    def get_neighbours(self, qbit):
+        x, y = self.qbit_coord_dict[qbit] #center
+        revers = {v: k for k, v in self.qbit_coord_dict.items()}
+        return [self.qbits_to_numbers[revers[coord]] if coord in revers.keys() else 0
+                for coord in self.neighbours()]
+
+
+    def from_grid_to_intrinsic(self):
+        """ from grid representation to intrinsic neighbour representation"""
+        return list(map(self.get_neighbours, self.qbit_coord_dict.keys()))
+
+
+    def get_intrinsic_cluster(self, intrinsic_representation):
+        intrinsic_neig_qbits = [list(filter(lambda x: x!=0, l)) for l in intrinsic_representation]
+        clusters_of_qbits = [l + [i + 1 ] for i, l in enumerate(intrinsic_neig_qbits)]
+        for qbit in self.qbits_to_numbers.values():
+            components = [cluster for cluster in clusters_of_qbits if qbit in cluster]
+            for i in components:
+                clusters_of_qbits.remove(i)
+            clusters_of_qbits += [list(set(itertools.chain.from_iterable(components)))]
+        return clusters_of_qbits
+    
+
+    def neighbours(self, x, y):
+        return ((x, y+1), (x+1, y+1), (x+1, y), (x+1, y-1), (x, y-1), (x-1, y-1), (x-1, y), (x-1, y+1))
+
+    # TODO: if we have cluster, polygons between cluster enlarge energy
+    def fitness(self, factors=[1,1,1,1]):
+        new_qbit_coord_dict = self.from_intrinsic_to_grid()
+        self.polygon_object.qbit_coord_dict = new_qbit_coord_dict
+        return Energy(self.polygon_object)(self.polygon_object, factors=factors)
+    
+    # TODO: count in how many plaqs each qbit is involved
+    def fitness_per_qbit(self):
+        pass
+
+    # TODO: combine good genes
+    def cross_over(self):
+
+
+    def from_intrinsic_to_grid(self):
+        intrinsic_representation = self.from_grid_to_intrinsic()
+        clusters = self.get_intrinsic_cluster(intrinsic_representation)
+        new_coords, radius = {}, 0
+        for j, cluster in enumerate(sorted(clusters, key=len)):
+            coords = dict.fromkeys(cluster)
+            radius += len(cluster) 
+            coords[cluster[0]], i = (radius, radius), 0
+            while list(coords.values()).count(None) > 0:
+                qbit = cluster[i%len(cluster)]
+                i += 1
+                if coords[qbit] is None:
+                    continue
+                coords_of_neigh_qbits = [self.neighbours(*coords[qbit])[i] 
+                                         for i in np.where(intrinsic_representation[qbit-1])[0]]
+                nonzero_neigh_qbits = list(filter(lambda x: x!=0, intrinsic_representation[qbit-1]))
+                for qbit_, coord in zip(nonzero_neigh_qbits, coords_of_neigh_qbits):
+                    coords[qbit_] = coord
+            radius += len(cluster) 
+            new_coords.update(coords)
+        return {k: new_coords[v] for k, v in self.qbits_to_numbers.items()}
+
+
+    def binary_list_from_indices(self, indices):
+        indices_set = set(indices)
+        return np.array([i in indices_set for i in list(self.qbits_to_numbers.values())]).astype(int)
+
+
+    def indices_from_binary_list(self, binary_list):
+        return (np.where(binary_list)[0] + 1).tolist()
+        
+        
+    def encode(self, binary_list):
+        binomial_tuples = zip(np.arange(len(binary_list)),
+                np.cumsum(binary_list))
+        binomial_coeffs = np.array(list(map(
+            lambda x: binom(x[0], x[1]), binomial_tuples)))
+        return np.dot(binary_list, binomial_coeffs)
+
+    
+    def decode(self):
+        pass
+
+
+               
