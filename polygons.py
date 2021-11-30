@@ -18,8 +18,9 @@ class Polygons():
         self.qbit_coord_dict = qbit_coord_dict
         if qbit_coord_dict is None:
             self.qbit_coord_dict = self.init_coords_for_qbits()
-        cycles = (logical_graph.get_cycles(3)
-                + logical_graph.get_cycles(4))
+        if cycles is None:
+            cycles = (logical_graph.get_cycles(3)
+                    + logical_graph.get_cycles(4))
         self.polygons = self.get_all_polygons(cycles)
 
     def update_qbits_coords(self, qbits, new_coords):
@@ -65,6 +66,7 @@ class Polygons():
         weights = np.divide(ones, ctp, out=(ones * 999), where=(ctp != 0))
         normalized_weights = weights / (weights.sum() / self.C)
         return normalized_weights
+
     @staticmethod
     def is_unit_square(polygon_coord):
         return Polygons.polygon_length(polygon_coord) - 4
@@ -82,6 +84,15 @@ class Polygons():
     def center_of_convex_hull(self):
         center = Polygon(self.convex_hull()).centroid
         return (center.x, center.y) 
+
+    def move_center_to_middle(self):
+        center_x, center_y = map(int, self.center_of_convex_hull())
+        middle_x = middle_y = self.K // 2
+        move_x, move_y = center_x - middle_x, center_y - middle_y
+        qbits = list(self.qbit_coord_dict.keys())
+        new_coords = [(coord[0] - move_x, coord[1] - move_y)
+                for coord in self.qbit_coord_dict.values()]
+        self.update_qbits_coords(qbits, new_coords)
 
     def qbit_distances_to_center(self):
         center = self.center_of_convex_hull()
@@ -114,7 +125,7 @@ class Polygons():
             patch = plt.Polygon(polygon,
                     zorder=0,
                     fill=fill,
-                    lw=1,
+                    lw=0,
                     facecolor = facecolor)
             ax.add_patch(patch)
 
