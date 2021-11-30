@@ -45,12 +45,14 @@ class Energy(Polygons):
     def __call__(self, polygon_object, factors: list=[1., 1., 1., 1.]):
         area, scope, compact, n_plaq = factors
         self.polygon_coords = polygon_object.get_all_polyg_coords()
-        #self.envelop_polygon = polygon_object.convex_hull()
+        self.envelop_polygon = polygon_object.convex_hull()
         self.qbit_coords = list(polygon_object.qbit_coord_dict.keys())
         list_of_plaquettes = self.is_plaquette()
         polygon_weights = self.polygon_weights(list_of_plaquettes)
-        #energy = (area * self.polygon_area(self.envelop_polygon)  
-        #        + scope * self.polygon_length(self.envelop_polygon)
-        #        + compact * self.number_of_non_plaquette_neighbours()
-        energy =  np.dot(np.array(list_of_plaquettes), polygon_weights) 
+        energy = (
+        #        area * self.polygon_area(self.envelop_polygon)  
+        #      + scope * self.polygon_length(self.envelop_polygon)
+        #      + compact * self.number_of_non_plaquette_neighbours()
+              + n_plaq * np.dot(np.array(list_of_plaquettes), polygon_weights) 
+              )
         return energy
