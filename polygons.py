@@ -13,6 +13,7 @@ class Polygons():
                  cycles: list=None):
 
         self.qbits = logical_graph.qubits_from_graph()
+        self.V = logical_graph.V
         self.K = len(self.qbits)
         self.C = logical_graph.num_constrains()
         self.qbit_coord_dict = qbit_coord_dict

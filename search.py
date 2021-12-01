@@ -39,14 +39,31 @@ class MC():
         qbit1, qbit2 = random.sample(qbit_coords.keys(), 2)
         return [qbit1, qbit2], [qbit_coords[qbit1], qbit_coords[qbit2]]    
 
+    # check if code is working, unit test
+    def relabel_lbits(self):
+        a, b = random.sample(range(0, self.polygon.V), 2)
+        n = self.polygon.qbit_coord_dict.keys()
+        n = [(-1,  k) if i== a else (i, k) for i, k in n]
+        n = [( i, -1) if k== a else (i, k) for i, k in n]
+        n = [( a,  k) if i== b else (i, k) for i, k in n]
+        n = [( i,  a) if k== b else (i, k) for i, k in n]
+        n = [( b,  k) if i==-1 else (i, k) for i, k in n]
+        new_qbits = [( i,  b) if k==-1 else (i, k) for i, k in n]
+        sorted_new_qbits = list(map(lambda x: tuple(sorted(x)), new_qbits))
+        coords = list(self.polygon.qbit_coord_dict.values())
+        return sorted_new_qbits, coords
+                      
+                      
     def step(self, operation: str):
         self.current_qbit_coords = deepcopy(self.polygon.qbit_coord_dict)
         current_energy = self.energy(self.polygon, factors=self.factors)
         if operation == 'contract':
-            qbits, new_coords = self.generate_new_coord_for_qbit()
+            qbits, coords = self.generate_new_coord_for_qbit()
         if operation == 'swap':
-            qbits, new_coords = self.swap_qbits()
-        self.polygon.update_qbits_coords(qbits, new_coords)
+            qbits, coords = self.swap_qbits()
+        if operation == 'relable':
+            qbits, coords = self.relabel_lbits()
+        self.polygon.update_qbits_coords(qbits, coords)
         new_energy = self.energy(self.polygon, factors=self.factors)
         return current_energy, new_energy
 
@@ -66,21 +83,14 @@ class MC():
         else:
             self.polygon.qbit_coord_dict = self.current_qbit_coords
 
-    def apply_contract(self, n_steps, temperature=None):
+    def apply(self, operation, n_steps, temperature=None):
         for i in range(n_steps):
-            current_energy, new_energy = self.step('contract')
-            self.metropolis(current_energy, new_energy, temperature)
-            if i % 100 == 0:
-                self.polygon.move_center_to_middle()
-
-    def apply_swap(self, n_steps, temperature=None):
-        for i in range(1, n_steps):
-            current_energy, new_energy = self.step('swap')
+            current_energy, new_energy = self.step(operation)
             self.metropolis(current_energy, new_energy, temperature)
             if i % 100 == 0:
                 self.polygon.move_center_to_middle()
                 
-
+                      
 
 class Genetic():
 
@@ -96,11 +106,15 @@ class Genetic():
         return dict(zip(qbits, numbers))
 
 
+    def neighbours(self, x, y):
+        return ((x, y+1), (x+1, y+1), (x+1, y), (x+1, y-1), (x, y-1), (x-1, y-1), (x-1, y), (x-1, y+1))
+
+
     def get_neighbours(self, qbit):
         x, y = self.qbit_coord_dict[qbit] #center
         revers = {v: k for k, v in self.qbit_coord_dict.items()}
         return [self.qbits_to_numbers[revers[coord]] if coord in revers.keys() else 0
-                for coord in self.neighbours()]
+                for coord in self.neighbours(x, y)]
 
 
     def from_grid_to_intrinsic(self):
@@ -119,22 +133,29 @@ class Genetic():
         return clusters_of_qbits
     
 
-    def neighbours(self, x, y):
-        return ((x, y+1), (x+1, y+1), (x+1, y), (x+1, y-1), (x, y-1), (x-1, y-1), (x-1, y), (x-1, y+1))
-
     # TODO: if we have cluster, polygons between cluster enlarge energy
     def fitness(self, factors=[1,1,1,1]):
         new_qbit_coord_dict = self.from_intrinsic_to_grid()
-        self.polygon_object.qbit_coord_dict = new_qbit_coord_dict
-        return Energy(self.polygon_object)(self.polygon_object, factors=factors)
+        polygon_object = deepcopy(self.polygon_object)
+        polygon_object.qbit_coord_dict = new_qbit_coord_dict
+        return Energy(polygon_object)(polygon_object, factors=factors)
     
-    # TODO: count in how many plaqs each qbit is involved
+
     def fitness_per_qbit(self):
-        pass
+        coords_qbit_dict = {v: k for k, v in 
+                self.polygon_object.qbit_coord_dict.items()}
+        qbits_in_polygon = [list(map(lambda x: coords_qbit_dict[x],
+            polygon)) for polygon in self.polygon_object.get_all_polyg_coords()]
+        qbits_in_plaqs = np.array(qbits_in_polygon,
+                dtype=object)[
+                np.array(Energy(self.polygon_object).is_plaquette()) == 0]
+        qbits_in_plaqs = list(map(tuple, np.concatenate(qbits_in_plaqs)))
+        return [qbits_in_plaqs.count(qbit) for qbit in self.polygon_object.qbits]
+
 
     # TODO: combine good genes
     def cross_over(self):
-
+        pass
 
     def from_intrinsic_to_grid(self):
         intrinsic_representation = self.from_grid_to_intrinsic()
