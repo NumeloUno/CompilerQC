@@ -6,7 +6,7 @@ from scipy.ndimage import convolve
 class Energy(Polygons):
 
     def __init__(self, polygon_object: Polygons):
-        self.polygon_coords = polygon_object.get_all_polyg_coords()
+        self.polygon_coords = polygon_object.get_all_polygon_coords()
         self.envelop_polygon = polygon_object.convex_hull()
         self.K, self.C = polygon_object.K, polygon_object.C
         #self.qbit_coords = list(polygon_object.qbit_coord_dict.keys())
@@ -20,12 +20,19 @@ class Energy(Polygons):
         return list(map(self.polygon_area, self.polygon_coords))
 
 
-    def is_plaquette(self):
+    def distance_to_plaquette(self):
+        """
+        return: list, each entry represents the closeness of a polygon 
+        to plaquette (square or triangle)
+        """
         return [self.is_unit_square(coord) if len(coord)==4 
                 else self.is_unit_triangle(coord) for coord in self.polygon_coords]
 
 
     def intersection_array(self):
+        """
+        return: unit square polygon which intersects with qbit layout
+        """
         unit_square_grid = self.get_grid_of_unit_squares(self.K)
         intersects = list(map(lambda x: Polygon(self.envelop_polygon).intersects(Polygon(x)),
             unit_square_grid))
@@ -51,10 +58,10 @@ class Energy(Polygons):
 
     def __call__(self, polygon_object, factors: list=[1., 1., 1., 1.]):
         area, scope, compact, n_plaq = factors
-        self.polygon_coords = polygon_object.get_all_polyg_coords()
+        self.polygon_coords = polygon_object.get_all_polygon_coords()
         self.envelop_polygon = polygon_object.convex_hull()
         #self.qbit_coords = list(polygon_object.qbit_coord_dict.keys())
-        list_of_plaquettes = self.is_plaquette()
+        list_of_plaquettes = self.distance_to_plaquette()
         polygon_weights = self.polygon_weights(list_of_plaquettes)
         energy = (
         #        area * self.polygon_area(self.envelop_polygon)  

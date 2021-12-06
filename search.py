@@ -3,6 +3,7 @@ import itertools
 import numpy as np
 from scipy.special import binom
 from copy import deepcopy
+from geneticalgorithm import geneticalgorithm as ga
 from polygons import Polygons
 from energy import Energy
 
@@ -32,7 +33,7 @@ class MC():
                 break
         if new_random_coord is None:
             qbit, new_random_coord = self.generate_new_coord_for_qbit(radius = radius ** 2) 
-        return qbit, new_random_coord
+        return [qbit], [new_random_coord]
         
     def swap_qbits(self):
         qbit_coords = self.polygon.qbit_coord_dict
@@ -68,7 +69,7 @@ class MC():
         return current_energy, new_energy
 
     def temperature(self):
-        num_of_found_plaqs = self.energy.is_plaquette().count(0)
+        num_of_found_plaqs = self.energy.distance_to_plaquette().count(0)
         still_to_find = self.polygon.C - num_of_found_plaqs
         return still_to_find * 0.001 # this factor seems to have an effect
 
@@ -92,13 +93,14 @@ class MC():
                 
                       
 
-class Genetic():
+class Encode():
 
-    def __init__(self, polygon_object: Polygons):
+    def __call__(self, polygon_object: Polygons):
         self.polygon_object = polygon_object
         self.qbit_coord_dict = polygon_object.qbit_coord_dict
         self.qbits_to_numbers = self.qbits_to_numbers_()
-        
+        return self.from_grid_to_intrinsic()
+
 
     def qbits_to_numbers_(self):
         qbits = list(self.qbit_coord_dict.keys())
@@ -119,7 +121,31 @@ class Genetic():
 
     def from_grid_to_intrinsic(self):
         """ from grid representation to intrinsic neighbour representation"""
-        return list(map(self.get_neighbours, self.qbit_coord_dict.keys()))
+        return np.array(list(map(self.get_neighbours, self.qbit_coord_dict.keys())))
+
+
+    def from_intrinsic_to_grid(self, intrinsic_representation):
+        clusters = self.get_intrinsic_cluster(intrinsic_representation)
+        new_coords, radius = {}, 0
+        for j, cluster in enumerate(sorted(clusters, key=len)):
+            coords = dict.fromkeys(cluster)
+            radius += len(cluster) 
+            coords[cluster[0]], i = (radius, radius), 0
+            while list(coords.values()).count(None) > 0:
+                qbit = int(cluster[i%len(cluster)])
+                i += 1
+                if coords[qbit] is None:
+                    continue
+                coords_of_neigh_qbits = [self.neighbours(*coords[qbit])[i] 
+                                         for i in np.where(intrinsic_representation[qbit-1])[0]]
+                nonzero_neigh_qbits = list(filter(lambda x: x!=0, intrinsic_representation[qbit-1]))
+                for qbit_, coord in zip(nonzero_neigh_qbits, coords_of_neigh_qbits):
+                    coords[qbit_] = coord
+                if i > 100:
+                    return -99999
+            radius += len(cluster) 
+            new_coords.update(coords)
+        return {k: new_coords[v] for k, v in self.qbits_to_numbers.items()}
 
 
     def get_intrinsic_cluster(self, intrinsic_representation):
@@ -133,52 +159,44 @@ class Genetic():
         return clusters_of_qbits
     
 
-    # TODO: if we have cluster, polygons between cluster enlarge energy
-    def fitness(self, factors=[1,1,1,1]):
-        new_qbit_coord_dict = self.from_intrinsic_to_grid()
+    # TODO: if we have cluster, polygons between cluster enlarge energy, also this deepcopy solution is ugly
+    def fitness(self, flattend_intrinsic_representation, factors=[1,1,1,1]):
+        intrinsic_representation = np.reshape(flattend_intrinsic_representation,
+                (len(flattend_intrinsic_representation) // 8, 8))
+        new_qbit_coord_dict = self.from_intrinsic_to_grid(intrinsic_representation)
         polygon_object = deepcopy(self.polygon_object)
         polygon_object.qbit_coord_dict = new_qbit_coord_dict
         return Energy(polygon_object)(polygon_object, factors=factors)
     
 
-    def fitness_per_qbit(self):
+    def fitness_per_qbit(self, flattend_intrinsic_representation):
+        intrinsic_representation = np.reshape(flattend_intrinsic_representation,
+                (len(flattend_intrinsic_representation) // 8, 8))
+        new_qbit_coord_dict = self.from_intrinsic_to_grid(intrinsic_representation)
+        #check if valid grid layout was found
+        if type(new_qbit_coord_dict) == int:
+            return [-99999]
+        #check if coords are unique:
+        if len(new_qbit_coord_dict) > len(set(new_qbit_coord_dict.values())):
+            return [-99999]
+        polygon_object = deepcopy(self.polygon_object)
+        polygon_object.qbit_coord_dict = new_qbit_coord_dict
         coords_qbit_dict = {v: k for k, v in 
-                self.polygon_object.qbit_coord_dict.items()}
+                polygon_object.qbit_coord_dict.items()}
         qbits_in_polygon = [list(map(lambda x: coords_qbit_dict[x],
-            polygon)) for polygon in self.polygon_object.get_all_polyg_coords()]
+            polygon)) for polygon in polygon_object.get_all_polyg_coords()]
         qbits_in_plaqs = np.array(qbits_in_polygon,
                 dtype=object)[
-                np.array(Energy(self.polygon_object).is_plaquette()) == 0]
+                np.array(Energy(polygon_object).is_plaquette()) == 0]
+        if not qbits_in_plaqs.size:
+            return [-99999]
         qbits_in_plaqs = list(map(tuple, np.concatenate(qbits_in_plaqs)))
-        return [qbits_in_plaqs.count(qbit) for qbit in self.polygon_object.qbits]
+        return [qbits_in_plaqs.count(qbit) for qbit in polygon_object.qbits]
 
 
     # TODO: combine good genes
     def cross_over(self):
         pass
-
-    def from_intrinsic_to_grid(self):
-        intrinsic_representation = self.from_grid_to_intrinsic()
-        clusters = self.get_intrinsic_cluster(intrinsic_representation)
-        new_coords, radius = {}, 0
-        for j, cluster in enumerate(sorted(clusters, key=len)):
-            coords = dict.fromkeys(cluster)
-            radius += len(cluster) 
-            coords[cluster[0]], i = (radius, radius), 0
-            while list(coords.values()).count(None) > 0:
-                qbit = cluster[i%len(cluster)]
-                i += 1
-                if coords[qbit] is None:
-                    continue
-                coords_of_neigh_qbits = [self.neighbours(*coords[qbit])[i] 
-                                         for i in np.where(intrinsic_representation[qbit-1])[0]]
-                nonzero_neigh_qbits = list(filter(lambda x: x!=0, intrinsic_representation[qbit-1]))
-                for qbit_, coord in zip(nonzero_neigh_qbits, coords_of_neigh_qbits):
-                    coords[qbit_] = coord
-            radius += len(cluster) 
-            new_coords.update(coords)
-        return {k: new_coords[v] for k, v in self.qbits_to_numbers.items()}
-
 
     def binary_list_from_indices(self, indices):
         indices_set = set(indices)
@@ -189,7 +207,7 @@ class Genetic():
         return (np.where(binary_list)[0] + 1).tolist()
         
         
-    def encode(self, binary_list):
+    def old_encode(self, binary_list):
         binomial_tuples = zip(np.arange(len(binary_list)),
                 np.cumsum(binary_list))
         binomial_coeffs = np.array(list(map(
