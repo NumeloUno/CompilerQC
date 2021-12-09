@@ -14,6 +14,7 @@ class MC():
         self.polygon = polygon_object
         self.factors = [1, 1, 1, 1]
         
+        
     def generate_new_coord_for_qbit(self, qbit: tuple=None, radius: float=None):
         if qbit is None:
             qbit = random.choice(list(self.polygon.qbit_coord_dict.keys()))
@@ -34,6 +35,7 @@ class MC():
         if new_random_coord is None:
             qbit, new_random_coord = self.generate_new_coord_for_qbit(radius = radius ** 2) 
         return [qbit], [new_random_coord]
+        
         
     def swap_qbits(self):
         qbit_coords = self.polygon.qbit_coord_dict
@@ -68,28 +70,31 @@ class MC():
         new_energy = self.energy(self.polygon, factors=self.factors)
         return current_energy, new_energy
 
+    
     def temperature(self):
         num_of_found_plaqs = self.energy.distance_to_plaquette().count(0)
         still_to_find = self.polygon.C - num_of_found_plaqs
         return still_to_find * 0.001 # this factor seems to have an effect
 
+    
     def metropolis(self, current_energy, new_energy, temperature=None):
         if temperature is None:
             temperature = self.temperature()
         delta_energy = new_energy - current_energy
-        if delta_energy < 0: 
-            pass
-        elif random.random() < min([1, np.exp(- delta_energy / temperature)]):
+        if random.random() < min([1, np.exp(- delta_energy / temperature)]):
             pass
         else:
             self.polygon.qbit_coord_dict = self.current_qbit_coords
+        return delta_energy
 
+            
     def apply(self, operation, n_steps, temperature=None):
         for i in range(n_steps):
             current_energy, new_energy = self.step(operation)
-            self.metropolis(current_energy, new_energy, temperature)
+            delta_energy = self.metropolis(current_energy, new_energy, temperature)
             if i % 100 == 0:
                 self.polygon.move_center_to_middle()
+            return delta_energy
                 
                       
 
