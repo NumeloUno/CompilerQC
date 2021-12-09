@@ -191,8 +191,8 @@ class Polygons():
             ax.scatter(*coord, color='red')
         x_range = sorted(self.convex_hull(), key=lambda x: x[0])
         y_range = sorted(self.convex_hull(), key=lambda y: y[1])
-        ax.set_xlim(min(x_range[0][0], y_range[0][1]),
-                 max(x_range[-1][0], y_range[-1][1]))
-        ax.set_ylim(min(x_range[0][0], y_range[0][1]),
-                 max(x_range[-1][0], y_range[-1][1]))
+        ax.set_xlim(min(x_range[0][0], y_range[0][1])-1,
+                  max(x_range[-1][0], y_range[-1][1])+1)
+        ax.set_ylim(min(x_range[0][0], y_range[0][1])-1,
+                  max(x_range[-1][0], y_range[-1][1])+1)
         return ax
