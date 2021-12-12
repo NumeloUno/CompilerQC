@@ -7,14 +7,28 @@ from graph import Graph
 
 class Energy(Polygons):
 
+
     def __init__(
             self,
             polygon_object: Polygons,
             ):
         self.polygon_coords = polygon_object.get_all_polygon_coords()
         self.envelop_polygon = polygon_object.convex_hull()
+        self.N = polygon_object.N
         self.K, self.C = polygon_object.K, polygon_object.C
         #self.qbit_coords = list(polygon_object.qbit_coord_dict.keys())
+    
+    scaling_for_plaq3 = ([  1.82184071,   6.06593094,  13.63807311,  25.44413237,
+        42.38993543,  65.381298  ,  95.32403166, 133.12394619,
+       179.68685042, 235.9185527 , 302.72486109, 381.01158345,
+       471.68452755, 575.64950108, 693.81231165, 827.07876687])
+    
+    scaling_for_plaq4 = ([   5.30056124,   14.89326143,   31.41826795,   56.68725207,
+         92.51185921,  140.70372216,  203.07446827,  281.43572232,
+        377.59910779,  493.37624741,  630.57876348,  791.01827803,
+        976.5064129 , 1188.85478983, 1429.87503047, 1701.37875641])
+
+
 
 
     def scopes_of_polygons(self):
@@ -30,8 +44,18 @@ class Energy(Polygons):
         return: list, each entry represents the closeness of a polygon 
         to plaquette (square or triangle)
         """
-        return [self.is_unit_square(coord) if len(coord)==4 
-                else self.is_unit_triangle(coord) for coord in self.polygon_coords]
+        distances = []
+        for coord in self.polygon_coords:
+            if len(coord) == 4:
+                distance = self.is_unit_square(coord)
+                if distance == 0:
+                    distance -= self.scaling_for_plaq4[self.N-4]
+            if len(coord) == 3:
+                distance = self.is_unit_triangle(coord)
+                if distance == 0:
+                    distance -= self.scaling_for_plaq3[self.N-4]
+            distances.append(distance)
+        return distances
 
 
     def intersection_array(self):
@@ -60,19 +84,20 @@ class Energy(Polygons):
     def distance_btw_pqbits(self):
         pass
 
-
+        
     def __call__(self, polygon_object, factors: list=[1., 1., 1., 1.]):
         area, scope, compact, n_plaq = factors
         self.polygon_coords = polygon_object.get_all_polygon_coords()
         self.envelop_polygon = polygon_object.convex_hull()
         #self.qbit_coords = list(polygon_object.qbit_coord_dict.keys())
         list_of_plaquettes = self.distance_to_plaquette()
-        polygon_weights = self.polygon_weights(list_of_plaquettes)
+        #polygon_weights = self.polygon_weights(list_of_plaquettes)
         energy = (
         #        area * self.polygon_area(self.envelop_polygon)  
         #      + scope * self.polygon_length(self.envelop_polygon)
         #      + compact * self.number_of_non_plaquette_neighbours()
-              + n_plaq * np.dot(np.array(list_of_plaquettes), polygon_weights) 
+        #      + n_plaq * np.dot(np.array(list_of_plaquettes), polygon_weights) 
+                sum(list_of_plaquettes)
               )
         return energy
 
