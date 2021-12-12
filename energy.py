@@ -2,10 +2,15 @@ import numpy as np
 from polygons import Polygons
 from shapely.geometry import Polygon, MultiPoint
 from scipy.ndimage import convolve
+from itertools import combinations, permutations
+from graph import Graph
 
 class Energy(Polygons):
 
-    def __init__(self, polygon_object: Polygons):
+    def __init__(
+            self,
+            polygon_object: Polygons,
+            ):
         self.polygon_coords = polygon_object.get_all_polygon_coords()
         self.envelop_polygon = polygon_object.convex_hull()
         self.K, self.C = polygon_object.K, polygon_object.C
@@ -70,3 +75,87 @@ class Energy(Polygons):
               + n_plaq * np.dot(np.array(list_of_plaquettes), polygon_weights) 
               )
         return energy
+
+
+class Enery_landscape():
+
+    def __init__(
+            self,
+            logical_graph: Graph,
+            polygon_object: Polygons,
+            ):
+        """
+        This class calulcates the energie landscape for different combinations (where are the qbits on the grid)
+        and for different permutations (certain positions on the grid, but different qbits on it)
+        grid: dict of coords as keys, ans numbers as values
+        """
+        self.r = logical_graph.K
+        self.grid = self.init_grid(logical_graph.N) 
+        self.fit = Energy(polygon_object)
+        self.qbits = polygon_object.qbits
+        self.polygon_object = polygon_object
+
+
+    def init_grid(
+            self,
+            N: int
+            ):
+        """
+        N: number of logical qbits
+        return: dict with key:value <-> tuple of grid point coordinate: grid point number
+        """
+        x, y = np.meshgrid(np.arange(N-1), np.arange(1, N))
+        grid_points = list(zip(x.flatten(), y.flatten()))
+        grid_point_numbers = np.arange(len(grid_points))
+        return dict(zip(grid_points, grid_point_numbers))
+
+
+    def get_all_combinations(
+            self, 
+            n: list=None
+            ):
+        """
+        n: grid point numbers  we consider, default is the whole square of (N-1)² points
+        r: number of qbits
+        return: list of tuples of all combinations, without order
+        """
+        if n is None:
+            n = list(self.grid.values())
+        return list(combinations(n, self.r))
+
+
+    def get_all_permutations(
+            self,
+            to_permute: list,
+            ):
+        """
+        to_permute: list of list(s) to permute
+        return: list of tuples of all permutations
+        """
+        return [list(permutations(i)) for i in to_permute]
+
+
+    def grid_num_to_coords(
+            self,
+            list_of_grid_nums: list,
+            ):
+        """
+        list_of_grid_nums: list of grid numbers for each qbit
+        return: list of coords for each qbit
+        """
+        return [list(self.grid.keys()) [i] for i in list_of_grid_nums]
+
+
+    def energy_landscape(
+            self,
+            list_of_coords: list
+            ):
+        """
+        list_of_coords: list of list(s) of coords
+        return: array of energy values
+        """
+        energy_list = []
+        for coords in list_of_coords:
+            self.polygon_object.update_qbits_coords(self.qbits, coords)
+            energy_list.append(self.fit(self.polygon_object))
+        return np.array(energy_list)
