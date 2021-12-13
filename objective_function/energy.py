@@ -4,6 +4,10 @@ from shapely.geometry import Polygon, MultiPoint
 from scipy.ndimage import convolve
 from itertools import combinations, permutations
 from CompilerQC import Graph
+import os.path
+homedir = os.path.expanduser("~/UniInnsbruck/")
+path_to_scaling_factors = os.path.join(homedir,
+        "CompilerQC/parameter_estimation/parameters")
 
 class Energy(Polygons):
 
@@ -17,18 +21,18 @@ class Energy(Polygons):
         self.N = polygon_object.N
         self.K, self.C = polygon_object.K, polygon_object.C
         #self.qbit_coords = list(polygon_object.qbit_coord_dict.keys())
-    
-    scaling_for_plaq3 = ([  1.82184071,   6.06593094,  13.63807311,  25.44413237,
-        42.38993543,  65.381298  ,  95.32403166, 133.12394619,
-       179.68685042, 235.9185527 , 302.72486109, 381.01158345,
-       471.68452755, 575.64950108, 693.81231165, 827.07876687])
-    
-    scaling_for_plaq4 = ([   5.30056124,   14.89326143,   31.41826795,   56.68725207,
-         92.51185921,  140.70372216,  203.07446827,  281.43572232,
-        377.59910779,  493.37624741,  630.57876348,  791.01827803,
-        976.5064129 , 1188.85478983, 1429.87503047, 1701.37875641])
+        self.scaling_for_plaq3 = self.scaling_factors_LHZ3()
+        self.scaling_for_plaq4 = self.scaling_factors_LHZ4()
 
+    @staticmethod
+    def scaling_factors_LHZ4():
+        return np.load(os.path.join(path_to_scaling_factors,
+            "scaling_factors_LHZ4.npy")
 
+    @staticmethod
+    def scaling_factors_LHZ3():
+        return np.load(os.path.join(path_to_scaling_factors,
+            "scaling_factors_LHZ3.npy")
 
 
     def scopes_of_polygons(self):
@@ -87,8 +91,8 @@ class Energy(Polygons):
         
     def __call__(self, polygon_object, factors: list=[1., 1., 1., 1.]):
         area, scope, compact, n_plaq = factors
-        self.polygon_coords = polygon_object.get_all_polygon_coords()
-        self.envelop_polygon = polygon_object.convex_hull()
+        #self.polygon_coords = polygon_object.get_all_polygon_coords()
+        #self.envelop_polygon = polygon_object.convex_hull()
         #self.qbit_coords = list(polygon_object.qbit_coord_dict.keys())
         list_of_plaquettes = self.distance_to_plaquette()
         #polygon_weights = self.polygon_weights(list_of_plaquettes)
