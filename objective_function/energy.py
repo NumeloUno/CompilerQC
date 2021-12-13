@@ -1,9 +1,9 @@
 import numpy as np
-from polygons import Polygons
+from CompilerQC import Polygons
 from shapely.geometry import Polygon, MultiPoint
 from scipy.ndimage import convolve
 from itertools import combinations, permutations
-from graph import Graph
+from CompilerQC import Graph
 
 class Energy(Polygons):
 
@@ -102,7 +102,7 @@ class Energy(Polygons):
         return energy
 
 
-class Enery_landscape():
+class Energy_landscape():
 
     def __init__(
             self,

@@ -4,8 +4,8 @@ import numpy as np
 from scipy.special import binom
 from copy import deepcopy
 from geneticalgorithm import geneticalgorithm as ga
-from polygons import Polygons
-from energy import Energy
+from CompilerQC import Polygons
+from CompilerQC.objective_function import Energy
 
 class MC():
 
