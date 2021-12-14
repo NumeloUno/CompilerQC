@@ -16,23 +16,23 @@ class Energy(Polygons):
             self,
             polygon_object: Polygons,
             ):
-        self.polygon_coords = polygon_object.get_all_polygon_coords()
-        self.envelop_polygon = polygon_object.convex_hull()
         self.N = polygon_object.N
         self.K, self.C = polygon_object.K, polygon_object.C
         #self.qbit_coords = list(polygon_object.qbit_coord_dict.keys())
-        self.scaling_for_plaq3 = self.scaling_factors_LHZ3()
-        self.scaling_for_plaq4 = self.scaling_factors_LHZ4()
+        self.scaling_for_plaq3 = self.scaling_factors_LHZ(3)
+        self.scaling_for_plaq4 = self.scaling_factors_LHZ(4)
 
     @staticmethod
-    def scaling_factors_LHZ4():
+    def scaling_factors_LHZ(number: int):
+        """
+        load the array of scaling factors for 
+        3plaqs or 4plaqs.
+        these scaling factors compensate for the 
+        higher number of non plaqs,
+        number: 3 or 4
+        """
         return np.load(os.path.join(path_to_scaling_factors,
-            "scaling_factors_LHZ4.npy")
-
-    @staticmethod
-    def scaling_factors_LHZ3():
-        return np.load(os.path.join(path_to_scaling_factors,
-            "scaling_factors_LHZ3.npy")
+           f"scaling_factors_LHZ{number}.npy"))
 
 
     def scopes_of_polygons(self):
@@ -44,6 +44,14 @@ class Energy(Polygons):
 
 
     def distance_to_plaquette(self):
+        """
+        return: list, each entry represents the closeness of a polygon 
+        to plaquette (square or triangle)
+        """
+        return [self.is_unit_square(coord) if len(coord)==4 
+                else self.is_unit_triangle(coord) for coord in self.polygon_coords]
+
+    def scaled_distance_to_plaquette(self):
         """
         return: list, each entry represents the closeness of a polygon 
         to plaquette (square or triangle)
@@ -62,6 +70,12 @@ class Energy(Polygons):
         return distances
 
 
+    def exp_factor(self, constant: float):
+        """
+        if all C plaqs has been found, energy is scaled down to 0
+        """
+        number_of_found_plaqs = self.distance_to_plaquette().count(0)
+        return (1 - np.exp(constant * (number_of_found_plaqs - self.C)))
     def intersection_array(self):
         """
         return: unit square polygon which intersects with qbit layout
@@ -89,19 +103,19 @@ class Energy(Polygons):
         pass
 
         
-    def __call__(self, polygon_object, factors: list=[1., 1., 1., 1.]):
+    def __call__(
+            self,
+            polygon_object,
+            constant_for_exp: float=1.,
+            factors: list=[1., 1., 1., 1.]):
         area, scope, compact, n_plaq = factors
-        #self.polygon_coords = polygon_object.get_all_polygon_coords()
-        #self.envelop_polygon = polygon_object.convex_hull()
-        #self.qbit_coords = list(polygon_object.qbit_coord_dict.keys())
-        list_of_plaquettes = self.distance_to_plaquette()
-        #polygon_weights = self.polygon_weights(list_of_plaquettes)
+        self.polygon_coords = polygon_object.get_all_polygon_coords()
+#         list_of_plaquettes = self.distance_to_plaquette()
+#         polygon_weights = self.polygon_weights(list_of_plaquettes)
+        list_of_plaquettes =self.scaled_distance_to_plaquette()
         energy = (
-        #        area * self.polygon_area(self.envelop_polygon)  
-        #      + scope * self.polygon_length(self.envelop_polygon)
-        #      + compact * self.number_of_non_plaquette_neighbours()
-        #      + n_plaq * np.dot(np.array(list_of_plaquettes), polygon_weights) 
-                sum(list_of_plaquettes)
+#               + n_plaq * np.dot(np.array(list_of_plaquettes), polygon_weights) 
+                self.exp_factor(constant_for_exp) * sum(list_of_plaquettes)
               )
         return energy
 
@@ -131,7 +145,7 @@ class Energy_landscape():
             ):
         """
         N: number of logical qbits
-        return: dict with key:value <-> tuple of grid point coordinate: grid point number
+        return: dict with key:value <-> tuple of grid point coordinate: grid point number
         """
         x, y = np.meshgrid(np.arange(N-1), np.arange(1, N))
         grid_points = list(zip(x.flatten(), y.flatten()))
@@ -177,7 +191,8 @@ class Energy_landscape():
 
     def energy_landscape(
             self,
-            list_of_coords: list
+            list_of_coords: list,
+            constant_for_exp: float=1.,
             ):
         """
         list_of_coords: list of list(s) of coords
@@ -186,5 +201,5 @@ class Energy_landscape():
         energy_list = []
         for coords in list_of_coords:
             self.polygon_object.update_qbits_coords(self.qbits, coords)
-            energy_list.append(self.fit(self.polygon_object))
+            energy_list.append(self.fit(self.polygon_object, constant_for_exp=constant_for_exp))
         return np.array(energy_list)
