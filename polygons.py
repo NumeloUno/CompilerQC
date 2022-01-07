@@ -37,9 +37,18 @@ class Polygons():
         """
         qbits: list of tuples
         new_coords: list of tuples
+        if new_coord is already occupied by a qbit,
+        this qbit is moved to the max coord + (1, 0)
         """
         for qbit, new_coord in zip(qbits, new_coords):
-            self.qbit_coord_dict[qbit] = new_coord
+           qbit_coords =  self.qbit_coord_dict.values()
+           if new_coord in qbit_coords:
+               qbit_to_move = dict(zip(
+                    self.qbit_coord_dict.values(),
+                    self.qbit_coord_dict.keys()))[new_coord]
+               self.qbit_coord_dict[qbit_to_move] = tuple(
+                       np.add(max(qbit_coords), (1, 0)))
+           self.qbit_coord_dict[qbit] = new_coord
 
 
     @classmethod
