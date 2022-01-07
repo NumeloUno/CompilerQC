@@ -1,4 +1,6 @@
 import numpy as np
+import networkx as nx
+
 
 class Graph():
     
@@ -13,6 +15,11 @@ class Graph():
         self.K = self.num_edges()
         self.C = self.num_constrains()
         self.clear()
+
+
+    def to_nx_graph(self):
+        """converts Graph object to networkx object"""
+        return nx.from_numpy_matrix(self.adj_matrix)
 
 
     def clear(self):
