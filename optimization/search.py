@@ -3,21 +3,39 @@ import itertools
 import numpy as np
 from scipy.special import binom
 from copy import deepcopy
-from geneticalgorithm import geneticalgorithm as ga
-from CompilerQC import Polygons
+from CompilerQC import Polygons, core
 from CompilerQC.objective_function import Energy
 
 class MC():
 
-    def __init__(self, polygon_object: Polygons):
+    def __init__(
+            self,
+            polygon_object: Polygons,
+            ):
         self.energy = Energy(polygon_object)
         self.polygon = polygon_object
         self.factors = [1, 1, 1, 1]
-        
-        
-    def generate_new_coord_for_qbit(self, qbit: tuple=None, radius: float=None):
+        self.movable_qbits = list(self.polygon.qbit_coord_dict.keys())
+
+    def update_movable_qbits(
+            self,
+            fixed_qbits: list,
+            ):
+        """
+        fixed_coords: qbit coords which belong to e.g the core obtained 
+        by the bipartite graph ansatz 
+        """
+        all_qbits = set(self.polygon.qbit_coord_dict.keys())
+        self.movable_qbits = list(all_qbits - set(fixed_qbits))
+
+
+    def generate_new_coord_for_qbit(
+            self,
+            qbit: tuple=None,
+            radius: float=None,
+            ):
         if qbit is None:
-            qbit = random.choice(list(self.polygon.qbit_coord_dict.keys()))
+            qbit = random.choice(self.movable_qbits)
         center_x, center_y = map(int, self.polygon.center_of_convex_hull())
         if radius is None:
             radius = round(np.sqrt(self.polygon.C))
@@ -39,12 +57,32 @@ class MC():
         
     def swap_qbits(self):
         qbit_coords = self.polygon.qbit_coord_dict
-        qbit1, qbit2 = random.sample(qbit_coords.keys(), 2)
+        qbit1, qbit2 = random.sample(self.movable_qbits, 2)
         return [qbit1, qbit2], [qbit_coords[qbit1], qbit_coords[qbit2]]    
+
+    def swap_lines_in_core(
+            self,
+            U: list,
+            V: list,
+            ):
+        """
+        U, V: list of qbits 
+        U and V are the parts of the complete bipartite graph
+        """
+        if random.choice([0, 1]):
+            i, j = random.sample(range(len(U)), 2)
+            U[i], U[j] = U[j], U[i]
+        else:
+            i, j = random.sample(range(len(V)), 2)
+            V[i], V[j] = V[j], V[i]
+        #swap two random elements in part
+
+        core_qbits, core_coords = core.qbits_and_coords_of_core(U, V)
+        return core_qbits, core_coords
 
     # check if code is working, unit test
     def relabel_lbits(self):
-        a, b = random.sample(range(0, self.polygon.V), 2)
+        a, b = random.sample(range(0, self.polygon.N), 2)
         n = self.polygon.qbit_coord_dict.keys()
         n = [(-1,  k) if i== a else (i, k) for i, k in n]
         n = [( i, -1) if k== a else (i, k) for i, k in n]
@@ -57,7 +95,12 @@ class MC():
         return sorted_new_qbits, coords
                       
                       
-    def step(self, operation: str):
+    def step(
+            self,
+            operation: str,
+            U: list=None,
+            V: list=None,
+            ):
         self.current_qbit_coords = deepcopy(self.polygon.qbit_coord_dict)
         current_energy = self.energy(self.polygon, factors=self.factors)
         if operation == 'contract':
@@ -66,6 +109,8 @@ class MC():
             qbits, coords = self.swap_qbits()
         if operation == 'relable':
             qbits, coords = self.relabel_lbits()
+        if operation == 'swap_lines_in_core':
+            qbits, coords = self.swap_lines_in_core(U, V)
         self.polygon.update_qbits_coords(qbits, coords)
         new_energy = self.energy(self.polygon, factors=self.factors)
         return current_energy, new_energy
@@ -88,9 +133,16 @@ class MC():
         return delta_energy
 
             
-    def apply(self, operation, n_steps, temperature=None):
+    def apply(
+            self,
+            operation,
+            n_steps,
+            temperature=None,
+            U: list=None,
+            V: list=None,
+            ):
         for i in range(n_steps):
-            current_energy, new_energy = self.step(operation)
+            current_energy, new_energy = self.step(operation, U, V)
             delta_energy = self.metropolis(current_energy, new_energy, temperature)
             if i % 100 == 0:
                 self.polygon.move_center_to_middle()
