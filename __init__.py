@@ -1,6 +1,6 @@
 from .graph import Graph
 from .polygons import Polygons
-
+from . import core
 from . import objective_function
 from . import optimization
 from . import parameter_estimation
