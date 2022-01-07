@@ -76,6 +76,8 @@ class Energy(Polygons):
         """
         number_of_found_plaqs = self.distance_to_plaquette().count(0)
         return (1 - np.exp(constant * (number_of_found_plaqs - self.C)))
+    
+
     def intersection_array(self):
         """
         return: unit square polygon which intersects with qbit layout
@@ -97,6 +99,7 @@ class Energy(Polygons):
                            [-1,  4, -1],
                            [ 0, -1,  0]])
         return np.sum(np.where(convolve(matrix, kernel) < 0, 1, 0))
+
 
     # TODO: complete tis function, actually this term is automatically fullfiled by the algo
     def distance_btw_pqbits(self):
