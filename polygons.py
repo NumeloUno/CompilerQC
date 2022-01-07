@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt
 from shapely.geometry import Point, Polygon, MultiPoint, MultiLineString
 from shapely.ops import polygonize
 from shapely import wkt
-from graph import Graph
+from CompilerQC import Graph
 
 class Polygons():
 
