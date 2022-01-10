@@ -29,11 +29,16 @@ class MC():
         self.movable_qbits = list(all_qbits - set(fixed_qbits))
 
 
-    def generate_new_coord_for_qbit(
+    def random_coord_around_center(
             self,
             qbit: tuple=None,
             radius: float=None,
             ):
+        """
+        return random coord around center of convex hull, if this coord is free
+        search in range of radius, if everything is occupied, search again with 
+        increased radius
+        """
         if qbit is None:
             qbit = random.choice(self.movable_qbits)
         center_x, center_y = map(int, self.polygon.center_of_convex_hull())
@@ -45,21 +50,55 @@ class MC():
         random_coords_around_center = list(zip(x.flatten(), y.flatten()))
         np.random.shuffle(random_coords_around_center)
         qbit_coords = self.polygon.qbit_coord_dict.values()
-        new_random_coord = None
-        for coord in random_coords_around_center:
-            if coord not in qbit_coords:
-                new_random_coord = coord
-                break
-        if new_random_coord is None:
-            qbit, new_random_coord = self.generate_new_coord_for_qbit(radius = radius ** 2) 
+        free_random_coords_around_center = list(
+                set(random_coords_around_center) - set(qbit_coords))
+        if len(free_random_coords_around_center) > 0:
+            new_random_coord = random.choice(free_random_coords_around_center)
+        else:
+            qbit, new_random_coord = [x[0] for x in 
+                    self.random_coord_around_center(radius = int(radius + 2))] 
         return [qbit], [new_random_coord]
+    
+    
+    @staticmethod
+    def neighbours(x, y):
+        return [(x, y+1), (x+1, y+1), (x+1, y), (x+1, y-1), (x, y-1), (x-1, y-1), (x-1, y), (x-1, y+1)]
         
         
+    def free_neighbour_coords(
+        self,
+    ):
+        """
+        return list of all free neighbours for all qbits
+        """
+        neighbour_list = []
+        qbit_coords = self.polygon.qbit_coord_dict.values()
+
+        for qbit_coord in qbit_coords: 
+            neighbour_list += MC.neighbours(*qbit_coord)
+        neighbour_list = list(
+            set(neighbour_list) - set(qbit_coords)) 
+        return neighbour_list
+    
+    def random_coord_next_to_core(
+            self,
+            qbit: tuple=None,
+            ):
+        """
+        generate random coord next to core (fixed qbits)
+        for random movable qbit
+        """
+        if qbit is None:
+            qbit = random.choice(self.movable_qbits)
+        new_coord = random.choice(self.free_neighbour_coords())
+        return [qbit], [new_coord]
+         
     def swap_qbits(self):
         qbit_coords = self.polygon.qbit_coord_dict
         qbit1, qbit2 = random.sample(self.movable_qbits, 2)
-        return [qbit1, qbit2], [qbit_coords[qbit1], qbit_coords[qbit2]]    
+        return [qbit1, qbit2], [qbit_coords[qbit2], qbit_coords[qbit1]]    
 
+    # TODO: check if this is working 
     def swap_lines_in_core(
             self,
             U: list,
@@ -76,7 +115,6 @@ class MC():
             i, j = random.sample(range(len(V)), 2)
             V[i], V[j] = V[j], V[i]
         #swap two random elements in part
-
         core_qbits, core_coords = core.qbits_and_coords_of_core(U, V)
         return core_qbits, core_coords
 
@@ -104,13 +142,16 @@ class MC():
         self.current_qbit_coords = deepcopy(self.polygon.qbit_coord_dict)
         current_energy = self.energy(self.polygon, factors=self.factors)
         if operation == 'contract':
-            qbits, coords = self.generate_new_coord_for_qbit()
+            qbits, coords = self.random_coord_around_center()
         if operation == 'swap':
             qbits, coords = self.swap_qbits()
         if operation == 'relable':
             qbits, coords = self.relabel_lbits()
         if operation == 'swap_lines_in_core':
             qbits, coords = self.swap_lines_in_core(U, V)
+        if operation == 'grow_core':
+            qbits, coords = self.random_coord_next_to_core()
+        print(qbits, coords)
         self.polygon.update_qbits_coords(qbits, coords)
         new_energy = self.energy(self.polygon, factors=self.factors)
         return current_energy, new_energy
