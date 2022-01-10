@@ -178,7 +178,7 @@ class Polygons():
         return unit_square_coords
 
 
-    def visualize(self, ax, polygon_coords):
+    def visualize(self, ax, polygon_coords, zoom=1):
         x, y = np.meshgrid(np.arange(self.K), np.arange(self.K))
         ax.scatter(x.flatten(), y.flatten(), color='grey', s=0.6)
         ax.set_yticklabels([])
@@ -200,8 +200,8 @@ class Polygons():
             ax.scatter(*coord, color='red')
         x_range = sorted(self.convex_hull(), key=lambda x: x[0])
         y_range = sorted(self.convex_hull(), key=lambda y: y[1])
-        ax.set_xlim(min(x_range[0][0], y_range[0][1])-1,
-                  max(x_range[-1][0], y_range[-1][1])+1)
-        ax.set_ylim(min(x_range[0][0], y_range[0][1])-1,
-                  max(x_range[-1][0], y_range[-1][1])+1)
+        ax.set_xlim(min(x_range[0][0], y_range[0][1])-zoom,
+                  max(x_range[-1][0], y_range[-1][1])+zoom)
+        ax.set_ylim(min(x_range[0][0], y_range[0][1])-zoom,
+                  max(x_range[-1][0], y_range[-1][1])+zoom)
         return ax
