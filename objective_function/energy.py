@@ -16,8 +16,11 @@ class Energy(Polygons):
             self,
             polygon_object: Polygons,
             ):
-        self.N = polygon_object.N
-        self.K, self.C = polygon_object.K, polygon_object.C
+        self.N, self.K, self.C = (
+                polygon_object.N,
+                polygon_object.K,
+                polygon_object.C,
+                )
         #self.qbit_coords = list(polygon_object.qbit_coord_dict.keys())
         self.scaling_for_plaq3 = self.scaling_factors_LHZ(3)
         self.scaling_for_plaq4 = self.scaling_factors_LHZ(4)
@@ -46,7 +49,7 @@ class Energy(Polygons):
     def distance_to_plaquette(self):
         """
         return: list, each entry represents the closeness of a polygon 
-        to plaquette (square or triangle)
+        to plaquette (square or triangle), which is zero if the plaquette is found
         """
         return [self.is_unit_square(coord) if len(coord)==4 
                 else self.is_unit_triangle(coord) for coord in self.polygon_coords]
@@ -54,7 +57,8 @@ class Energy(Polygons):
     def scaled_distance_to_plaquette(self):
         """
         return: list, each entry represents the closeness of a polygon 
-        to plaquette (square or triangle)
+        to plaquette (square or triangle), which is minus the the sacling factor
+        LHZ (Wolfgangs Idee)
         """
         distances = []
         for coord in self.polygon_coords:
@@ -112,13 +116,14 @@ class Energy(Polygons):
             constant_for_exp: float=1.,
             factors: list=[1., 1., 1., 1.]):
         area, scope, compact, n_plaq = factors
-        self.polygon_coords = polygon_object.get_all_polygon_coords()
-#         list_of_plaquettes = self.distance_to_plaquette()
-#         polygon_weights = self.polygon_weights(list_of_plaquettes)
-        list_of_plaquettes =self.scaled_distance_to_plaquette()
+#        self.polygon_coords = polygon_object.get_all_polygon_coords()
+        self.polygon_coords = polygon_object.polygons_outside_core()
+        list_of_plaquettes = self.distance_to_plaquette()
+        polygon_weights = self.polygon_weights(list_of_plaquettes)
+#         list_of_plaquettes =self.scaled_distance_to_plaquette()
         energy = (
-#               + n_plaq * np.dot(np.array(list_of_plaquettes), polygon_weights) 
-                self.exp_factor(constant_for_exp) * sum(list_of_plaquettes)
+              + n_plaq * np.dot(np.array(list_of_plaquettes), polygon_weights) 
+#                 self.exp_factor(constant_for_exp) * sum(list_of_plaquettes)
               )
         return energy
 
