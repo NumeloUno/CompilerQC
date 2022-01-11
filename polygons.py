@@ -1,7 +1,7 @@
 import numpy as np
 import itertools
 from matplotlib import pyplot as plt
-from shapely.geometry import Point, Polygon, MultiPoint, MultiLineString
+from shapely.geometry import Point, Polygon, MultiPoint, MultiLineString, LineString
 from shapely.ops import polygonize
 from shapely import wkt
 from CompilerQC import Graph
@@ -10,8 +10,9 @@ class Polygons():
 
     def __init__(self,
                  logical_graph: Graph,
+                 core_qbits: list=[],
                  qbit_coord_dict: dict=None,
-                 cycles: list=None
+                 cycles: list=None,
                  ):
         """
         logical_graph: logical graph with N nodes and K edges
@@ -27,8 +28,12 @@ class Polygons():
             cycles = (logical_graph.get_cycles(3)
                     + logical_graph.get_cycles(4))
         self.polygons = self.get_all_polygons(cycles)
+        self.movable_qbits = list(
+            set(self.qbit_coord_dict.keys()) - set(core_qbits)
+        )
+        self.core_qbits = core_qbits
 
-
+    # TODO: if qbit not in qbits, raise error   
     def update_qbits_coords(
             self,
             qbits: list,
@@ -41,14 +46,14 @@ class Polygons():
         this qbit is moved to the max coord + (1, 0)
         """
         for qbit, new_coord in zip(qbits, new_coords):
-           qbit_coords =  self.qbit_coord_dict.values()
-           if new_coord in qbit_coords:
-               qbit_to_move = dict(zip(
+            qbit_coords =  self.qbit_coord_dict.values()
+            if new_coord in qbit_coords:
+                qbit_to_move = dict(zip(
                     self.qbit_coord_dict.values(),
                     self.qbit_coord_dict.keys()))[new_coord]
-               self.qbit_coord_dict[qbit_to_move] = tuple(
+                self.qbit_coord_dict[qbit_to_move] = tuple(
                        np.add(max(qbit_coords), (1, 0)))
-           self.qbit_coord_dict[qbit] = new_coord
+            self.qbit_coord_dict[qbit] = new_coord
 
 
     @classmethod
@@ -117,7 +122,10 @@ class Polygons():
         """
         measure closeness to plaquette
         """
-        return Polygons.polygon_length(polygon_coord) - 4
+        scope = [LineString([*x]).length
+                for x in itertools.combinations(
+                    polygon_coord, 2)]
+        return sum(scope) - (4 + 2 * np.sqrt(2))
 
 
     @staticmethod
@@ -128,18 +136,72 @@ class Polygons():
         return Polygons.polygon_length(polygon_coord) - (2 + np.sqrt(2))
 
 
-    def convex_hull(self):
+    @staticmethod
+    def neighbours(coords: tuple):
+        x, y = coords
+        return [(x, y+1), (x+1, y+1), (x+1, y), (x+1, y-1), (x, y-1), (x-1, y-1), (x-1, y), (x-1, y+1)]
+
+    def inside_core_coords(
+            self,
+            core_coords: list=None,
+            ):
         """
-        return envelop polygon of all qbits
+        input: list of coords, which build the core,
+        return: list of coords which are inside the core, 
+        not at the edge of it
         """
-        qbit_coords = list(self.qbit_coord_dict.values())
+        if core_coords is None:
+            core_coords = [c for q, c in self.qbit_coord_dict.items()
+                    if q in self.core_qbits]
+        neighbour_coords = map(Polygons.neighbours, core_coords)
+        is_inside_core = list(
+                map(lambda s: set(s).issubset(core_coords),
+                    neighbour_coords)
+                )
+        inside_coords = list(
+                itertools.compress(core_coords, is_inside_core)
+                )
+        return inside_coords
+    
+    def polygons_outside_core(
+            self,
+            core_coords: list=None,
+            ):
+        """
+        input: list of coords, which build the core,
+        returns all polygons which are not connected to 
+        coords inside the core
+        """
+        inside_coords = self.inside_core_coords(core_coords)
+        return [coords for coords in self.get_all_polygon_coords()
+         if set(coords).isdisjoint(inside_coords)]
+            
+
+
+    def convex_hull(
+            self,
+            qbit_coords: list=None
+            ):
+        """
+        return envelop polygon of qbit_coords, if 
+        qbit_coords are None, all qbits coords are considered
+        """
+        if qbit_coords is None:
+            qbit_coords = list(self.qbit_coord_dict.values())
         qbits = MultiPoint(qbit_coords)
         envelop_polygon = qbits.convex_hull
         return list(envelop_polygon.exterior.coords)
 
 
-    def center_of_convex_hull(self):
-        center = Polygon(self.convex_hull()).centroid
+    def center_of_convex_hull(
+            self,
+            qbit_coords: list=None,
+            ):
+        """
+        return center coords of enevelop of qbit_coords,
+        if None, all qbits are considered
+        """
+        center = Polygon(self.convex_hull(qbit_coords)).centroid
         return (center.x, center.y) 
 
 
