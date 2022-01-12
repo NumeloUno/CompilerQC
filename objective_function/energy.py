@@ -21,7 +21,6 @@ class Energy(Polygons):
                 polygon_object.K,
                 polygon_object.C,
                 )
-        #self.qbit_coords = list(polygon_object.qbit_coord_dict.keys())
         self.scaling_for_plaq3 = self.scaling_factors_LHZ(3)
         self.scaling_for_plaq4 = self.scaling_factors_LHZ(4)
 
@@ -36,14 +35,6 @@ class Energy(Polygons):
         """
         return np.load(os.path.join(path_to_scaling_factors,
            f"scaling_factors_LHZ{number}.npy"))
-
-
-    def scopes_of_polygons(self):
-        return list(map(self.polygon_length, self.polygon_coords))
-
-
-    def area_of_polygons(self):
-        return list(map(self.polygon_area, self.polygon_coords))
 
 
     def distance_to_plaquette(self):
@@ -82,33 +73,11 @@ class Energy(Polygons):
         return (1 - np.exp(constant * (number_of_found_plaqs - self.C)))
     
 
-    def intersection_array(self):
+    # TODO: complete tis function
+    def same_lbits_on_line(self):
         """
-        return: unit square polygon which intersects with qbit layout
+        reward bipartite lines are found
         """
-        unit_square_grid = self.get_grid_of_unit_squares(self.K)
-        intersects = list(map(lambda x: Polygon(self.envelop_polygon).intersects(Polygon(x)),
-            unit_square_grid))
-        touches = list(map(lambda x: Polygon(self.envelop_polygon).touches(Polygon(x)),
-            unit_square_grid))
-        intersected_unit_square = np.logical_xor(intersects, touches)
-        return np.reshape(intersected_unit_square, (self.K - 1, self.K - 1))
-
-
-    def number_of_non_plaquette_neighbours(self):
-        """ from 69962789 stackoverflow """
-        matrix = self.intersection_array().astype(int)
-        matrix = np.pad(matrix, 1, mode='constant')
-        kernel = np.array([[ 0, -1,  0],
-                           [-1,  4, -1],
-                           [ 0, -1,  0]])
-        return np.sum(np.where(convolve(matrix, kernel) < 0, 1, 0))
-
-
-    # TODO: complete tis function, actually this term is automatically fullfiled by the algo
-    def distance_btw_pqbits(self):
-        pass
-
         
     def __call__(
             self,
