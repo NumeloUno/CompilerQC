@@ -126,7 +126,6 @@ class MC():
         distances = list(map(lambda coord: 
                         LineString([core_center, coord]).length,
                         movable_coords))
-        print([distances.index(max(distances))])
         most_distand_qbit = movable_coords[distances.index(max(distances))]
         # TODO: add variance of distances, if small --> return None
         return [qbit for qbit, coord in self.polygon.qbit_coord_dict.items()
