@@ -122,11 +122,11 @@ class Polygons():
         """
         measure closeness to plaquette
         """
-        scope = [LineString([*x]).length
-                for x in itertools.combinations(
-                    polygon_coord, 2)]
-        return sum(scope) - (4 + 2 * np.sqrt(2))
-
+#         scope = [LineString([*x]).length
+#                 for x in itertools.combinations(
+#                     polygon_coord, 2)]
+#         return sum(scope) - (4 + 2 * np.sqrt(2))
+        return Polygons.polygon_length(polygon_coord) - 4
 
     @staticmethod
     def is_unit_triangle(polygon_coord):
