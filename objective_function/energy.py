@@ -16,11 +16,9 @@ class Energy(Polygons):
             self,
             polygon_object: Polygons,
             ):
-        self.N, self.K, self.C = (
-                polygon_object.N,
-                polygon_object.K,
-                polygon_object.C,
-                )
+        self.N = polygon_object.N
+        self.K = polygon_object.K 
+        self.C = polygon_object.C
         self.scaling_for_plaq3 = self.scaling_factors_LHZ(3)
         self.scaling_for_plaq4 = self.scaling_factors_LHZ(4)
 
