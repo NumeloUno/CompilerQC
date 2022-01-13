@@ -10,7 +10,7 @@ class Polygons():
 
     def __init__(self,
                  logical_graph: Graph,
-                 core_qbit_coord_dict: dict=dict(),
+                 core_bipartite_sets: list=[[],[]],
                  ):
         """
         logical_graph: logical graph with N nodes and K edges
@@ -24,15 +24,39 @@ class Polygons():
         self.polygons = self.get_all_polygons(cycles)
         self.qbit_coord_dict = self.init_coords_for_qbits()
         # define qbits and their coords for core and outside core
+        self.U, self.V = core_bipartite_sets
+        core_qbit_coord_dict = self.core_qbits_and_coords_from_sets(
+            self.U,
+            self.V,
+        )
         self.core_qbits = list(core_qbit_coord_dict.keys())
-        self.movable_qbits = list(set(self.qbits) - set(core_qbits))
+        self.movable_qbits = list(set(self.qbits) - set(self.core_qbits))
         self.movable_coords = [
-            self.qbit_coord_dict[qbit] for qbit in self.movable_coords
+            self.qbit_coord_dict[qbit] for qbit in self.movable_qbits
         ]
-        self.core_coords = core_coords
-        self.update_qbits_coords(core_qbits, core_coords)
+        self.core_coords = list(core_qbit_coord_dict.values())
+        self.update_qbits_coords(self.core_qbits, self.core_coords)
 
-
+    @staticmethod
+    def core_qbits_and_coords_from_sets(
+            U: list,
+            V: list,
+            ):
+        """
+        input: two sets of logical bits, generating the
+        complete bipartite graph
+        return: list of qbits and their coords
+        which build the core of the physical graph
+        """
+        # coords
+        x, y = np.meshgrid(np.arange(len(U)), np.arange(len(V)))
+        coords = list(zip(x.flatten(), y.flatten()))
+        # qbits
+        lbit1, lbit2 = np.meshgrid(U, V)
+        qbits = list(zip(lbit1.flatten(), lbit2.flatten()))
+        sorted_qbits = list(map(tuple, map(sorted, qbits)))
+        return dict(zip(sorted_qbits, coords))
+    
     # TODO: if qbit not in qbits, raise error   
     def update_qbits_coords(
             self,
@@ -50,12 +74,35 @@ class Polygons():
             if new_coord in qbit_coords:
                 qbit_to_move = dict(zip(
                     self.qbit_coord_dict.values(),
-                    self.qbit_coord_dict.keys()))[new_coord]
-                self.qbit_coord_dict[qbit_to_move] = tuple(
+                    self.qbit_coord_dict.keys())
+                                   )[new_coord]
+                move_to_coord = tuple(
                        np.add(max(qbit_coords), (1, 0)))
+                self.qbit_coord_dict[qbit_to_move] = move_to_coord
+                self.update_core_and_movable_coords(
+                    qbit_to_move, move_to_coord)
             self.qbit_coord_dict[qbit] = new_coord
+            self.update_core_and_movable_coords(qbit, new_coord)
 
 
+    def update_core_and_movable_coords(
+        self,
+        qbit: tuple,
+        new_coord: tuple,
+    ):
+        """
+        update core_coords or movable_coords
+        """
+        if qbit in self.core_qbits:
+            self.core_coords[
+                self.core_qbits.index(
+                    qbit)] = new_coord
+        elif qbit in self.movable_qbits:
+            self.movable_coords[
+                self.movable_qbits.index(
+                    qbit)] = new_coord
+        else:
+            raise AssertionError("qbit is neither in the core nor in the movable part", qbit)
     @classmethod
     def get_polygon_from_cycle(
             self,
