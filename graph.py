@@ -35,13 +35,13 @@ class Graph():
         """
         self.visited[node] = True
         if n == 0:
-            if self.adj_matrix[node][start_node] == 1:
+            if self.adj_matrix[node][start_node]:
                 self.count += 1
                 self.paths.append(path)
             self.visited[node] = False
             return
         for new_node in range(self.N):
-            if self.visited[new_node] == False and self.adj_matrix[node][new_node] == 1:
+            if not self.visited[new_node] and self.adj_matrix[node][new_node]:
                 next_path = path[:]
                 next_path.append(new_node)
                 self.DFS(n-1, new_node, start_node, next_path)
@@ -102,8 +102,8 @@ class Graph():
 
 
     @classmethod
-    def fully(cls, n):
-        """ generates fully connected graph with n nodes"""
+    def complete(cls, n):
+        """ generates complete connected graph with n nodes"""
         return cls(np.ones((n,n)) - np.identity(n))
 
 
