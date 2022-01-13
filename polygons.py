@@ -10,28 +10,28 @@ class Polygons():
 
     def __init__(self,
                  logical_graph: Graph,
-                 core_qbits: list=[],
-                 qbit_coord_dict: dict=None,
-                 cycles: list=None,
+                 core_qbit_coord_dict: dict=dict(),
                  ):
         """
         logical_graph: logical graph with N nodes and K edges
         """
         self.qbits = logical_graph.qbits_from_graph()
         self.N = logical_graph.N
-        self.K = logical_graph.K 
+        self.K = logical_graph.K
         self.C = logical_graph.C
-        self.qbit_coord_dict = qbit_coord_dict
-        if qbit_coord_dict is None:
-            self.qbit_coord_dict = self.init_coords_for_qbits()
-        if cycles is None:
-            cycles = (logical_graph.get_cycles(3)
-                    + logical_graph.get_cycles(4))
+        cycles = (logical_graph.get_cycles(3)
+                  + logical_graph.get_cycles(4))
         self.polygons = self.get_all_polygons(cycles)
-        self.movable_qbits = list(
-            set(self.qbit_coord_dict.keys()) - set(core_qbits)
-        )
-        self.core_qbits = core_qbits
+        self.qbit_coord_dict = self.init_coords_for_qbits()
+        # define qbits and their coords for core and outside core
+        self.core_qbits = list(core_qbit_coord_dict.keys())
+        self.movable_qbits = list(set(self.qbits) - set(core_qbits))
+        self.movable_coords = [
+            self.qbit_coord_dict[qbit] for qbit in self.movable_coords
+        ]
+        self.core_coords = core_coords
+        self.update_qbits_coords(core_qbits, core_coords)
+
 
     # TODO: if qbit not in qbits, raise error   
     def update_qbits_coords(
@@ -122,11 +122,11 @@ class Polygons():
         """
         measure closeness to plaquette
         """
-#         scope = [LineString([*x]).length
-#                 for x in itertools.combinations(
-#                     polygon_coord, 2)]
-#         return sum(scope) - (4 + 2 * np.sqrt(2))
-        return Polygons.polygon_length(polygon_coord) - 4
+        scope = [LineString([*x]).length
+                for x in itertools.combinations(
+                    polygon_coord, 2)]
+        return sum(scope) - (4 + 2 * np.sqrt(2))
+#        return Polygons.polygon_length(polygon_coord) - 4
 
     @staticmethod
     def is_unit_triangle(polygon_coord):
@@ -141,38 +141,27 @@ class Polygons():
         x, y = coords
         return [(x, y+1), (x+1, y+1), (x+1, y), (x+1, y-1), (x, y-1), (x-1, y-1), (x-1, y), (x-1, y+1)]
 
-    def inside_core_coords(
-            self,
-            core_coords: list=None,
-            ):
+    def inside_core_coords(self):
         """
-        input: list of coords, which build the core,
         return: list of coords which are inside the core, 
         not at the edge of it
         """
-        if core_coords is None:
-            core_coords = [c for q, c in self.qbit_coord_dict.items()
-                    if q in self.core_qbits]
-        neighbour_coords = map(Polygons.neighbours, core_coords)
+        neighbour_coords = map(Polygons.neighbours, self.core_coords)
         is_inside_core = list(
-                map(lambda s: set(s).issubset(core_coords),
+                map(lambda s: set(s).issubset(self.core_coords),
                     neighbour_coords)
                 )
         inside_coords = list(
-                itertools.compress(core_coords, is_inside_core)
+                itertools.compress(self.core_coords, is_inside_core)
                 )
         return inside_coords
     
-    def polygons_outside_core(
-            self,
-            core_coords: list=None,
-            ):
+    def polygons_outside_core(self):
         """
-        input: list of coords, which build the core,
         returns all polygons which are not connected to 
         coords inside the core
         """
-        inside_coords = self.inside_core_coords(core_coords)
+        inside_coords = self.inside_core_coords()
         return [coords for coords in self.get_all_polygon_coords()
          if set(coords).isdisjoint(inside_coords)]
             
@@ -205,6 +194,21 @@ class Polygons():
         return (center.x, center.y) 
 
 
+    def qbit_distances_to_center(
+            self,
+            qbit_coords: list=None,
+            ):
+        """
+        list of distances for each qbit to center of qbit_coords,
+        could e.g be the core_coords --> core_center
+        """
+        center = self.center_of_convex_hull(qbit_coords)
+        if qbit_coords is None:
+            qbit_coords = self.qbit_coord_dict.values()
+        distances = list(map(lambda x: Point(center).distance(Point(x)), qbit_coords))
+        return distances
+
+    
     def move_center_to_middle(self):
         """
         calculates the CoM of the convex hull
@@ -213,18 +217,11 @@ class Polygons():
         center_x, center_y = map(int, self.center_of_convex_hull())
         middle_x = middle_y = self.K // 2
         move_x, move_y = center_x - middle_x, center_y - middle_y
-        qbits = list(self.qbit_coord_dict.keys())
         new_coords = [(coord[0] - move_x, coord[1] - move_y)
                 for coord in self.qbit_coord_dict.values()]
-        self.update_qbits_coords(qbits, new_coords)
+        self.update_qbits_coords(self.qbits, new_coords)
 
-
-    def qbit_distances_to_center(self):
-        center = self.center_of_convex_hull()
-        qbit_coords = self.qbit_coord_dict.values()
-        distances = list(map(lambda x: Point(center).distance(Point(x)), qbit_coords))
-        return distances
-
+        
 
     @staticmethod
     def get_grid_of_unit_squares(grid_length):
