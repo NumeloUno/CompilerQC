@@ -82,19 +82,23 @@ class Energy(Polygons):
     def __call__(
             self,
             polygon_object,
-            constant_for_exp: float=1.,
-            factors: list=[1., 1., 1., 1.]):
-        area, scope, compact, n_plaq = factors
-#        self.polygon_coords = polygon_object.get_all_polygon_coords()
-        self.polygon_coords = polygon_object.polygons_outside_core()
-        list_of_plaquettes = self.distance_to_plaquette()
-        polygon_weights = self.polygon_weights(list_of_plaquettes)
-#         list_of_plaquettes =self.scaled_distance_to_plaquette()
-        energy = (
-              + n_plaq * np.dot(np.array(list_of_plaquettes), polygon_weights) 
-#                 self.exp_factor(constant_for_exp) * sum(list_of_plaquettes)
-              )
-        return energy
+            terms: list=[1., 0., 1.]):
+        (
+                ignore_inside_polygons,
+                scaled_wolfgang,
+                polygon_weigth,
+                ) = terms 
+        if ignore_inside_polygons:
+            self.polygon_coords = polygon_object.polygons_outside_core()
+        else:
+            self.polygon_coords = polygon_object.get_all_polygon_coords()
+        if scaled_wolfgang:
+            list_of_plaquettes =self.scaled_distance_to_plaquette()
+            return sum(list_of_plaquettes)
+        if polygon_weigth:
+            list_of_plaquettes = self.distance_to_plaquette()
+            polygon_weights = self.polygon_weights(list_of_plaquettes)
+            return np.dot(np.array(list_of_plaquettes), polygon_weights) 
 
 
 class Energy_landscape():
