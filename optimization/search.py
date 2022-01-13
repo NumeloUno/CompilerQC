@@ -13,12 +13,13 @@ class MC():
             self,
             polygon_object: Polygons,
             temperature: float,
+            UV: list=None,
             ):
         self.energy = Energy(polygon_object)
         self.polygon = polygon_object
         self.temperature = temperature
-        self.factors = [1, 1, 1, 1]
-
+        self.terms=[1, 0, 1]
+        self.UV = UV
 
     def random_coord_around_core_center(
             self,
@@ -32,11 +33,11 @@ class MC():
         """
         if qbit is None:
             qbit = random.choice(self.polygon.movable_qbits)
-        core_qbit_coords = [self.polygon.qbit_coord_dict[qbit]
+        core_coords = [self.polygon.qbit_coord_dict[qbit]
                 for qbit in self.polygon.core_qbits]
         center_x, center_y = map(int, 
                 self.polygon.center_of_convex_hull(
-                    core_qbit_coords)
+                    core_coords)
                 )
         if radius is None:
             radius = round(np.sqrt(self.polygon.C))
@@ -81,9 +82,8 @@ class MC():
         generate random coord next to core (fixed qbits)
         for random movable qbit
         """
-        core_coords = [c for q, c in
-                self.polygon.qbit_coord_dict.items() 
-                if q in self.polygon.core_qbits]
+        core_coords = [self.polygon.qbit_coord_dict[qbit]
+                for qbit in self.polygon.core_qbits]
         if qbit is None:
             qbit = random.choice(self.polygon.movable_qbits)
         new_coord = random.choice(self.free_neighbour_coords(
@@ -96,14 +96,14 @@ class MC():
         qbit1, qbit2 = random.sample(self.polygon.movable_qbits, 2)
         return [qbit1, qbit2], [qbit_coords[qbit2], qbit_coords[qbit1]]    
 
-    # TODO: could be that a, b not in core if not LHZ!
     def swap_lines_in_core(
             self,
             ):
         """
-        swap two logical nodes or only in core -> swap lines
+        swap two logical nodes(from set U or V) only in core -> swap lines
         """
-        a, b = random.sample(range(0, self.polygon.N), 2)
+        U_or_V = random.sample(self.UV, 1)[0]
+        a, b = random.sample(U_or_V, 2)
         n = self.polygon.core_qbits
         n = [(-1,  k) if i== a else (i, k) for i, k in n]
         n = [( i, -1) if k== a else (i, k) for i, k in n]
@@ -112,14 +112,14 @@ class MC():
         n = [( b,  k) if i==-1 else (i, k) for i, k in n]
         swapped_core_qbits = [( i,  b) if k==-1 else (i, k) for i, k in n]
         sorted_swapped_core_qbits = list(
-                map(lambda x: tuple(sorted(x)), new_qbits))
-        core_coords = [c for q, c in self.polygon.qbit_coord_dict.items()
-                if q in self.polygon.core_qbits]
+                map(lambda x: tuple(sorted(x)), swapped_core_qbits))
+        core_coords = [self.polygon.qbit_coord_dict[qbit]
+                for qbit in self.polygon.core_qbits]
         return sorted_swapped_core_qbits, core_coords
                       
     def most_distant_qbit_from_core(self):
-        core_coords = [c for q, c in self.polygon.qbit_coord_dict.items()
-                if q in self.polygon.core_qbits]
+        core_coords = [self.polygon.qbit_coord_dict[qbit]
+                for qbit in self.polygon.core_qbits]
         core_center = self.polygon.center_of_convex_hull(core_coords)
         movable_coords = [coord for qbit, coord in 
                 self.polygon.qbit_coord_dict.items()]
@@ -137,18 +137,18 @@ class MC():
             operation: str,
             ):
         self.current_qbit_coords = deepcopy(self.polygon.qbit_coord_dict)
-        current_energy = self.energy(self.polygon, factors=self.factors)
-        qbit = self.most_distant_qbit_from_core()[0]
+        current_energy = self.energy(self.polygon, terms=self.terms)
+        #qbit = self.most_distant_qbit_from_core()[0]
         if operation == 'contract':
-            qbits, coords = self.random_coord_around_core_center(qbit)
+            qbits, coords = self.random_coord_around_core_center()
         if operation == 'swap':
             qbits, coords = self.swap_qbits()
         if operation == 'swap_lines_in_core':
             qbits, coords = self.swap_lines_in_core()
         if operation == 'grow_core':
-            qbits, coords = self.random_coord_next_to_core(qbit)
+            qbits, coords = self.random_coord_next_to_core()
         self.polygon.update_qbits_coords(qbits, coords)
-        new_energy = self.energy(self.polygon, factors=self.factors)
+        new_energy = self.energy(self.polygon, terms=self.terms)
         return current_energy, new_energy
 
     
@@ -180,6 +180,5 @@ class MC():
             delta_energy = self.metropolis(current_energy, new_energy)
             #if i % 100 == 0:
             #    self.polygon.move_center_to_middle()
-            return delta_energy
-                
+        #return delta_enerfy_list
                       
