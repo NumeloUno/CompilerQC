@@ -11,13 +11,19 @@ from shapely.geometry import LineString
 class MC:
     def __init__(
         self,
-        polygon_object: Polygons,
-        temperature: float = 1.0,
+        energy_object: Energy,
+        temperatur_schedule: str = "1 / x",
+        acceptance: str = "np.exp(- x / y)",
+        n_moves: int = 100,
+        schedule: dict = {},
     ):
-        self.energy = Energy(polygon_object)
-        self.polygon = polygon_object
-        self.temperature = temperature
-        self.terms = [1, 0, 1]
+        self.energy = energy_object
+        self.polygon = energy_object.polygon
+        self.temperatur_schedule = temperatur_schedule
+        self.acceptance = acceptance
+        self.schedule = schedule
+        self.n_total_steps = 0
+        self.n_moves = n_moves
 
     def random_coord_around_core_center(
         self,
@@ -40,6 +46,8 @@ class MC:
         y = np.arange(center_y - radius, center_y + radius)
         x, y = np.meshgrid(x, y)
         random_coords_around_center = list(zip(x.flatten(), y.flatten()))
+        self.random_coords_around_center = random_coords_around_center
+
         np.random.shuffle(random_coords_around_center)
         qbit_coords = self.polygon.qbit_coord_dict.values()
         free_random_coords_around_center = list(
@@ -102,7 +110,9 @@ class MC:
         sorted_swapped_core_qbits = list(
             map(lambda x: tuple(sorted(x)), swapped_core_qbits)
         )
-        return sorted_swapped_core_qbits, self.polygon.core_coords
+        # detach core_coords from class
+        core_coords = [coord for coord in self.polygon.core_coords]
+        return sorted_swapped_core_qbits, core_coords
 
     def most_distant_qbit_from_core(self):
         core_center = self.polygon.center_of_convex_hull(self.polygon.core_coords)
@@ -124,8 +134,8 @@ class MC:
         self,
         operation: str,
     ):
-        self.current_qbit_coords = deepcopy(self.polygon.qbit_coord_dict)
-        current_energy = self.energy(self.polygon, terms=self.terms)
+        self.current_polygon = deepcopy(self.polygon)
+        current_energy = self.energy(self.polygon)
         # qbit = self.most_distant_qbit_from_core()[0]
         if operation == "contract":
             qbits, coords = self.random_coord_around_core_center()
@@ -136,22 +146,23 @@ class MC:
         if operation == "grow_core":
             qbits, coords = self.random_coord_next_to_core()
         self.polygon.update_qbits_coords(qbits, coords)
-        new_energy = self.energy(self.polygon, terms=self.terms)
+        new_energy = self.energy(self.polygon)
         return current_energy, new_energy
 
-    def update_temperature(self, temperature: float = None):
-        if temperature is None:
-            num_of_found_plaqs = self.energy.distance_to_plaquette().count(0)
-            still_to_find = self.polygon.C - num_of_found_plaqs
-            temperature = still_to_find * 0.001  # this factor seems to have an effect
-        self.temperature = temperature
+    def temperature(self, k: int=None):
+        if k is None:
+            k = self.n_total_steps
+        temperatur = lambda x: eval(str(self.temperatur_schedule))
+        return temperatur(k) + 1e-5
 
     def metropolis(self, current_energy, new_energy):
+        self.n_total_steps += 1
         delta_energy = new_energy - current_energy
-        if random.random() < min([1, np.exp(-delta_energy / self.temperature)]):
+        acceptance_probability = lambda x, y: eval(str(self.acceptance))
+        if random.random() < min([1, acceptance_probability(delta_energy, self.temperature())]):
             pass
         else:
-            self.polygon.qbit_coord_dict = self.current_qbit_coords
+            self.polygon = self.current_polygon
         return delta_energy
 
     def apply(
@@ -163,4 +174,14 @@ class MC:
             current_energy, new_energy = self.step(operation)
             delta_energy = self.metropolis(current_energy, new_energy)
         # update polygon in energy
-        self.energy(self.polygon, terms=self.terms)
+        self.energy(self.polygon)
+
+    def optimization_schedule(
+            self,
+            ):
+        """
+        schedule is a dict = {operation:n_steps}
+        set schedule for the optimization
+        """
+        for operation, n_steps in self.schedule.items():
+            self.apply(operation, n_steps)
