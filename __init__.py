@@ -1,3 +1,4 @@
+from . import paths
 from .graph import Graph
 from .polygons import Polygons
 from . import core

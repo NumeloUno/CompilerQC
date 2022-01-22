@@ -5,6 +5,8 @@ from scipy.ndimage import convolve
 from itertools import combinations, permutations
 from CompilerQC import Graph
 import os.path
+from copy import deepcopy
+
 
 homedir = os.path.expanduser("~/UniInnsbruck/")
 path_to_scaling_factors = os.path.join(
@@ -17,9 +19,7 @@ class Energy(Polygons):
         self,
         polygon_object: Polygons,
     ):
-        self.N = polygon_object.N
-        self.K = polygon_object.K
-        self.C = polygon_object.C
+        self.polygon = polygon_object
         self.scaling_for_plaq3 = self.scaling_factors_LHZ(3)
         self.scaling_for_plaq4 = self.scaling_factors_LHZ(4)
 
@@ -48,6 +48,28 @@ class Energy(Polygons):
             for coord in self.polygon_coords
         ]
 
+    def arbitrary_scaled_distance_to_plaqutte(self):
+        """
+        return four lists (non 3_plaqs, non 4_plaqs,
+        3_plaqs, 4_plaqs)
+        """
+        non_plaqs_3, non_plaqs_4 = [], []
+        plaqs_3, plaqs_4 = [], []
+        for coord in self.polygon_coords:
+            if len(coord) == 4:
+                distance = self.is_unit_square(coord)
+                if distance == 0:
+                    plaqs_3.append(distance)
+                else: 
+                    non_plaqs_3.append(distance)
+            if len(coord) == 4:
+                distance = self.is_unit_triangle(coord)
+                if distance == 0:
+                    plaqs_4.append(distance)
+                else:
+                    non_plaqs_4.append(distance)
+        return non_plaqs_3, non_plaqs_4, plaqs_3, plaqs_4
+
     def scaled_distance_to_plaquette(self):
         """
         return: list, each entry represents the closeness of a polygon
@@ -59,11 +81,11 @@ class Energy(Polygons):
             if len(coord) == 4:
                 distance = self.is_unit_square(coord)
                 if distance == 0:
-                    distance -= self.scaling_for_plaq4[self.N - 4]
+                    distance -= self.scaling_for_plaq4[self.polygon.N - 4]
             if len(coord) == 3:
                 distance = self.is_unit_triangle(coord)
                 if distance == 0:
-                    distance -= self.scaling_for_plaq3[self.N - 4]
+                    distance -= self.scaling_for_plaq3[self.polygon.N - 4]
             distances.append(distance)
         return distances
 
@@ -72,7 +94,7 @@ class Energy(Polygons):
         if all C plaqs has been found, energy is scaled down to 0
         """
         number_of_found_plaqs = self.distance_to_plaquette().count(0)
-        return 1 - np.exp(constant * (number_of_found_plaqs - self.C))
+        return 1 - np.exp(constant * (number_of_found_plaqs - self.polygon.C))
 
     # TODO: complete tis function
     def same_lbits_on_line(self):
@@ -95,7 +117,7 @@ class Energy(Polygons):
             return sum(list_of_plaquettes)
         if polygon_weigth:
             list_of_plaquettes = self.distance_to_plaquette()
-            polygon_weights = self.polygon_weights(list_of_plaquettes)
+            polygon_weights = self.polygon.polygon_weights(list_of_plaquettes)
             return np.dot(np.array(list_of_plaquettes), polygon_weights)
 
 
