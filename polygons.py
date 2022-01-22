@@ -25,7 +25,7 @@ class Polygons:
         self.qbit_coord_dict = self.init_coords_for_qbits()
         # define qbits and their coords for core and outside core
         self.U, self.V = core_bipartite_sets
-        core_qbit_coord_dict = self.core_qbits_and_coords_from_sets(
+        core_qbit_coord_dict = Polygons.core_qbits_and_coords_from_sets(
             self.U,
             self.V,
         )
@@ -69,6 +69,8 @@ class Polygons:
         if new_coord is already occupied by a qbit,
         this qbit is moved to the max coord + (1, 0)
         """
+        # copying the lists to detach them from class, otherwise lists are changed during loop
+        qbits, new_coords = qbits[:], new_coords[:]
         for qbit, new_coord in zip(qbits, new_coords):
             qbit_coords = self.qbit_coord_dict.values()
             if new_coord in qbit_coords:
@@ -254,6 +256,14 @@ class Polygons:
             for coord in self.qbit_coord_dict.values()
         ]
         self.update_qbits_coords(self.qbits, new_coords)
+        
+    def n_found_plaqs(self):
+        return [
+            self.is_unit_square(coord)
+            if len(coord) == 4
+            else self.is_unit_triangle(coord)
+            for coord in self.get_all_polygon_coords()
+        ].count(0)
 
     @staticmethod
     def get_grid_of_unit_squares(grid_length):
