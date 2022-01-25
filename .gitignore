@@ -1,9 +1,0 @@
-/.env
-/notebooks/Plots/*
-TODO.md
-__pycache__/
-*.ipynb
-.ipynb_checkpoints/
-*.swp
-test*.py
-*.pdf

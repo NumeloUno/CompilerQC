@@ -21,6 +21,8 @@ def evaluate_optimization(
         mc = update_mc(mc, mc_schedule)
         for repetition in range(mc.n_moves):
             mc.optimization_schedule()
+            if mc.polygon.n_found_plaqs() == mc.polygon.C:
+                break
         success_rate.append((mc.polygon.C - mc.polygon.n_found_plaqs()) == 0)
         if visualize:
             fig, ax = plt.subplots(ncols=1, figsize=(5, 5))
