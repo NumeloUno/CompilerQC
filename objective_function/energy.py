@@ -56,14 +56,14 @@ class Energy(Polygons):
         non_plaqs_3, non_plaqs_4 = [], []
         plaqs_3, plaqs_4 = [], []
         for coord in self.polygon_coords:
-            if len(coord) == 4:
-                distance = self.is_unit_square(coord)
+            if len(coord) == 3:
+                distance = self.is_unit_triangle(coord)
                 if distance == 0:
                     plaqs_3.append(distance)
                 else: 
                     non_plaqs_3.append(distance)
             if len(coord) == 4:
-                distance = self.is_unit_triangle(coord)
+                distance = self.is_unit_square(coord)
                 if distance == 0:
                     plaqs_4.append(distance)
                 else:
