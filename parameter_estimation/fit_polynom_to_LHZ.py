@@ -7,61 +7,6 @@ import os.path
 homedir = os.path.expanduser("~/UniInnsbruck/")
 pathset = os.path.join(homedir, "CompilerQC/parameter_estimation/parameters")
 
-# this function calculates the energy of LHZ analytically
-def scope_of_shapes(x, y, n):
-    """
-    x, y are the scopes of possible rectengulars you can draw in LHZ
-    N=4: xy 11
-    N=5: xy 11, 12, 21
-    ...
-
-    calculate the scope of the rectengular, the "triangular" and the "cross"
-    maybe I will add a sketch
-    """
-    n = n - 2
-    square = 2 * x + 2 * y
-    triangular = (
-        n
-        - (y - 1)
-        + n
-        - (x - 1)
-        + np.sqrt(y ** 2 + (n - (y - 1) - x) ** 2)
-        + np.sqrt(x ** 2 + (n - (x - 1) - y) ** 2)
-    )
-    cross = (
-        n
-        - (y - 1)
-        - x
-        + n
-        - (x - 1)
-        - y
-        + np.sqrt(y ** 2 + (n - (y - 1)) ** 2)
-        + np.sqrt(x ** 2 + (n - (x - 1)) ** 2)
-    )
-    return sum([triangular, square, cross]) - 3 * 4
-
-
-def total_energy_LHZ4(N_):
-    """
-    loop over all rectengulars one can draw in LHZ,
-    calculate the scope_of_shapes() for each (xy) and sum it
-    """
-    summe = 0
-    for N in range(4, N_ + 1):
-        summe += sum(
-            map(
-                lambda x: scope_of_shapes(*x),
-                [
-                    (i, j, n)
-                    for n in range(4, N + 1)
-                    for i in range(1, n)
-                    for j in range(1, n)
-                    if i + j <= n - 2
-                ],
-            )
-        )
-    return summe
-
 
 def number_4plaqs(N):
     """
@@ -70,6 +15,22 @@ def number_4plaqs(N):
     C = (N / 2 * (N - 1) - N + 1) - number_3plaqs(N)
     return int(C)
 
+def total_energy_LHZ4(N):
+    """
+    calculates the scope (minus unit triangle scope) of 3er polygons in LHZ
+    and sums over it
+    """
+    polys = []
+    for l in itertools.combinations([i for i in range(0, N)], 4):
+        l1 = [l[0], l[2], l[1], l[3]]
+        l2 = [l[0], l[2], l[3], l[1]]
+
+        polys.append(
+            sum([Polygons.is_unit_square(Polygons.get_polygon_from_cycle(list(l))),
+             Polygons.is_unit_square(Polygons.get_polygon_from_cycle(list(l1))),
+             Polygons.is_unit_square(Polygons.get_polygon_from_cycle(list(l2)))])
+        )
+    return sum(polys)
 
 def total_energy_LHZ3(N):
     """
