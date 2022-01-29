@@ -7,10 +7,20 @@ import os.path
 homedir = os.path.expanduser("~/UniInnsbruck/")
 pathset = os.path.join(homedir, "CompilerQC/parameter_estimation/parameters")
 
+"""
+by changing the scope of a unit square to the sanduhr format, non plaqs scopes increased,
+the analytical forumula isnt considering this fact
+"""
+
 # this function calculates the energy of LHZ analytically
 def scope_of_shapes(x, y, n):
     """
     x, y are the scopes of possible rectengulars you can draw in LHZ
+    o -- x -- o
+    |         |  
+    y         y   
+    |         |
+    o -- x -- o
     N=4: xy 11
     N=5: xy 11, 12, 21
     ...
@@ -38,10 +48,11 @@ def scope_of_shapes(x, y, n):
         + np.sqrt(y ** 2 + (n - (y - 1)) ** 2)
         + np.sqrt(x ** 2 + (n - (x - 1)) ** 2)
     )
-    return sum([triangular, square, cross]) - 3 * 4
+    scope_of_unit_square = 4 #+ 2 * np.sqrt(2)
+    return sum([triangular, square, cross]) - 3 * scope_of_unit_square
 
 
-def total_energy_LHZ4(N_):
+def _total_energy_LHZ4(N_):
     """
     loop over all rectengulars one can draw in LHZ,
     calculate the scope_of_shapes() for each (xy) and sum it
@@ -70,6 +81,22 @@ def number_4plaqs(N):
     C = (N / 2 * (N - 1) - N + 1) - number_3plaqs(N)
     return int(C)
 
+def total_energy_LHZ4(N):
+    """
+    calculates the scope (minus unit triangle scope) of 3er polygons in LHZ
+    and sums over it
+    """
+    polys = []
+    for l in itertools.combinations([i for i in range(0, N)], 4):
+        l1 = [l[0], l[2], l[1], l[3]]
+        l2 = [l[0], l[2], l[3], l[1]]
+
+        polys.append(
+            sum([Polygons.is_unit_square(Polygons.get_polygon_from_cycle(list(l))),
+             Polygons.is_unit_square(Polygons.get_polygon_from_cycle(list(l1))),
+             Polygons.is_unit_square(Polygons.get_polygon_from_cycle(list(l2)))])
+        )
+    return sum(polys)
 
 def total_energy_LHZ3(N):
     """
