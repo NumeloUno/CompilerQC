@@ -8,10 +8,21 @@ from CompilerQC import Graph
 
 
 class Polygons:
+    """
+    this class converts the edges of a graph to qbits
+    and puts them on a grid. the qbits are connected to 
+    other qbits if they formed a closed cyle (3 or 4 length) 
+    in the graph. So the qbits are connected to polygons of
+    length three or four. Some qbits are part of the core 
+    (definded by the core bipartite sets). If the class is 
+    initialized with a qbit to coord dict, the coords are not 
+    thrown randomly on the grid.
+    """
     def __init__(
         self,
         logical_graph: Graph,
         core_bipartite_sets: list = [[], []],
+        qbit_coord_dict: dict=None,
     ):
         """
         logical_graph: logical graph with N nodes and K edges
@@ -21,8 +32,10 @@ class Polygons:
         self.K = logical_graph.K
         self.C = logical_graph.C
         cycles = logical_graph.get_cycles(3) + logical_graph.get_cycles(4)
-        self.polygons = self.get_all_polygons(cycles)
-        self.qbit_coord_dict = self.init_coords_for_qbits()
+        self.polygons = Polygons.get_all_polygons(cycles)
+        if qbit_coord_dict is None:
+            qbit_coord_dict = self.init_coords_for_qbits()
+        self.qbit_coord_dict = qbit_coord_dict
         # define qbits and their coords for core and outside core
         self.U, self.V = core_bipartite_sets
         core_qbit_coord_dict = Polygons.core_qbits_and_coords_from_sets(
@@ -100,10 +113,11 @@ class Polygons:
                 "qbit is neither in the core nor in the movable part", qbit
             )
 
-    @classmethod
-    def get_polygon_from_cycle(self, cycle: list):
+    @staticmethod
+    def get_polygon_from_cycle(cycle: list):
         """
         cycle: cycle in graph
+        returns polygon
         """
         cycle = cycle + [cycle[0]]
         polygon = list(map(tuple, map(sorted, zip(cycle, cycle[1:]))))
@@ -132,8 +146,9 @@ class Polygons:
     def polygon_area(polygon_coord):
         return Polygon(polygon_coord).area
 
-    def get_all_polygons(self, cycles):
-        return list(map(self.get_polygon_from_cycle, cycles))
+    @staticmethod
+    def get_all_polygons(cycles):
+        return list(map(Polygons.get_polygon_from_cycle, cycles))
 
     def get_all_polygon_coords(self):
         """
@@ -154,13 +169,14 @@ class Polygons:
     def is_unit_square(polygon_coord):
         """
         measure closeness to plaquette
+        also from sanduhr plaquettes
         """
         scope = [
             LineString([*x]).length for x in itertools.combinations(polygon_coord, 2)
         ]
         return sum(scope) - (4 + 2 * np.sqrt(2))
 
-    #        return Polygons.polygon_length(polygon_coord) - 4
+        #return Polygons.polygon_length(polygon_coord) - 4
 
     @staticmethod
     def is_unit_triangle(polygon_coord):
