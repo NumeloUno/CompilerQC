@@ -4,6 +4,7 @@ from scipy.special import binom
 import itertools
 import os.path
 
+#  TODO: make this to pathlib and use paths.py
 homedir = os.path.expanduser("~/UniInnsbruck/")
 pathset = os.path.join(homedir, "CompilerQC/parameter_estimation/parameters")
 
@@ -14,6 +15,7 @@ def number_4plaqs(N):
     """
     C = (N / 2 * (N - 1) - N + 1) - number_3plaqs(N)
     return int(C)
+
 
 def total_energy_LHZ4(N):
     """
@@ -26,11 +28,16 @@ def total_energy_LHZ4(N):
         l2 = [l[0], l[2], l[3], l[1]]
 
         polys.append(
-            sum([Polygons.is_unit_square(Polygons.get_polygon_from_cycle(list(l))),
-             Polygons.is_unit_square(Polygons.get_polygon_from_cycle(list(l1))),
-             Polygons.is_unit_square(Polygons.get_polygon_from_cycle(list(l2)))])
+            sum(
+                [
+                    Polygons.is_unit_square(Polygons.get_polygon_from_cycle(list(l))),
+                    Polygons.is_unit_square(Polygons.get_polygon_from_cycle(list(l1))),
+                    Polygons.is_unit_square(Polygons.get_polygon_from_cycle(list(l2))),
+                ]
+            )
         )
     return sum(polys)
+
 
 def total_energy_LHZ3(N):
     """
