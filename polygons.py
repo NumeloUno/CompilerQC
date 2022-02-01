@@ -1,4 +1,5 @@
 import numpy as np
+import networkx as nx
 import itertools
 from matplotlib import pyplot as plt
 from shapely.geometry import Point, Polygon, MultiPoint, MultiLineString, LineString
@@ -274,25 +275,12 @@ class Polygons:
         self.update_qbits_coords(self.qbits, new_coords)
         
     def n_found_plaqs(self):
-        return [
-            self.is_unit_square(coord)
-            if len(coord) == 4
-            else self.is_unit_triangle(coord)
-            for coord in self.get_all_polygon_coords()
-        ].count(0)
-
-    @staticmethod
-    def get_grid_of_unit_squares(grid_length):
         """
-        from 37041377 stackoverflow
-        returns coordinates of unit square polygons
+        number of found plaqs in current layout
         """
-        x = y = np.arange(grid_length)
-        hlines = [((x1, yi), (x2, yi)) for x1, x2 in zip(x[:-1], x[1:]) for yi in y]
-        vlines = [((xi, y1), (xi, y2)) for y1, y2 in zip(y[:-1], y[1:]) for xi in x]
-        grid = list(polygonize(MultiLineString(hlines + vlines)))
-        unit_square_coords = [list(square.exterior.coords) for square in grid]
-        return unit_square_coords
+        from warnings import warn
+        warn("this function will be removed, dont use it anymore")
+        return len(self.found_plaquettes)
 
     def visualize(self, ax, polygon_coords, zoom=1):
         x, y = np.meshgrid(np.arange(self.K), np.arange(self.K))
@@ -321,3 +309,29 @@ class Polygons:
             max(x_range[-1][0], y_range[-1][1]) + zoom,
         )
         return ax
+
+    def found_plaquettes(self):
+        """
+        list all plaquettes which are in the current layout
+        """
+        plaquettes = np.array(self.polygons, dtype=object)[
+                np.array([Polygons.is_unit_square(coord)
+                if len(coord) == 4
+                else Polygons.is_unit_triangle(coord)
+                for coord in self.get_all_polygon_coords()])
+                == 0 ]
+        return [list(map(tuple, plaquette)) for plaquette in plaquettes]
+
+    def to_nx_graph(self):
+        """
+        converts the current layout to a graph,
+        only valid polygons (plaquettes) are considered
+        """
+        edges = list(map(Polygons.get_polygon_from_cycle, self.found_plaquettes()))
+        edges = [edge for edge_list in edges for edge in edge_list]
+
+        physical_graph = nx.Graph()
+        physical_graph.add_nodes_from(self.qbits)
+        physical_graph.add_edges_from(edges)
+
+        return nx.to_undirected(physical_graph)
