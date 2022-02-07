@@ -280,7 +280,7 @@ class Polygons:
         """
         from warnings import warn
         warn("this function will be removed, dont use it anymore")
-        return len(self.found_plaquettes)
+        return len(self.found_plaquettes())
 
     def visualize(self, ax, polygon_coords, zoom=1):
         x, y = np.meshgrid(np.arange(self.K), np.arange(self.K))

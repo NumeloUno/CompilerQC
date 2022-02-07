@@ -16,12 +16,14 @@ class MC:
         acceptance: str = "np.exp(- x / y)",
         n_moves: int = 100,
         schedule: dict = {},
+        energy_schedule: dict = {},
     ):
         self.energy = energy_object
         self.polygon = energy_object.polygon
         self.temperatur_schedule = temperatur_schedule
         self.acceptance = acceptance
         self.schedule = schedule
+        self.energy_schedule = energy_schedule
         self.n_total_steps = 0
         self.n_moves = n_moves
 
@@ -135,7 +137,7 @@ class MC:
         operation: str,
     ):
         self.current_polygon = deepcopy(self.polygon)
-        current_energy = self.energy(self.polygon)
+        current_energy = self.energy(self.polygon, self.energy_schedule)
         # qbit = self.most_distant_qbit_from_core()[0]
         if operation == "contract":
             qbits, coords = self.random_coord_around_core_center()
@@ -146,7 +148,7 @@ class MC:
         if operation == "grow_core":
             qbits, coords = self.random_coord_next_to_core()
         self.polygon.update_qbits_coords(qbits, coords)
-        new_energy = self.energy(self.polygon)
+        new_energy = self.energy(self.polygon, self.energy_schedule)
         return current_energy, new_energy
 
     def temperature(self, k: int=None):
@@ -174,7 +176,7 @@ class MC:
             current_energy, new_energy = self.step(operation)
             delta_energy = self.metropolis(current_energy, new_energy)
         # update polygon in energy
-        self.energy(self.polygon)
+        self.energy(self.polygon, self.energy_schedule)
 
     def optimization_schedule(
             self,

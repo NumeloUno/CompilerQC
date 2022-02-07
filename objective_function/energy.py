@@ -102,12 +102,15 @@ class Energy(Polygons):
         reward bipartite lines are found
         """
 
-    def __call__(self, polygon_object, terms: list = [1.0, 0.0, 1.0]):
+    def __call__(self, polygon_object, schedule: list = [1.0, 0.0, 1.0, 0.0]):
+        if type(schedule) == dict:
+            schedule = list(schedule.values())
         (
             ignore_inside_polygons,
             scaled_wolfgang,
             polygon_weigth,
-        ) = terms
+            no_scaling,
+        ) = schedule
         if ignore_inside_polygons:
             self.polygon_coords = polygon_object.polygons_outside_core()
         else:
@@ -119,6 +122,10 @@ class Energy(Polygons):
             list_of_plaquettes = self.distance_to_plaquette()
             polygon_weights = self.polygon.polygon_weights(list_of_plaquettes)
             return np.dot(np.array(list_of_plaquettes), polygon_weights)
+        if no_scaling:
+            list_of_plaquettes = self.distance_to_plaquette()
+            return sum(list_of_plaquettes)
+
 
 
 class Energy_landscape:

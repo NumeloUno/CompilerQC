@@ -92,7 +92,7 @@ class Graph:
         """generates complete connected graph with n nodes"""
         return cls(np.ones((n, n)) - np.identity(n))
 
-    # TODO: random graph may have no cycles, fix this
+    # TODO: random graph may have no cycles, fix this-> check if C,K,N are compatibe, add density parameter
     @classmethod
     def random(cls, n):
         """generates graph with n nodes and random connections"""
