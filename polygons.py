@@ -11,7 +11,7 @@ class Polygons:
     def __init__(
         self,
         logical_graph: Graph,
-        core_bipartite_sets: list = [[], []],
+        core_qbit_coord_dict: dict,
     ):
         """
         logical_graph: logical graph with N nodes and K edges
@@ -24,11 +24,6 @@ class Polygons:
         self.polygons = self.get_all_polygons(cycles)
         self.qbit_coord_dict = self.init_coords_for_qbits()
         # define qbits and their coords for core and outside core
-        self.U, self.V = core_bipartite_sets
-        core_qbit_coord_dict = Polygons.core_qbits_and_coords_from_sets(
-            self.U,
-            self.V,
-        )
         self.core_qbits = list(core_qbit_coord_dict.keys())
         self.movable_qbits = list(set(self.qbits) - set(self.core_qbits))
         self.movable_coords = [
@@ -36,6 +31,22 @@ class Polygons:
         ]
         self.core_coords = list(core_qbit_coord_dict.values())
         self.update_qbits_coords(self.core_qbits, self.core_coords)
+
+    @classmethod
+    def from_max_core_bipartite_sets(
+            cls,
+            logical_graph: Graph,
+            core_bipartite_sets: list = [[], []],
+            ):
+        """
+        initialize Polygons object by using bipartite core sets U and V
+        """
+        self.U, self.V = core_bipartite_sets
+        core_qbit_coord_dict = Polygons.core_qbits_and_coords_from_sets(
+            self.U,
+            self.V,
+        )
+        return cls(logical_graph, core_qbit_coord_dict)
 
     @staticmethod
     def core_qbits_and_coords_from_sets(
