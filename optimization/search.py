@@ -98,21 +98,24 @@ class MC:
         """
         swap two logical nodes(from set U or V) only in core -> swap lines
         """
-        U_or_V = random.sample([self.polygon.U, self.polygon.V], 1)[0]
-        a, b = random.sample(U_or_V, 2)
-        n = self.polygon.core_qbits
-        n = [(-1, k) if i == a else (i, k) for i, k in n]
-        n = [(i, -1) if k == a else (i, k) for i, k in n]
-        n = [(a, k) if i == b else (i, k) for i, k in n]
-        n = [(i, a) if k == b else (i, k) for i, k in n]
-        n = [(b, k) if i == -1 else (i, k) for i, k in n]
-        swapped_core_qbits = [(i, b) if k == -1 else (i, k) for i, k in n]
-        sorted_swapped_core_qbits = list(
-            map(lambda x: tuple(sorted(x)), swapped_core_qbits)
-        )
-        # detach core_coords from class
-        core_coords = [coord for coord in self.polygon.core_coords]
-        return sorted_swapped_core_qbits, core_coords
+        try:
+            U_or_V = random.sample([self.polygon.U, self.polygon.V], 1)[0]
+            a, b = random.sample(U_or_V, 2)
+            n = self.polygon.core_qbits
+            n = [(-1, k) if i == a else (i, k) for i, k in n]
+            n = [(i, -1) if k == a else (i, k) for i, k in n]
+            n = [(a, k) if i == b else (i, k) for i, k in n]
+            n = [(i, a) if k == b else (i, k) for i, k in n]
+            n = [(b, k) if i == -1 else (i, k) for i, k in n]
+            swapped_core_qbits = [(i, b) if k == -1 else (i, k) for i, k in n]
+            sorted_swapped_core_qbits = list(
+                map(lambda x: tuple(sorted(x)), swapped_core_qbits)
+            )
+            # detach core_coords from class
+            core_coords = [coord for coord in self.polygon.core_coords]
+            return sorted_swapped_core_qbits, core_coords
+        except AttributeError:
+            print('sets U and V arent defined yet, please define them to call this function')
 
     def most_distant_qbit_from_core(self):
         core_center = self.polygon.center_of_convex_hull(self.polygon.core_coords)
