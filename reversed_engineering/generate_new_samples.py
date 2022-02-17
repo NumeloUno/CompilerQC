@@ -67,17 +67,23 @@ def save_problem(output, save_in_folder: str):
 
     eventid = datetime.now().strftime("%Y%m-%d%H-%M%S-") + str(uuid4())
     # Save
-    os.makedirs(paths.database_path / save_in_folder / f"problem_N_{N}_K_{K}_C_{C}", exist_ok=True)
+    os.makedirs(
+        paths.database_path / save_in_folder / f"problem_N_{N}_K_{K}_C_{C}",
+        exist_ok=True,
+    )
     dictionary = {"qbit_coord_dict": qbit_coord_dict, "graph_adj_matrix": adj_matrix}
     np.save(
-        paths.database_path / save_in_folder / f"problem_N_{N}_K_{K}_C_{C}" / f"{eventid}.npy",
+        paths.database_path
+        / save_in_folder
+        / f"problem_N_{N}_K_{K}_C_{C}"
+        / f"{eventid}.npy",
         dictionary,
     )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Generate new samples for the database, containing graphs and their compiled solutions"
+        description="Generate new samples for the database, containing graphs and their compiled solutions. The square_plaquette_probability is set random between 20-100%"
     )
     parser.add_argument(
         "-n",
@@ -87,11 +93,18 @@ if __name__ == "__main__":
         help="how many new samples you want to generate",
     )
     parser.add_argument(
-        "-C",
-        "--min_max_num_consraints",
-        type=list,
-        default=[2, 20],
-        help="generate samples with constraints C between [min, max]",
+        "-C_min",
+        "--min_num_consraints",
+        type=int,
+        default=2,
+        help="generate samples with constraints C above C_min",
+    )
+    parser.add_argument(
+        "-C_max",
+        "--max_num_consraints",
+        type=int,
+        default=20,
+        help="generate samples with constraints C up to C_max",
     )
     parser.add_argument(
         "-path",
@@ -101,7 +114,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     for sample in tqdm(range(args.number_of_new_samples), desc="Generate new samples"):
-        for C in range(*args.min_max_num_consraints):
+        for C in range(args.min_num_consraints, args.max_num_consraints):
             square_plaquette_probability = random.uniform(0.2, 1)
             output = create_problem(client, C, square_plaquette_probability)
             # visualize_parityos_output(output)
