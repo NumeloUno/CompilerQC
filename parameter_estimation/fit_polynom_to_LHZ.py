@@ -7,7 +7,6 @@ import os.path
 homedir = os.path.expanduser("~/UniInnsbruck/")
 pathset = os.path.join(homedir, "CompilerQC/parameter_estimation/parameters")
 
-
 def number_4plaqs(N):
     """
     number of 4plaqs in LHZ
