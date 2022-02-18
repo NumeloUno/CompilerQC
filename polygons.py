@@ -23,6 +23,7 @@ class Polygons:
         self,
         logical_graph: Graph,
         qbit_coord_dict: dict=None,
+        core_qbit_core_dict = dict(),
     ):
         """
         logical_graph: logical graph with N nodes and K edges
