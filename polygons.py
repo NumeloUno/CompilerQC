@@ -1,4 +1,5 @@
 import numpy as np
+import networkx as nx
 import itertools
 from matplotlib import pyplot as plt
 from shapely.geometry import Point, Polygon, MultiPoint, MultiLineString, LineString
@@ -8,10 +9,20 @@ from CompilerQC import Graph
 
 
 class Polygons:
+    """
+    this class converts the edges of a graph to qbits
+    and puts them on a grid. the qbits are connected to 
+    other qbits if they formed a closed cyle (3 or 4 length) 
+    in the graph. So the qbits are connected to polygons of
+    length three or four. Some qbits are part of the core 
+    (definded by the core bipartite sets). If the class is 
+    initialized with a qbit to coord dict, the coords are not 
+    thrown randomly on the grid.
+    """
     def __init__(
         self,
         logical_graph: Graph,
-        core_qbit_coord_dict: dict,
+        qbit_coord_dict: dict=None,
     ):
         """
         logical_graph: logical graph with N nodes and K edges
@@ -21,8 +32,10 @@ class Polygons:
         self.K = logical_graph.K
         self.C = logical_graph.C
         cycles = logical_graph.get_cycles(3) + logical_graph.get_cycles(4)
-        self.polygons = self.get_all_polygons(cycles)
-        self.qbit_coord_dict = self.init_coords_for_qbits()
+        self.polygons = Polygons.get_all_polygons(cycles)
+        if qbit_coord_dict is None:
+            qbit_coord_dict = self.init_coords_for_qbits()
+        self.qbit_coord_dict = qbit_coord_dict
         # define qbits and their coords for core and outside core
         self.core_qbits = list(core_qbit_coord_dict.keys())
         self.movable_qbits = list(set(self.qbits) - set(self.core_qbits))
@@ -111,10 +124,11 @@ class Polygons:
                 "qbit is neither in the core nor in the movable part", qbit
             )
 
-    @classmethod
-    def get_polygon_from_cycle(self, cycle: list):
+    @staticmethod
+    def get_polygon_from_cycle(cycle: list):
         """
         cycle: cycle in graph
+        returns polygon
         """
         cycle = cycle + [cycle[0]]
         polygon = list(map(tuple, map(sorted, zip(cycle, cycle[1:]))))
@@ -143,8 +157,9 @@ class Polygons:
     def polygon_area(polygon_coord):
         return Polygon(polygon_coord).area
 
-    def get_all_polygons(self, cycles):
-        return list(map(self.get_polygon_from_cycle, cycles))
+    @staticmethod
+    def get_all_polygons(cycles):
+        return list(map(Polygons.get_polygon_from_cycle, cycles))
 
     def get_all_polygon_coords(self):
         """
@@ -165,13 +180,14 @@ class Polygons:
     def is_unit_square(polygon_coord):
         """
         measure closeness to plaquette
+        also from sanduhr plaquettes
         """
         scope = [
             LineString([*x]).length for x in itertools.combinations(polygon_coord, 2)
         ]
         return sum(scope) - (4 + 2 * np.sqrt(2))
 
-    #        return Polygons.polygon_length(polygon_coord) - 4
+        #return Polygons.polygon_length(polygon_coord) - 4
 
     @staticmethod
     def is_unit_triangle(polygon_coord):
@@ -269,25 +285,12 @@ class Polygons:
         self.update_qbits_coords(self.qbits, new_coords)
         
     def n_found_plaqs(self):
-        return [
-            self.is_unit_square(coord)
-            if len(coord) == 4
-            else self.is_unit_triangle(coord)
-            for coord in self.get_all_polygon_coords()
-        ].count(0)
-
-    @staticmethod
-    def get_grid_of_unit_squares(grid_length):
         """
-        from 37041377 stackoverflow
-        returns coordinates of unit square polygons
+        number of found plaqs in current layout
         """
-        x = y = np.arange(grid_length)
-        hlines = [((x1, yi), (x2, yi)) for x1, x2 in zip(x[:-1], x[1:]) for yi in y]
-        vlines = [((xi, y1), (xi, y2)) for y1, y2 in zip(y[:-1], y[1:]) for xi in x]
-        grid = list(polygonize(MultiLineString(hlines + vlines)))
-        unit_square_coords = [list(square.exterior.coords) for square in grid]
-        return unit_square_coords
+        from warnings import warn
+        warn("this function will be removed, dont use it anymore")
+        return len(self.found_plaquettes())
 
     def visualize(self, ax, polygon_coords, zoom=1):
         x, y = np.meshgrid(np.arange(self.K), np.arange(self.K))
@@ -316,3 +319,29 @@ class Polygons:
             max(x_range[-1][0], y_range[-1][1]) + zoom,
         )
         return ax
+
+    def found_plaquettes(self):
+        """
+        list all plaquettes which are in the current layout
+        """
+        plaquettes = np.array(self.polygons, dtype=object)[
+                np.array([Polygons.is_unit_square(coord)
+                if len(coord) == 4
+                else Polygons.is_unit_triangle(coord)
+                for coord in self.get_all_polygon_coords()])
+                == 0 ]
+        return [list(map(tuple, plaquette)) for plaquette in plaquettes]
+
+    def to_nx_graph(self):
+        """
+        converts the current layout to a graph,
+        only valid polygons (plaquettes) are considered
+        """
+        edges = list(map(Polygons.get_polygon_from_cycle, self.found_plaquettes()))
+        edges = [edge for edge_list in edges for edge in edge_list]
+
+        physical_graph = nx.Graph()
+        physical_graph.add_nodes_from(self.qbits)
+        physical_graph.add_edges_from(edges)
+
+        return nx.to_undirected(physical_graph)

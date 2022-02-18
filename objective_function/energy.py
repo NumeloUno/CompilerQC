@@ -20,8 +20,6 @@ class Energy(Polygons):
         polygon_object: Polygons,
     ):
         self.polygon = polygon_object
-        self.scaling_for_plaq3 = self.scaling_factors_LHZ(3)
-        self.scaling_for_plaq4 = self.scaling_factors_LHZ(4)
 
     @staticmethod
     def scaling_factors_LHZ(number: int):
@@ -36,19 +34,7 @@ class Energy(Polygons):
             os.path.join(path_to_scaling_factors, f"scaling_factors_LHZ{number}.npy")
         )
 
-    def distance_to_plaquette(self):
-        """
-        return: list, each entry represents the closeness of a polygon
-        to plaquette (square or triangle), which is zero if the plaquette is found
-        """
-        return [
-            self.is_unit_square(coord)
-            if len(coord) == 4
-            else self.is_unit_triangle(coord)
-            for coord in self.polygon_coords
-        ]
-
-    def arbitrary_scaled_distance_to_plaqutte(self):
+    def scopes_of_polygons(self):
         """
         return four lists (non 3_plaqs, non 4_plaqs,
         3_plaqs, 4_plaqs)
@@ -56,38 +42,35 @@ class Energy(Polygons):
         non_plaqs_3, non_plaqs_4 = [], []
         plaqs_3, plaqs_4 = [], []
         for coord in self.polygon_coords:
-            if len(coord) == 4:
-                distance = self.is_unit_square(coord)
+            if len(coord) == 3:
+                distance = self.is_unit_triangle(coord)
                 if distance == 0:
                     plaqs_3.append(distance)
                 else: 
                     non_plaqs_3.append(distance)
             if len(coord) == 4:
-                distance = self.is_unit_triangle(coord)
+                distance = self.is_unit_square(coord)
                 if distance == 0:
                     plaqs_4.append(distance)
                 else:
                     non_plaqs_4.append(distance)
-        return non_plaqs_3, non_plaqs_4, plaqs_3, plaqs_4
+        return np.array(non_plaqs_3), np.array(non_plaqs_4), np.array(plaqs_3), np.array(plaqs_4)
 
-    def scaled_distance_to_plaquette(self):
+    def scaled_distance_to_plaquette(
+            self,
+            scaling_for_plaq3: float=0,
+            scaling_for_plaq4: float=0,
+            ):
         """
         return: list, each entry represents the closeness of a polygon
-        to plaquette (square or triangle), which is minus the the sacling factor
-        LHZ (Wolfgangs Idee)
+        to plaquette (square or triangle), which is zero if the plaquette is found
+        and minus a sacling factor set in this function
         """
-        distances = []
-        for coord in self.polygon_coords:
-            if len(coord) == 4:
-                distance = self.is_unit_square(coord)
-                if distance == 0:
-                    distance -= self.scaling_for_plaq4[self.polygon.N - 4]
-            if len(coord) == 3:
-                distance = self.is_unit_triangle(coord)
-                if distance == 0:
-                    distance -= self.scaling_for_plaq3[self.polygon.N - 4]
-            distances.append(distance)
-        return distances
+        non_plaqs_3, non_plaqs_4, plaqs_3, plaqs_4 = self.scopes_of_polygons()
+        plaqs_3 -= scaling_for_plaq3
+        plaqs_4 -= scaling_for_plaq4
+        return np.concatenate((non_plaqs_3, non_plaqs_4, plaqs_3, plaqs_4))
+
 
     def exp_factor(self, constant: float):
         """
@@ -102,23 +85,44 @@ class Energy(Polygons):
         reward bipartite lines are found
         """
 
-    def __call__(self, polygon_object, terms: list = [1.0, 0.0, 1.0]):
-        (
-            ignore_inside_polygons,
-            scaled_wolfgang,
-            polygon_weigth,
-        ) = terms
-        if ignore_inside_polygons:
+    def __call__(self,
+            polygon_object,
+            schedule=dict(),
+                ):
+        default_schedule = {
+                'ignore_inside_polygons':False,
+                'scaled_as_LHZ': False,
+                'individual_scaling': False,
+                'polygon_weight': False,
+                'no_scaling': False,
+                }
+        default_schedule.update(schedule)
+        if default_schedule['ignore_inside_polygons']:
             self.polygon_coords = polygon_object.polygons_outside_core()
         else:
             self.polygon_coords = polygon_object.get_all_polygon_coords()
-        if scaled_wolfgang:
-            list_of_plaquettes = self.scaled_distance_to_plaquette()
+        if default_schedule['scaled_as_LHZ']:
+            scaling_for_plaq3 = self.scaling_factors_LHZ(3)[polygon_object.N - 4]
+            scaling_for_plaq4 = self.scaling_factors_LHZ(4)[polygon_object.N - 4]
+            list_of_plaquettes = self.scaled_distance_to_plaquette(
+                    scaling_for_plaq3 = scaling_for_plaq3,
+                    scaling_for_plaq4 = scaling_for_plaq4,
+                    )
             return sum(list_of_plaquettes)
-        if polygon_weigth:
-            list_of_plaquettes = self.distance_to_plaquette()
+        if default_schedule['individual_scaling']:
+            list_of_plaquettes = self.scaled_distance_to_plaquette(
+                    scaling_for_plaq3 = self.scaling_for_plaq3,
+                    scaling_for_plaq4 = self.scaling_for_plaq4,
+                    )
+            return sum(list_of_plaquettes)
+        if default_schedule['polygon_weight']:
+            list_of_plaquettes = self.scaled_distance_to_plaquette()
             polygon_weights = self.polygon.polygon_weights(list_of_plaquettes)
             return np.dot(np.array(list_of_plaquettes), polygon_weights)
+        if default_schedule['no_scaling']:
+            list_of_plaquettes = self.scaled_distance_to_plaquette()
+            return sum(list_of_plaquettes)
+
 
 
 class Energy_landscape:

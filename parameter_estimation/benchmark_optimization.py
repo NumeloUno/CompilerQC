@@ -3,7 +3,7 @@ import random
 import matplotlib.pyplot as plt
 import yaml
 import argparse
-from copy import deepcopy
+from copy import deepcopy #actually deepcopy isnt needed here
 from CompilerQC import Graph, Polygons, core, Energy, MC, paths
 
 def update_mc(mc, mc_schedule) -> MC:
@@ -15,6 +15,11 @@ def update_mc(mc, mc_schedule) -> MC:
 def evaluate_optimization(
     energy_object: Energy, mc_schedule: dict, batch_size: int, visualize: bool = False
 ):
+    """
+    evaluate monte carlo/ simulated annealing schedule for batch_size timed and returns
+    a success probability -> measure of how good the choosen schedule (temperature, 
+    configuration distribution, ...) is
+    """
     success_rate = []
     for iteration in range(batch_size):
         mc = MC(deepcopy(energy_object))
@@ -36,9 +41,13 @@ def evaluate_optimization(
 
 def run_benchmark(
     energy_object: Energy,
-    batch_size: int = 20,
+    batch_size: int = 100,
     id_of_benchmark: str = "",
 ):
+    """
+    evaluate simulated annealing schedules from mc_parameters yaml
+    and save success rate in corresponding txt
+    """
 
     path_to_config = paths.parameters_path / f"mc_parameters_{id_of_benchmark}.yaml"
     path_to_results = (
@@ -69,7 +78,7 @@ if __name__ == "__main__":
         "-b",
         "--batchsize",
         type=int,
-        default=20,
+        default=100,
         help="how many times each schedule is evaluated",
     )
     parser.add_argument(
