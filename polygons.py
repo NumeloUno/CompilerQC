@@ -140,9 +140,9 @@ class Polygons:
         initialization of qbits with random coordinates
         return: dictionary with qbits and coordinates
         """
-        coords = list(np.ndindex(self.K, self.K))
+        coords = list(np.ndindex(self.N, self.N))
         np.random.shuffle(coords)
-        return dict(zip(self.qbits, coords[: self.K]))
+        return dict(zip(self.qbits, coords[: self.N]))
 
     def get_coords_of_polygon(self, polygon):
         """
