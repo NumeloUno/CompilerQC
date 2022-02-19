@@ -5,6 +5,10 @@ import yaml
 import argparse
 from copy import deepcopy #actually deepcopy isnt needed here
 from CompilerQC import Graph, Polygons, core, Energy, MC, paths
+import os 
+from CompilerQC.reversed_engineering.functions_for_database import (
+    problem_from_file, energy_from_problem, get_files_to_problems
+)
 
 def update_mc(mc, mc_schedule) -> MC:
     for k, v in mc_schedule.items():
@@ -65,14 +69,38 @@ def run_benchmark(
         print(name, succes_rate)
     file.close()
 
+def benchmark_problem_folder(args):
+    for file in get_files_to_problems(args.problem_folder):
+        graph_adj_matrix, qbit_coord_dict = (
+            problem_from_file(file))
+        polygon_scopes, NKC = energy_from_problem(graph_adj_matrix, qbit_coord_dict)
+        n3, n4, p3, p4 = polygon_scopes
+        scaling_for_plaquette = (sum(n3) + sum(n4)) / NKC[2]
 
+        graph = Graph(adj_matrix=graph_adj_matrix)
+        U, V = [], []
+        if args.with_core:
+            nn = core.largest_complete_bipartite_graph(graph)
+            K_nn = core.complete_bipartite_graph(*nn)
+            U, V = core.parts_of_complete_bipartite_graph(graph.to_nx_graph(), K_nn)
+        polygon_object = Polygons.from_max_core_bipartite_sets(graph, [U, V])
+        energy_object = Energy(polygon_object)
+        energy_object.scaling_for_plaq3 = scaling_for_plaquette
+        energy_object.scaling_for_plaq4 = scaling_for_plaquette
+        run_benchmark(energy_object, args.batchsize, args.id_of_benchmark)
+
+        break
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
         description="Benchmark the settings for MC in the mc_parameters.yaml and save evaluation in mc_benchmark_results.txt"
     )
     parser.add_argument(
-        "-N", type=int, default=4, help="size of complete connected logical graph"
+        "-path",
+        "--problem_folder",
+        type=str,
+        default='training_set',
+        help="path of problems to benchmark"
     )
     parser.add_argument(
         "-b",
@@ -88,11 +116,14 @@ if __name__ == "__main__":
         default="",
         help="save results using id (which is also in filename of mc_parameters.yaml) in filename",
     )
+    parser.add_argument(
+        "-core",
+        "--with_core",
+        type=bool,
+        default=False,
+        help="start with bipartite core",
+    )
     args = parser.parse_args()
-    graph = Graph.complete(args.N)
-    nn = core.largest_complete_bipartite_graph(graph)
-    K_nn = core.complete_bipartite_graph(*nn)
-    U, V = core.parts_of_complete_bipartite_graph(graph.to_nx_graph(), K_nn)
-    polygon_object = Polygons(graph, core_bipartite_sets=[U, V])
-    energy_object = Energy(polygon_object)
-    run_benchmark(energy_object, args.batchsize, args.id_of_benchmark)
+    benchmark_problem_folder(args)
+
+
