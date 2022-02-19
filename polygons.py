@@ -211,6 +211,17 @@ class Polygons:
             (x - 1, y + 1),
         ]
 
+    @staticmethod
+    def free_neighbour_coords(qbit_coords: list):
+        """
+        return list of all free neighbours for qbits_coords
+        """
+        neighbour_list = []
+        for qbit_coord in qbit_coords:
+            neighbour_list += Polygons.neighbours(qbit_coord)
+        neighbour_list = list(set(neighbour_list) - set(qbit_coords))
+        return neighbour_list
+
     def inside_core_coords(self):
         """
         return: list of coords which are inside the core,

@@ -28,16 +28,6 @@ class MC:
         self.n_moves = n_moves
 
 
-    def free_neighbour_coords(self, qbit_coords: list):
-        """
-        return list of all free neighbours for qbits_coords
-        """
-        neighbour_list = []
-        for qbit_coord in qbit_coords:
-            neighbour_list += Polygons.neighbours(qbit_coord)
-        neighbour_list = list(set(neighbour_list) - set(qbit_coords))
-        return neighbour_list
-
     # TODO: add radius to polygon.neighbour function, what if core is not in the middle and only a small part of the graph
     def random_coord_next_to_core(
         self,
@@ -50,7 +40,7 @@ class MC:
         """
         if qbit is None:
             qbit = random.choice(self.polygon.movable_qbits)
-        new_coord = random.choice(self.free_neighbour_coords(self.polygon.core_coords))
+        new_coord = random.choice(Polygons.free_neighbour_coords(self.polygon.core_coords))
         return [qbit], [new_coord]
 
     def swap_qbits(self):
