@@ -22,8 +22,8 @@ class Polygons:
     def __init__(
         self,
         logical_graph: Graph,
+        core_qbit_coord_dict = dict(),
         qbit_coord_dict: dict=None,
-        core_qbit_core_dict = dict(),
     ):
         """
         logical_graph: logical graph with N nodes and K edges
@@ -55,12 +55,12 @@ class Polygons:
         """
         initialize Polygons object by using bipartite core sets U and V
         """
-        self.U, self.V = core_bipartite_sets
+        cls.U, cls.V = core_bipartite_sets
         core_qbit_coord_dict = Polygons.core_qbits_and_coords_from_sets(
-            self.U,
-            self.V,
+            cls.U,
+            cls.V,
         )
-        return cls(logical_graph, core_qbit_coord_dict)
+        return cls(logical_graph=logical_graph,core_qbit_coord_dict=core_qbit_coord_dict)
 
     @staticmethod
     def core_qbits_and_coords_from_sets(
