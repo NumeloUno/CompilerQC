@@ -27,42 +27,6 @@ class MC:
         self.n_total_steps = 0
         self.n_moves = n_moves
 
-    def random_coord_around_core_center(
-        self,
-        qbit: tuple = None,
-        radius: float = None,
-    ):
-        """
-        return random coord around center of core(! not convex hull), if this coord is free
-        search in range of radius, if everything is occupied, search again with
-        increased radius
-        """
-        if qbit is None:
-            qbit = random.choice(self.polygon.movable_qbits)
-        center_x, center_y = map(
-            int, self.polygon.center_of_convex_hull(self.polygon.core_coords)
-        )
-        if radius is None:
-            radius = round(np.sqrt(self.polygon.C))
-        x = np.arange(center_x - radius, center_x + radius)
-        y = np.arange(center_y - radius, center_y + radius)
-        x, y = np.meshgrid(x, y)
-        random_coords_around_center = list(zip(x.flatten(), y.flatten()))
-        self.random_coords_around_center = random_coords_around_center
-
-        np.random.shuffle(random_coords_around_center)
-        qbit_coords = self.polygon.qbit_coord_dict.values()
-        free_random_coords_around_center = list(
-            set(random_coords_around_center) - set(qbit_coords)
-        )
-        if len(free_random_coords_around_center) > 0:
-            new_random_coord = random.choice(free_random_coords_around_center)
-        else:
-            qbit, new_random_coord = [
-                x[0]
-                for x in self.random_coord_around_core_center(radius=int(radius + 1))
-            ]
-        return [qbit], [new_random_coord]
 
     def free_neighbour_coords(self, qbit_coords: list):
         """
@@ -74,7 +38,7 @@ class MC:
         neighbour_list = list(set(neighbour_list) - set(qbit_coords))
         return neighbour_list
 
-    # TODO: add radius to polygon.neighbour function
+    # TODO: add radius to polygon.neighbour function, what if core is not in the middle and only a small part of the graph
     def random_coord_next_to_core(
         self,
         qbit: tuple = None,
@@ -90,9 +54,28 @@ class MC:
         return [qbit], [new_coord]
 
     def swap_qbits(self):
-        qbit_coords = self.polygon.qbit_coord_dict
-        qbit1, qbit2 = random.sample(self.polygon.movable_qbits, 2)
-        return [qbit1, qbit2], [qbit_coords[qbit2], qbit_coords[qbit1]]
+        """
+        swap qbits which are next to each other
+        if no qbits are next to each other, swap any qbits
+        """
+        qbit_coords = self.polygon.movable_coords.copy()
+        random.shuffle(qbit_coords)
+        for coord in qbit_coords:
+            coords_neighbour_qbits = list(set(
+                    Polygons.neighbours(coord)
+                    ).intersection(
+                    self.polygon.movable_coords))
+            if len(coords_neighbour_qbits):
+                random.shuffle(coords_neighbour_qbits)
+                coord_to_swap_with = coords_neighbour_qbits[0]
+                coord_qbit_dict = {v:k for k,v in 
+                        self.polygon.qbit_coord_dict.items()}
+                qbit1 = coord_qbit_dict[coord]
+                qbit2 = coord_qbit_dict[coord_to_swap_with]
+                return [qbit1, qbit2], [coord_to_swap_with, coord]
+        else:
+            qbit1, qbit2 = random.sample(self.polygon.movable_qbits, 2)
+            return [qbit1, qbit2], [qbit_coords[qbit2], qbit_coords[qbit1]]
 
     def swap_lines_in_core(
         self,
@@ -141,7 +124,6 @@ class MC:
     ):
         self.current_polygon = deepcopy(self.polygon)
         current_energy = self.energy(self.polygon, self.energy_schedule)
-        # qbit = self.most_distant_qbit_from_core()[0]
         if operation == "contract":
             qbits, coords = self.random_coord_around_core_center()
         if operation == "swap":
