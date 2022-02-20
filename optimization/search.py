@@ -77,7 +77,8 @@ class MC:
                 return [qbit1, qbit2], [coord_to_swap_with, coord]
         else:
             qbit1, qbit2 = random.sample(self.polygon.movable_qbits, 2)
-            return [qbit1, qbit2], [qbit_coords[qbit2], qbit_coords[qbit1]]
+            return [qbit1, qbit2], [self.polygon.qbit_coord_dict[qbit2], self.polygon
+                    .qbit_coord_dict[qbit1]]
 
     def swap_lines_in_core(
         self,
