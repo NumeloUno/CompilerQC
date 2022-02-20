@@ -3,6 +3,7 @@ import random
 import matplotlib.pyplot as plt
 import yaml
 import argparse
+from tqdm import tqdm
 from copy import deepcopy #actually deepcopy isnt needed here
 from CompilerQC import Graph, Polygons, core, Energy, MC, paths
 import os 
@@ -70,7 +71,9 @@ def run_benchmark(
     file.close()
 
 def benchmark_problem_folder(args):
-    for file in get_files_to_problems(args.problem_folder):
+    for file in tqdm(get_files_to_problems(args.problem_folder), desc=f"Evaluate problems in folder {args.problem_folder}"):
+        if int(str(file).split('_')[-3]) > args.max_C:
+            continue
         graph_adj_matrix, qbit_coord_dict = (
             problem_from_file(file))
         polygon_scopes, NKC = energy_from_problem(graph_adj_matrix, qbit_coord_dict)
@@ -115,6 +118,13 @@ if __name__ == "__main__":
         type=int,
         default="",
         help="save results using id (which is also in filename of mc_parameters.yaml) in filename",
+    )
+    parser.add_argument(
+        "-C",
+        "--max_C",
+        type=int,
+        default=10,
+        help="set the maximum C, for which benchmarks should be done",
     )
     parser.add_argument(
         "-core",
