@@ -212,7 +212,8 @@ class Polygons:
         if radius is larger than one, more neighbours are considered
         """
         range_ = range(- radius, radius + 1)
-        return [(x, y) for x in range_ for y in range_ if (x, y) != coord]
+        return [tuple(np.add(coord, (x, y)))
+                for x in range_ for y in range_ if (x, y) != (0, 0)]
 
     def free_neighbour_coords(self, qbit_coords: list, radius: int=1):
         """
