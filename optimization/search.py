@@ -29,18 +29,30 @@ class MC:
 
 
     # TODO: add radius to polygon.neighbour function, what if core is not in the middle and only a small part of the graph
-    def random_coord_next_to_core(
+    def random_coord_on_grid(
         self,
         qbit: tuple = None,
-        radius: float = None,
+        radius: int = 1,
     ):
         """
         generate random coord next to core (fixed qbits)
-        for random movable qbit
+        for random movable qbit. If core is empty, take any free neighbour
+        which is still on the grid. Increase neighbourhood radius, if everything in the neighbourhood is occupied
         """
         if qbit is None:
             qbit = random.choice(self.polygon.movable_qbits)
-        new_coord = random.choice(self.polygon.free_neighbour_coords(self.polygon.core_coords))
+        coords_around_searching = self.polygon.core_coords
+        if coords_around_searching == []:
+            coords_around_searching = list(self.polygon.qbit_coord_dict.values())
+        while True:
+            free_neighbours = self.polygon.free_neighbour_coords(
+                    coords_around_searching, radius=radius)
+            if free_neighbours != []:
+                break
+            else:
+                radius += 1
+
+        new_coord = random.choice(free_neighbours)
         return [qbit], [new_coord]
 
     def swap_qbits(self):
@@ -114,14 +126,12 @@ class MC:
     ):
         self.current_polygon = deepcopy(self.polygon)
         current_energy = self.energy(self.polygon, self.energy_schedule)
-        if operation == "contract":
-            qbits, coords = self.random_coord_around_core_center()
+        if operation == "random":
+            qbits, coords = self.random_coord_on_grid()
         if operation == "swap":
             qbits, coords = self.swap_qbits()
         if operation == "swap_lines_in_core":
             qbits, coords = self.swap_lines_in_core()
-        if operation == "grow_core":
-            qbits, coords = self.random_coord_next_to_core()
         self.polygon.update_qbits_coords(qbits, coords)
         new_energy = self.energy(self.polygon, self.energy_schedule)
         return current_energy, new_energy
