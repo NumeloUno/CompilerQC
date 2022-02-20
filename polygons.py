@@ -1,4 +1,5 @@
 import numpy as np
+import random
 import networkx as nx
 import itertools
 from matplotlib import pyplot as plt
@@ -45,7 +46,8 @@ class Polygons:
         ]
         self.core_coords = list(core_qbit_coord_dict.values())
         self.update_qbits_coords(self.core_qbits, self.core_coords)
-
+        from warnings import warn
+        warn("The maximal grid size is 10 x 10, thats ok since all problems so far can be put on a grid of this size. Of course, this has to be generalized")
     @classmethod
     def from_max_core_bipartite_sets(
             cls,
@@ -82,7 +84,6 @@ class Polygons:
         sorted_qbits = list(map(tuple, map(sorted, qbits)))
         return dict(zip(sorted_qbits, coords))
 
-    # TODO: if qbit not in qbits, raise error. move_to_coord should be better choosen than max
     def update_qbits_coords(
         self,
         qbits: list,
@@ -102,7 +103,15 @@ class Polygons:
                 qbit_to_move = dict(
                     zip(self.qbit_coord_dict.values(), self.qbit_coord_dict.keys())
                 )[new_coord]
-                move_to_coord = tuple(np.add(max(qbit_coords), (1, 0)))
+                radius = 1
+                while True:
+                    free_neighbours = self.free_neighbour_coords(
+                    qbit_coords, radius=radius)
+                    if free_neighbours != []:
+                        break
+                    else:
+                        radius += 1
+                move_to_coord = random.choice(free_neighbours)
                 self.qbit_coord_dict[qbit_to_move] = move_to_coord
                 self.update_core_and_movable_coords(qbit_to_move, move_to_coord)
             self.qbit_coord_dict[qbit] = new_coord
@@ -140,9 +149,9 @@ class Polygons:
         initialization of qbits with random coordinates
         return: dictionary with qbits and coordinates
         """
-        coords = list(np.ndindex(self.N, self.N))
+        coords = list(np.ndindex(min(10, self.N), min(10, self.N)))
         np.random.shuffle(coords)
-        return dict(zip(self.qbits, coords[: self.N]))
+        return dict(zip(self.qbits, coords[: self.K]))
 
     def get_coords_of_polygon(self, polygon):
         """
@@ -198,29 +207,23 @@ class Polygons:
         return Polygons.polygon_length(polygon_coord) - (2 + np.sqrt(2))
 
     @staticmethod
-    def neighbours(coords: tuple):
-        x, y = coords
-        return [
-            (x, y + 1),
-            (x + 1, y + 1),
-            (x + 1, y),
-            (x + 1, y - 1),
-            (x, y - 1),
-            (x - 1, y - 1),
-            (x - 1, y),
-            (x - 1, y + 1),
-        ]
-
-    @staticmethod
-    def free_neighbour_coords(qbit_coords: list):
+    def neighbours(coord: tuple, radius: int=1):
+        """ return list of all direct neighbours (to coord) by default,
+        if radius is larger than one, more neighbours are considered
         """
-        return list of all free neighbours for qbits_coords
+        range_ = range(- radius, radius + 1)
+        return [(x, y) for x in range_ for y in range_ if (x, y) != coord]
+
+    def free_neighbour_coords(self, qbit_coords: list, radius: int=1):
+        """
+        return list of all free neighbours coords (which are on the allowed grid) for qbits_coords
         """
         neighbour_list = []
         for qbit_coord in qbit_coords:
-            neighbour_list += Polygons.neighbours(qbit_coord)
+            neighbour_list += Polygons.neighbours(qbit_coord, radius=radius)
         neighbour_list = list(set(neighbour_list) - set(qbit_coords))
-        return neighbour_list
+        grid_coords = list(np.ndindex(min(10, self.N), min(10, self.N)))
+        return list(set(neighbour_list).intersection(grid_coords))
 
     def inside_core_coords(self):
         """
@@ -301,7 +304,7 @@ class Polygons:
         number of found plaqs in current layout
         """
         from warnings import warn
-        warn("this function will be removed, dont use it anymore")
+        warn("the function n_found_plaqs in polygons.py will be removed, dont use it anymore")
         return len(self.found_plaquettes())
 
     def visualize(self, ax, polygon_coords, zoom=1):

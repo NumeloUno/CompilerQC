@@ -40,7 +40,7 @@ class MC:
         """
         if qbit is None:
             qbit = random.choice(self.polygon.movable_qbits)
-        new_coord = random.choice(Polygons.free_neighbour_coords(self.polygon.core_coords))
+        new_coord = random.choice(self.polygon.free_neighbour_coords(self.polygon.core_coords))
         return [qbit], [new_coord]
 
     def swap_qbits(self):
