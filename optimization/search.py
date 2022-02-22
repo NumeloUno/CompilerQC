@@ -1,4 +1,5 @@
 import random
+from pathlib import Path
 import itertools
 import numpy as np
 from scipy.special import binom
@@ -16,7 +17,7 @@ class MC:
         acceptance: str = "np.exp(- x / y)",
         n_moves: int = 100,
         schedule: dict = {},
-        energy_schedule: dict = {},
+        energy_schedule: dict = {'no_scaling':True},
     ):
         self.energy = energy_object
         self.polygon = energy_object.polygon
@@ -27,30 +28,25 @@ class MC:
         self.n_total_steps = 0
         self.n_moves = n_moves
 
-
     # TODO: add radius to polygon.neighbour function, what if core is not in the middle and only a small part of the graph
     def random_coord_on_grid(
         self,
-        qbit: tuple = None,
-        radius: int = 1,
     ):
         """
         generate random coord next to core (fixed qbits)
         for random movable qbit. If core is empty, take any free neighbour
-        which is still on the grid. Increase neighbourhood radius, if everything in the neighbourhood is occupied
         """
-        if qbit is None:
-            qbit = random.choice(self.polygon.movable_qbits)
+        qbit_coords = list(self.polygon.qbit_coord_dict.values())
+        # isolated qbits are choosen with a higher probability
+        weights = (8 - np.array(Polygons.neighbours_per_qbit(qbit_coords)))
+        weights = [10 * i if i==8 else i for i in weights]
+        qbit = random.choices(self.polygon.qbits, weights=weights)[0]
+            # weights = [2 if qbit not in self.polygon.covered_qbits() else 1 for qbit in self.polygon.movable_qbits]
+            # qbit = random.choices(self.polygon.movable_qbits, weights=weights)[0]
         coords_around_searching = self.polygon.core_coords
         if coords_around_searching == []:
-            coords_around_searching = list(self.polygon.qbit_coord_dict.values())
-        while True:
-            free_neighbours = self.polygon.free_neighbour_coords(
-                    coords_around_searching, radius=radius)
-            if free_neighbours != []:
-                break
-            else:
-                radius += 1
+            coords_around_searching = qbit_coords
+        free_neighbours = self.polygon.free_neighbour_coords(coords_around_searching)
 
         new_coord = random.choice(free_neighbours)
         return [qbit], [new_coord]
@@ -134,6 +130,8 @@ class MC:
         if operation == "swap_lines_in_core":
             qbits, coords = self.swap_lines_in_core()
         self.polygon.update_qbits_coords(qbits, coords)
+        f = Path('coords_per_move.npy').open('ab')
+        np.save(f, list(self.polygon.qbit_coord_dict.values()))
         new_energy = self.energy(self.polygon, self.energy_schedule)
         return current_energy, new_energy
 
@@ -159,10 +157,13 @@ class MC:
         n_steps,
     ):
         for i in range(n_steps):
+            if self.polygon.n_found_plaqs() == self.polygon.C:# or break by minimum energy
+                break
             current_energy, new_energy = self.step(operation)
             delta_energy = self.metropolis(current_energy, new_energy)
-        # update polygon in energy
-        self.energy(self.polygon, self.energy_schedule)
+        # update polygon in energy, still necessary?
+        self.energy(self.polygon)
+        return delta_energy
 
     def optimization_schedule(
             self,

@@ -7,7 +7,6 @@ from CompilerQC import Graph
 import os.path
 from copy import deepcopy
 
-
 homedir = os.path.expanduser("~/UniInnsbruck/")
 path_to_scaling_factors = os.path.join(
     homedir, "CompilerQC/parameter_estimation/parameters"
@@ -44,18 +43,39 @@ class Energy(Polygons):
         for coord in self.polygon_coords:
             if len(coord) == 3:
                 distance = self.is_unit_triangle(coord)
-                if distance == 0:
+                if distance == 3.41421:
                     plaqs_3.append(distance)
                 else: 
                     non_plaqs_3.append(distance)
             if len(coord) == 4:
                 distance = self.is_unit_square(coord)
-                if distance == 0:
+                if distance == 6.82843:
                     plaqs_4.append(distance)
                 else:
                     non_plaqs_4.append(distance)
         return np.array(non_plaqs_3), np.array(non_plaqs_4), np.array(plaqs_3), np.array(plaqs_4)
 
+    def scopes_of_polygons_(self):
+        """ return list of the scopes of all polygons,
+        this function is much faster than scopes_of_polygons,
+        but returns one list instead of four (np3, np4, p3, p4)
+        """
+        return list(map(self.scope_of_polygon, self.polygon_coords))
+    
+    def scaled_distance_to_plaquette_(
+            self,
+            scaling_for_plaq3: float=0,
+            scaling_for_plaq4: float=0,
+            ):
+        """
+        return: list of scopes of all polygons, if a polygon is a plaquette, 
+        the scaling_for_plaq is substracted
+        """
+        scopes = np.round(np.array(self.scopes_of_polygons_()), decimals=5)
+        scopes[ scopes == 3.41421 ] -= scaling_for_plaq3
+        scopes[ scopes == 6.82843 ] -= scaling_for_plaq4
+        return scopes
+           
     def scaled_distance_to_plaquette(
             self,
             scaling_for_plaq3: float=0,
@@ -110,17 +130,17 @@ class Energy(Polygons):
                     )
             return sum(list_of_plaquettes)
         if default_schedule['individual_scaling']:
-            list_of_plaquettes = self.scaled_distance_to_plaquette(
+            list_of_plaquettes = self.scaled_distance_to_plaquette_(
                     scaling_for_plaq3 = self.scaling_for_plaq3,
                     scaling_for_plaq4 = self.scaling_for_plaq4,
                     )
             return sum(list_of_plaquettes)
         if default_schedule['polygon_weight']:
-            list_of_plaquettes = self.scaled_distance_to_plaquette()
+            list_of_plaquettes = self.scaled_distance_to_plaquette_()
             polygon_weights = self.polygon.polygon_weights(list_of_plaquettes)
             return np.dot(np.array(list_of_plaquettes), polygon_weights)
         if default_schedule['no_scaling']:
-            list_of_plaquettes = self.scaled_distance_to_plaquette()
+            list_of_plaquettes = self.scaled_distance_to_plaquette_()
             return sum(list_of_plaquettes)
 
 
