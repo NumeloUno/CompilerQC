@@ -2,6 +2,8 @@ import numpy as np
 import random
 import networkx as nx
 import itertools
+from itertools import combinations
+from math import dist
 from matplotlib import pyplot as plt
 from shapely.geometry import Point, Polygon, MultiPoint, MultiLineString, LineString
 from shapely.ops import polygonize
@@ -33,7 +35,7 @@ class Polygons:
         self.N = logical_graph.N
         self.K = logical_graph.K
         self.C = logical_graph.C
-        cycles = logical_graph.get_cycles(3) + logical_graph.get_cycles(4)
+        cycles = logical_graph.all_3_and_4_cycles
         self.polygons = Polygons.get_all_polygons(cycles)
         if qbit_coord_dict is None:
             qbit_coord_dict = self.init_coords_for_qbits()
@@ -46,8 +48,7 @@ class Polygons:
         ]
         self.core_coords = list(core_qbit_coord_dict.values())
         self.update_qbits_coords(self.core_qbits, self.core_coords)
-        from warnings import warn
-        warn("The maximal grid size is 10 x 10, thats ok since all problems so far can be put on a grid of this size. Of course, this has to be generalized")
+
     @classmethod
     def from_max_core_bipartite_sets(
             cls,
@@ -103,15 +104,7 @@ class Polygons:
                 qbit_to_move = dict(
                     zip(self.qbit_coord_dict.values(), self.qbit_coord_dict.keys())
                 )[new_coord]
-                radius = 1
-                while True:
-                    free_neighbours = self.free_neighbour_coords(
-                    qbit_coords, radius=radius)
-                    if free_neighbours != []:
-                        break
-                    else:
-                        radius += 1
-                move_to_coord = random.choice(free_neighbours)
+                move_to_coord = random.choice(self.free_neighbour_coords(qbit_coords))
                 self.qbit_coord_dict[qbit_to_move] = move_to_coord
                 self.update_core_and_movable_coords(qbit_to_move, move_to_coord)
             self.qbit_coord_dict[qbit] = new_coord
@@ -149,7 +142,9 @@ class Polygons:
         initialization of qbits with random coordinates
         return: dictionary with qbits and coordinates
         """
-        coords = list(np.ndindex(min(10, self.N), min(10, self.N)))
+        init_grid_size = int(np.sqrt(self.K)) + 1
+        coords = list(np.ndindex(init_grid_size, init_grid_size))
+        assert len(coords) > self.K, "init coords: more qbits than coords"
         np.random.shuffle(coords)
         return dict(zip(self.qbits, coords[: self.K]))
 
@@ -187,6 +182,13 @@ class Polygons:
         return normalized_weights
 
     @staticmethod
+    def scope_of_polygon(polygon_coord):
+        """
+        return scope of the polygon
+        """
+        return sum(list(map(lambda c: dist(*c), list(combinations(polygon_coord, 2)))))
+
+    @staticmethod
     def is_unit_square(polygon_coord):
         """
         measure closeness to plaquette
@@ -195,7 +197,7 @@ class Polygons:
         scope = [
             LineString([*x]).length for x in itertools.combinations(polygon_coord, 2)
         ]
-        return sum(scope) - (4 + 2 * np.sqrt(2))
+        return round(sum(scope), 5) #- (4 + 2 * np.sqrt(2))
 
         #return Polygons.polygon_length(polygon_coord) - 4
 
@@ -204,7 +206,7 @@ class Polygons:
         """
         measure closeness to plaquette
         """
-        return Polygons.polygon_length(polygon_coord) - (2 + np.sqrt(2))
+        return round(Polygons.polygon_length(polygon_coord), 5) # - (2 + np.sqrt(2))
 
     @staticmethod
     def neighbours(coord: tuple, radius: int=1):
@@ -217,14 +219,29 @@ class Polygons:
 
     def free_neighbour_coords(self, qbit_coords: list, radius: int=1):
         """
-        return list of all free neighbours coords (which are on the allowed grid) for qbits_coords
+        return list of all free neighbours coords for qbits_coords (which are not isolated)
+        if there are no free neighbours, increase neighbourhood
         """
         neighbour_list = []
-        for qbit_coord in qbit_coords:
-            neighbour_list += Polygons.neighbours(qbit_coord, radius=radius)
-        neighbour_list = list(set(neighbour_list) - set(qbit_coords))
-        grid_coords = list(np.ndindex(min(10, self.N), min(10, self.N)))
-        return list(set(neighbour_list).intersection(grid_coords))
+        non_isolated_qbits = [qbit for qbit, n_neigh in zip(qbit_coords, Polygons.neighbours_per_qbit(qbit_coords)) if n_neigh > 0]
+        while True:
+            for qbit_coord in non_isolated_qbits:
+                neighbour_list += Polygons.neighbours(qbit_coord, radius=radius)
+            neighbour_list = [coord for coord in neighbour_list if coord not in qbit_coords]
+            if neighbour_list != []:
+                return neighbour_list
+            else:
+                radius += 1
+    
+    @staticmethod
+    def neighbours_per_qbit(qbit_coords: list):
+        """
+        returns a list of qbit neighbours for each qbit,
+        e.g. 0 means this qbit is isolated and has not qbits
+        """
+        return [len(
+            set(Polygons.neighbours(qbit_coord)).intersection(qbit_coords)
+            ) for qbit_coord in qbit_coords]
 
     def inside_core_coords(self):
         """
@@ -347,6 +364,13 @@ class Polygons:
                 for coord in self.get_all_polygon_coords()])
                 == 0 ]
         return [list(map(tuple, plaquette)) for plaquette in plaquettes]
+
+    def covered_qbits(self):
+        """
+        returns list of all qbits which are in a plaq
+        """
+        found_plaqs = self.found_plaquettes()
+        return list(set([qbit for plaq in found_plaqs for qbit in plaq]))
 
     def to_nx_graph(self):
         """

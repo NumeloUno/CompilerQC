@@ -14,6 +14,7 @@ class Graph:
         self.K = self.num_edges()
         self.C = self.num_constrains()
         self.clear()
+        self.all_3_and_4_cycles = self.get_cycles(3) + self.get_cycles(4)
 
     def to_nx_graph(self):
         """converts Graph object to networkx object"""
