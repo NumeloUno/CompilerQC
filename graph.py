@@ -18,7 +18,8 @@ class Graph:
 
     def to_nx_graph(self):
         """converts Graph object to networkx object"""
-        return nx.from_numpy_matrix(self.adj_matrix)
+        return nx.from_numpy_array(self.adj_matrix)
+    
 
     def clear(self):
         self.visited = [False] * self.N
