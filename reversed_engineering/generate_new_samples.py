@@ -16,7 +16,7 @@ password = "4k9ZF8k!w99geb"
 client = Client(user, password)
 
 
-def create_problem(client, num_constraints: int, square_plaquette_probability: int):
+def create_problem(num_constraints: int, square_plaquette_probability: int):
     """
     create logical problem and its compiled solution
     on a 8 x 8 grid, with num_constraints
@@ -37,8 +37,7 @@ def create_problem(client, num_constraints: int, square_plaquette_probability: i
 
     return output
 
-
-def save_problem(output, save_in_folder: str):
+def translate_and_save_problem(output, save_in_folder: str='training_set', save: bool=True):
     """
     brings output from create_problem() in form
     for Graph class (adj_matrix) and Polygon class
@@ -64,21 +63,25 @@ def save_problem(output, save_in_folder: str):
     C = len(output.compiled_problem.constraints)
     K = len(qbits)
     N = np.abs(C - K - 1)
+    
+    if save:
 
-    eventid = datetime.now().strftime("%Y%m-%d%H-%M%S-") + str(uuid4())
-    # Save
-    os.makedirs(
-        paths.database_path / save_in_folder / f"problem_N_{N}_K_{K}_C_{C}",
-        exist_ok=True,
-    )
-    dictionary = {"qbit_coord_dict": qbit_coord_dict, "graph_adj_matrix": adj_matrix}
-    np.save(
-        paths.database_path
-        / save_in_folder
-        / f"problem_N_{N}_K_{K}_C_{C}"
-        / f"{eventid}.npy",
-        dictionary,
-    )
+        eventid = datetime.now().strftime("%Y%m-%d%H-%M%S-") + str(uuid4())
+        # Save
+        os.makedirs(
+            paths.database_path / save_in_folder / f"problem_N_{N}_K_{K}_C_{C}",
+            exist_ok=True,
+        )
+        dictionary = {"qbit_coord_dict": qbit_coord_dict, "graph_adj_matrix": adj_matrix}
+        np.save(
+            paths.database_path
+            / save_in_folder
+            / f"problem_N_{N}_K_{K}_C_{C}"
+            / f"{eventid}.npy",
+            dictionary,
+        )
+    
+    return adj_matrix, qbit_coord_dict
 
 
 if __name__ == "__main__":
@@ -116,8 +119,8 @@ if __name__ == "__main__":
     for sample in tqdm(range(args.number_of_new_samples), desc="Generate new samples"):
         for C in range(args.min_num_consraints, args.max_num_consraints):
             square_plaquette_probability = random.uniform(0.2, 1)
-            output = create_problem(client, C, square_plaquette_probability)
+            output = create_problem(C, square_plaquette_probability)
             # visualize_parityos_output(output)
-            save_problem(output, save_in_folder=args.path)
+            translate_and_save_problem(output, save_in_folder=args.path)
 
 # read_dictionary = np.load(paths.database_path / f'problem_N_{N}_K_{K}_C_{C}' / filename,allow_pickle='TRUE').item()
