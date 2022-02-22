@@ -26,7 +26,7 @@ def evaluate_optimization(
     configuration distribution, ...) is
     """
     success_rate = []
-    for iteration in range(batch_size):
+    for iteration in tqdm(range(batch_size), desc="Iterations per sample"):
         mc = MC(deepcopy(energy_object))
         mc = update_mc(mc, mc_schedule)
         for repetition in range(mc.n_moves):
@@ -67,13 +67,15 @@ def run_benchmark(
         file.write(
             name + " " + str(succes_rate) + " " + str(energy_object.polygon.N) + "\n"
         )
-        print(name, succes_rate)
+        print(name, succes_rate, energy_object.polygon.N)
     file.close()
 
 def benchmark_problem_folder(args):
-    for file in tqdm(get_files_to_problems(args.problem_folder), desc=f"Evaluate problems in folder {args.problem_folder}"):
-        if int(str(file).split('_')[-3]) > args.max_C:
-            continue
+    problems = get_files_to_problems(
+                problem_folder=args.problem_folder,
+                max_C=args.max_C
+                )
+    for file in tqdm(problems, desc=f"Evaluate problems in folder {args.problem_folder}"):
         graph_adj_matrix, qbit_coord_dict = (
             problem_from_file(file))
         polygon_scopes, NKC = energy_from_problem(graph_adj_matrix, qbit_coord_dict)
@@ -92,7 +94,6 @@ def benchmark_problem_folder(args):
         energy_object.scaling_for_plaq4 = scaling_for_plaquette
         run_benchmark(energy_object, args.batchsize, args.id_of_benchmark)
 
-        break
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
