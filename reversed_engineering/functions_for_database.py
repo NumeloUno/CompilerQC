@@ -28,14 +28,15 @@ def energy_from_problem(graph_adj_matrix: np.array, qbit_coord_dict: dict):
     energy(polygon_object=polygon_object) # just to initialize energy.polygon_coords
     return energy.scopes_of_polygons(), [polygon_object.N, polygon_object.K, polygon_object.C]
 
-def get_files_to_problems(problem_folder: str="training_set"):
+def get_files_to_problems(problem_folder: str="training_set", max_C: int=50):
     """
-    returns all files in problem_folder
+    returns all files in problem_folder, if problem has less constraints C than max_C
     """
     filenames = []
     for path in os.listdir(paths.database_path / problem_folder):
-        for filename in os.listdir(paths.database_path  / problem_folder / path):
-            filenames.append(paths.database_path / problem_folder / path / filename)
+        if int(path.split('_')[-1]) <= max_C:
+            for filename in os.listdir(paths.database_path  / problem_folder / path):
+                filenames.append(paths.database_path / problem_folder / path / filename)
     return filenames
 
 def get_all_distances(problem_folder: str="training_set"):
