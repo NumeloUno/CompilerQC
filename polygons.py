@@ -1,15 +1,8 @@
 import numpy as np
 import random
-import networkx as nx
-import itertools
 from itertools import combinations
 from math import dist
 from matplotlib import pyplot as plt
-from shapely.geometry import Point, Polygon, MultiPoint, MultiLineString, LineString
-from shapely.ops import polygonize
-from shapely import wkt
-from CompilerQC import Graph
-
 
 class Polygons:
     """
@@ -18,117 +11,27 @@ class Polygons:
     other qbits if they formed a closed cyle (3 or 4 length) 
     in the graph. So the qbits are connected to polygons of
     length three or four. Some qbits are part of the core 
-    (definded by the core bipartite sets). If the class is 
-    initialized with a qbit to coord dict, the coords are not 
-    thrown randomly on the grid.
+    (e.g. definded by the core bipartite sets).
     """
+    
+    unit_triangle_scope = round((np.sqrt(2) + 2) / 3, 5)
+    unit_square_scope = round((2 * np.sqrt(2) + 4) / 4, 5)
+
     def __init__(
         self,
-        logical_graph: Graph,
-        core_qbit_coord_dict = dict(),
-        qbit_coord_dict: dict=None,
+        qbits: 'Qbits'
     ):
         """
         logical_graph: logical graph with N nodes and K edges
         """
-        self.qbits = logical_graph.qbits_from_graph()
-        self.N = logical_graph.N
-        self.K = logical_graph.K
-        self.C = logical_graph.C
-        cycles = logical_graph.all_3_and_4_cycles
-        self.polygons = Polygons.get_all_polygons(cycles)
-        if qbit_coord_dict is None:
-            qbit_coord_dict = self.init_coords_for_qbits()
-        self.qbit_coord_dict = qbit_coord_dict
-        # define qbits and their coords for core and outside core
-        self.core_qbits = list(core_qbit_coord_dict.keys())
-        self.movable_qbits = list(set(self.qbits) - set(self.core_qbits))
-        self.movable_coords = [
-            self.qbit_coord_dict[qbit] for qbit in self.movable_qbits
-        ]
-        self.core_coords = list(core_qbit_coord_dict.values())
-        self.update_qbits_coords(self.core_qbits, self.core_coords)
+        self.qbits = qbits
+        self.graph = self.qbits.graph
+        self.polygons = Polygons.create_polygons(self.graph.cycles)
+        self.qbits.set_all_polygons(self.polygons)
 
-    @classmethod
-    def from_max_core_bipartite_sets(
-            cls,
-            logical_graph: Graph,
-            core_bipartite_sets: list = [[], []],
-            ):
-        """
-        initialize Polygons object by using bipartite core sets U and V
-        """
-        cls.U, cls.V = core_bipartite_sets
-        core_qbit_coord_dict = Polygons.core_qbits_and_coords_from_sets(
-            cls.U,
-            cls.V,
-        )
-        return cls(logical_graph=logical_graph,core_qbit_coord_dict=core_qbit_coord_dict)
 
     @staticmethod
-    def core_qbits_and_coords_from_sets(
-        U: list,
-        V: list,
-    ):
-        """
-        input: two sets of logical bits, generating the
-        complete bipartite graph
-        return: list of qbits and their coords
-        which build the core of the physical graph
-        """
-        # coords
-        x, y = np.meshgrid(np.arange(len(U)), np.arange(len(V)))
-        coords = list(zip(x.flatten(), y.flatten()))
-        # qbits
-        lbit1, lbit2 = np.meshgrid(U, V)
-        qbits = list(zip(lbit1.flatten(), lbit2.flatten()))
-        sorted_qbits = list(map(tuple, map(sorted, qbits)))
-        return dict(zip(sorted_qbits, coords))
-
-    def update_qbits_coords(
-        self,
-        qbits: list,
-        new_coords: list,
-    ):
-        """
-        qbits: list of tuples
-        new_coords: list of tuples
-        if new_coord is already occupied by a qbit,
-        this qbit is moved to the max coord + (1, 0)
-        """
-        # copying the lists to detach them from class, otherwise lists are changed during loop
-        qbits, new_coords = qbits[:], new_coords[:]
-        for qbit, new_coord in zip(qbits, new_coords):
-            qbit_coords = self.qbit_coord_dict.values()
-            if new_coord in qbit_coords:
-                qbit_to_move = dict(
-                    zip(self.qbit_coord_dict.values(), self.qbit_coord_dict.keys())
-                )[new_coord]
-                move_to_coord = random.choice(self.free_neighbour_coords(qbit_coords))
-                self.qbit_coord_dict[qbit_to_move] = move_to_coord
-                self.update_core_and_movable_coords(qbit_to_move, move_to_coord)
-            self.qbit_coord_dict[qbit] = new_coord
-            self.update_core_and_movable_coords(qbit, new_coord)
-
-    def update_core_and_movable_coords(
-        self,
-        qbit: tuple,
-        new_coord: tuple,
-    ):
-        """
-        update core_coords or movable_coords
-        """
-        if qbit in self.core_qbits:
-            self.core_coords[self.core_qbits.index(qbit)] = new_coord
-        elif qbit in self.movable_qbits:
-            self.movable_coords[self.movable_qbits.index(qbit)] = new_coord
-        else:
-            raise AssertionError(
-                "qbit is neither in the core nor in the movable part", qbit
-            )
-
-    @staticmethod
-    def get_polygon_from_cycle(cycle: list):
+    def create_polygon_from_cycle(cycle: list):
         """
         cycle: cycle in graph
         returns polygon
@@ -137,212 +40,91 @@ class Polygons:
         polygon = list(map(tuple, map(sorted, zip(cycle, cycle[1:]))))
         return polygon
 
-    def init_coords_for_qbits(self):
-        """
-        initialization of qbits with random coordinates
-        return: dictionary with qbits and coordinates
-        """
-        init_grid_size = int(np.sqrt(self.K)) + 1
-        coords = list(np.ndindex(init_grid_size, init_grid_size))
-        assert len(coords) > self.K, "init coords: more qbits than coords"
-        np.random.shuffle(coords)
-        return dict(zip(self.qbits, coords[: self.K]))
-
-    def get_coords_of_polygon(self, polygon):
+    @staticmethod
+    def create_polygons(cycles):
+        return list(map(Polygons.create_polygon_from_cycle, cycles))
+    
+    @staticmethod
+    def coords_of_polygon(qubit_to_coord_dict: dict, polygon):
         """
         return: list of coords of single polygon
         """
-        return list(map(self.qbit_coord_dict.get, polygon))
+        return list(map(qubit_to_coord_dict.get, polygon))
 
-    @staticmethod
-    def polygon_length(polygon_coord):
-        return Polygon(polygon_coord).length
-
-    @staticmethod
-    def polygon_area(polygon_coord):
-        return Polygon(polygon_coord).area
-
-    @staticmethod
-    def get_all_polygons(cycles):
-        return list(map(Polygons.get_polygon_from_cycle, cycles))
-
-    def get_all_polygon_coords(self):
+    @staticmethod    
+    def polygons_coords(qubit_to_coord_dict: dict, polygons):
         """
-        return: list of lists, each list contains
-        coordinates of a polygon
-        """
-        return list(map(self.get_coords_of_polygon, self.polygons))
-
-    # TODO: this function can get very important, think more about it
-    def polygon_weights(self, closeness_to_plaquette):
-        ctp = np.array(closeness_to_plaquette)
-        ones = np.ones_like(ctp)
-        weights = np.divide(ones, ctp, out=(ones * 999), where=(ctp != 0))
-        normalized_weights = weights / (weights.sum() / self.C)
-        return normalized_weights
+        return: array of lists, each list contains
+        coordinates of a polygon,
+        """ 
+        return [Polygons.coords_of_polygon(qubit_to_coord_dict, polygon) for polygon in polygons]
+    
 
     @staticmethod
     def scope_of_polygon(polygon_coord):
         """
         return scope of the polygon
         """
-        return sum(list(map(lambda c: dist(*c), list(combinations(polygon_coord, 2)))))
+        return round(sum([dist(*c) for c in list(combinations(polygon_coord, 2))]) / len(polygon_coord), 5)
 
-    @staticmethod
-    def is_unit_square(polygon_coord):
-        """
-        measure closeness to plaquette
-        also from sanduhr plaquettes
-        """
-        scope = [
-            LineString([*x]).length for x in itertools.combinations(polygon_coord, 2)
-        ]
-        return round(sum(scope), 5) #- (4 + 2 * np.sqrt(2))
 
-        #return Polygons.polygon_length(polygon_coord) - 4
+    def envelop_rect(self, padding: int=1):
+        """
+        generate grid coords of envelop rectengular (of all qbits) with padding
+        """
+        x, y = np.array(self.qbits.coords).T
+        x, y = np.meshgrid(np.arange(min(x) - padding, max(x) + (padding + 1)),
+                           np.arange(min(y) - padding, max(y) + (padding + 1)))
+        return list(zip(x.flatten(), y.flatten()))      
 
-    @staticmethod
-    def is_unit_triangle(polygon_coord):
+    def found_plaqs(self):
         """
-        measure closeness to plaquette
+        listing all plaquettes in current compilation,
+        without looping over all polygons
         """
-        return round(Polygons.polygon_length(polygon_coord), 5) # - (2 + np.sqrt(2))
-
-    @staticmethod
-    def neighbours(coord: tuple, radius: int=1):
-        """ return list of all direct neighbours (to coord) by default,
-        if radius is larger than one, more neighbours are considered
-        """
-        range_ = range(- radius, radius + 1)
-        return [tuple(np.add(coord, (x, y)))
-                for x in range_ for y in range_ if (x, y) != (0, 0)]
-
-    def free_neighbour_coords(self, qbit_coords: list, radius: int=1):
-        """
-        return list of all free neighbours coords for qbits_coords (which are not isolated)
-        if there are no free neighbours, increase neighbourhood
-        """
-        neighbour_list = []
-        non_isolated_qbits = [qbit for qbit, n_neigh in zip(qbit_coords, Polygons.neighbours_per_qbit(qbit_coords)) if n_neigh > 0]
-        while True:
-            for qbit_coord in non_isolated_qbits:
-                neighbour_list += Polygons.neighbours(qbit_coord, radius=radius)
-            neighbour_list = [coord for coord in neighbour_list if coord not in qbit_coords]
-            if neighbour_list != []:
-                return neighbour_list
-            else:
-                radius += 1
+        coords = self.envelop_rect(padding=0)
+        coord_to_qbit_dict = self.qbits.coord_to_qbit_dict
+        # get upper right square of coords for each coord
+        square = lambda coord: [coord_to_qbit_dict.get((coord[0]+i, coord[1]+j), np.nan) for i in range(2) for j in range(2)]
+        # remove nan in each square
+        qbits_in_each_square = [list(filter(lambda v: v==v, square)) for square in list(map(square, coords))]
+        # consider only squares with more than 2 qbits
+        relevant_squares = [[qbit.qubit for qbit in square ]for square in qbits_in_each_square  if len(square) > 2]
+        # list of 3 combinations and 4 combis, 4 combis are appended by all possible 3 combis
+        possible_plaqs = [[i] if len(i) == 3 else list(combinations(i, 3))+[i] for i in relevant_squares]
+        # count number of nodes in each 3er or 4er combination, divide it by length of combination
+        a = [[len(set(sum(x,()))) / len(x) for x in i] for i in possible_plaqs]
+        # if there is a one in a 3er combi, there is a plaquette
+        # if there is a one in a 4er combi and its 3 combinations (for 3plaqs), its a 4 plaq
+        # if there are two ones in a a 4er combi and its 3 combinations (for 3plaqs), the first one is a 3er plaq
+        return ([possible_plaqs[i][j] for i,j  in [[i,l.index(1)] for i,l in enumerate(a) if 1 in l]])
     
-    @staticmethod
-    def neighbours_per_qbit(qbit_coords: list):
-        """
-        returns a list of qbit neighbours for each qbit,
-        e.g. 0 means this qbit is isolated and has not qbits
-        """
-        return [len(
-            set(Polygons.neighbours(qbit_coord)).intersection(qbit_coords)
-            ) for qbit_coord in qbit_coords]
-
-    def inside_core_coords(self):
-        """
-        return: list of coords which are inside the core,
-        not at the edge of it
-        """
-        neighbour_coords = map(Polygons.neighbours, self.core_coords)
-        is_inside_core = list(
-            map(lambda s: set(s).issubset(self.core_coords), neighbour_coords)
-        )
-        inside_coords = list(itertools.compress(self.core_coords, is_inside_core))
-        return inside_coords
-
-    def polygons_outside_core(self):
-        """
-        returns all polygons which are not connected to
-        coords inside the core
-        """
-        inside_coords = self.inside_core_coords()
-        return [
-            coords
-            for coords in self.get_all_polygon_coords()
-            if set(coords).isdisjoint(inside_coords)
-        ]
-
-    def convex_hull(self, qbit_coords: list = None):
-        """
-        return envelop polygon of qbit_coords, if
-        qbit_coords are None, all qbits coords are considered
-        """
-        if qbit_coords is None:
-            qbit_coords = list(self.qbit_coord_dict.values())
-        qbits = MultiPoint(qbit_coords)
-        envelop_polygon = qbits.convex_hull
-        return list(envelop_polygon.exterior.coords)
-
-    def center_of_convex_hull(
-        self,
-        qbit_coords: list = None,
-    ):
-        """
-        return center coords of enevelop of qbit_coords,
-        if None, all qbits are considered
-        """
-        center = Polygon(self.convex_hull(qbit_coords)).centroid
-        return (center.x, center.y)
-
-    def qbit_distances_to_center(
-        self,
-        qbit_coords: list = None,
-    ):
-        """
-        list of distances for each qbit to center of qbit_coords,
-        could e.g be the core_coords --> core_center
-        """
-        center = self.center_of_convex_hull(qbit_coords)
-        if qbit_coords is None:
-            qbit_coords = self.qbit_coord_dict.values()
-        distances = list(map(lambda x: Point(center).distance(Point(x)), qbit_coords))
-        return distances
-
-    def move_center_to_middle(self):
-        """
-        calculates the CoM of the convex hull
-        and moves the hull to the center of the grid
-        """
-        center_x, center_y = map(int, self.center_of_convex_hull())
-        middle_x = middle_y = self.K // 2
-        move_x, move_y = center_x - middle_x, center_y - middle_y
-        new_coords = [
-            (coord[0] - move_x, coord[1] - move_y)
-            for coord in self.qbit_coord_dict.values()
-        ]
-        self.update_qbits_coords(self.qbits, new_coords)
-        
-    def n_found_plaqs(self):
-        """
-        number of found plaqs in current layout
-        """
-        from warnings import warn
-        warn("the function n_found_plaqs in polygons.py will be removed, dont use it anymore")
-        return len(self.found_plaquettes())
-
-    def visualize(self, ax, polygon_coords, zoom=1):
-        x, y = np.meshgrid(np.arange(self.K), np.arange(self.K))
-        ax.scatter(x.flatten(), y.flatten(), color="grey", s=0.6)
+    @property
+    def number_of_plaqs(self):
+        return len(self.found_plaqs())
+    
+    
+    def visualize(self, ax=None, zoom=1):
+        if ax is None:
+            _, ax = plt.subplots()
+        x, y = list(zip(*self.envelop_rect()))
+        ax.scatter(x, y, color="grey", s=0.6)
         ax.set_yticklabels([])
         ax.set_xticklabels([])
-        for polygon in polygon_coords:
+        for polygon in self.polygons_coords(self.qbits.qubit_to_coord_dict, self.polygons):
             fill, facecolor = False, None
-            if len(polygon) == 4 and self.is_unit_square(polygon) == 0:
+            if self.scope_of_polygon(polygon) == self.unit_square_scope:
                 fill, facecolor = True, "lightblue"
-            if len(polygon) == 3 and self.is_unit_triangle(polygon) == 0:
+            if self.scope_of_polygon(polygon) == self.unit_triangle_scope:
                 fill, facecolor = True, "indianred"
             patch = plt.Polygon(polygon, zorder=0, fill=fill, lw=0, facecolor=facecolor)
             ax.add_patch(patch)
-        for qbit, coord in self.qbit_coord_dict.items():
+        for qbit, coord in self.qbits.qubit_to_coord_dict.items():
             ax.annotate(str(qbit), coord)
             ax.scatter(*coord, color="red")
-        x_range = sorted(self.convex_hull(), key=lambda x: x[0])
-        y_range = sorted(self.convex_hull(), key=lambda y: y[1])
+
+        x_range = sorted(self.envelop_rect(), key=lambda x: x[0])
+        y_range = sorted(self.envelop_rect(), key=lambda y: y[1])
         ax.set_xlim(
             min(x_range[0][0], y_range[0][1]) - zoom,
             max(x_range[-1][0], y_range[-1][1]) + zoom,
@@ -351,37 +133,3 @@ class Polygons:
             min(x_range[0][0], y_range[0][1]) - zoom,
             max(x_range[-1][0], y_range[-1][1]) + zoom,
         )
-        return ax
-
-    def found_plaquettes(self):
-        """
-        list all plaquettes which are in the current layout
-        """
-        plaquettes = np.array(self.polygons, dtype=object)[
-                np.array([Polygons.is_unit_square(coord)
-                if len(coord) == 4
-                else Polygons.is_unit_triangle(coord)
-                for coord in self.get_all_polygon_coords()])
-                == 0 ]
-        return [list(map(tuple, plaquette)) for plaquette in plaquettes]
-
-    def covered_qbits(self):
-        """
-        returns list of all qbits which are in a plaq
-        """
-        found_plaqs = self.found_plaquettes()
-        return list(set([qbit for plaq in found_plaqs for qbit in plaq]))
-
-    def to_nx_graph(self):
-        """
-        converts the current layout to a graph,
-        only valid polygons (plaquettes) are considered
-        """
-        edges = list(map(Polygons.get_polygon_from_cycle, self.found_plaquettes()))
-        edges = [edge for edge_list in edges for edge in edge_list]
-
-        physical_graph = nx.Graph()
-        physical_graph.add_nodes_from(self.qbits)
-        physical_graph.add_edges_from(edges)
-
-        return nx.to_undirected(physical_graph)

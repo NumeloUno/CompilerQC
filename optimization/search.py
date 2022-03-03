@@ -1,155 +1,90 @@
-import random
-from pathlib import Path
-import itertools
+import random 
 import numpy as np
-from scipy.special import binom
 from copy import deepcopy
-from CompilerQC import Polygons, core
-from CompilerQC.objective_function import Energy
-from shapely.geometry import LineString
-
+from CompilerQC import Energy
 
 class MC:
     def __init__(
         self,
         energy_object: Energy,
         temperatur_schedule: str = "1 / x",
-        acceptance: str = "np.exp(- x / y)",
-        n_moves: int = 100,
-        schedule: dict = {},
-        energy_schedule: dict = {'no_scaling':True},
     ):
         self.energy = energy_object
-        self.polygon = energy_object.polygon
         self.temperatur_schedule = temperatur_schedule
-        self.acceptance = acceptance
-        self.schedule = schedule
-        self.energy_schedule = energy_schedule
         self.n_total_steps = 0
-        self.n_moves = n_moves
+        self.n_good_moves = 0
+        self.n_bad_moves = 0
+        self.check_sum = 0
 
-    # TODO: add radius to polygon.neighbour function, what if core is not in the middle and only a small part of the graph
-    def random_coord_on_grid(
-        self,
-    ):
+    def select_move(self):
         """
-        generate random coord next to core (fixed qbits)
-        for random movable qbit. If core is empty, take any free neighbour
+        move random qbit to random coord
+        if coord is already occupied, swap qbits
         """
-        qbit_coords = list(self.polygon.qbit_coord_dict.values())
-        # isolated qbits are choosen with a higher probability
-        weights = (8 - np.array(Polygons.neighbours_per_qbit(qbit_coords)))
-        weights = [10 * i if i==8 else i for i in weights]
-        qbit = random.choices(self.polygon.qbits, weights=weights)[0]
-            # weights = [2 if qbit not in self.polygon.covered_qbits() else 1 for qbit in self.polygon.movable_qbits]
-            # qbit = random.choices(self.polygon.movable_qbits, weights=weights)[0]
-        coords_around_searching = self.polygon.core_coords
-        if coords_around_searching == []:
-            coords_around_searching = qbit_coords
-        free_neighbours = self.polygon.free_neighbour_coords(coords_around_searching)
-
-        new_coord = random.choice(free_neighbours)
-        return [qbit], [new_coord]
-
-    def swap_qbits(self):
+        qbit = self.energy.polygon_object.qbits.random()
+        target_coord = self.generate_coord()
+        if target_coord in self.energy.polygon_object.qbits.coords:
+            target_qbit = self.energy.polygon_object.qbits.qbit_from_coord(target_coord)
+            return qbit, target_qbit
+        else: 
+            return qbit, target_coord
+        
+    def apply_move(self, qbit, coord_or_qbit):
         """
-        swap qbits which are next to each other
-        if no qbits are next to each other, swap any qbits
+        move qbit to coord
+        if coord is a qbit (occupied coord), swap qbits
         """
-        qbit_coords = self.polygon.movable_coords.copy()
-        random.shuffle(qbit_coords)
-        for coord in qbit_coords:
-            coords_neighbour_qbits = list(set(
-                    Polygons.neighbours(coord)
-                    ).intersection(
-                    self.polygon.movable_coords))
-            if len(coords_neighbour_qbits):
-                random.shuffle(coords_neighbour_qbits)
-                coord_to_swap_with = coords_neighbour_qbits[0]
-                coord_qbit_dict = {v:k for k,v in 
-                        self.polygon.qbit_coord_dict.items()}
-                qbit1 = coord_qbit_dict[coord]
-                qbit2 = coord_qbit_dict[coord_to_swap_with]
-                return [qbit1, qbit2], [coord_to_swap_with, coord]
+        if type(coord_or_qbit) == tuple:
+            qbit.coord = coord_or_qbit        
         else:
-            qbit1, qbit2 = random.sample(self.polygon.movable_qbits, 2)
-            return [qbit1, qbit2], [self.polygon.qbit_coord_dict[qbit2], self.polygon
-                    .qbit_coord_dict[qbit1]]
-
-    def swap_lines_in_core(
-        self,
-    ):
+            self.energy.polygon_object.qbits.swap_qbits(qbit, coord_or_qbit)
+            
+    def generate_coord(self):
         """
-        swap two logical nodes(from set U or V) only in core -> swap lines
+        generate random coord in grid
+        ###change generate coord only every e.g. 5 steps
         """
-        try:
-            U_or_V = random.sample([self.polygon.U, self.polygon.V], 1)[0]
-            a, b = random.sample(U_or_V, 2)
-            n = self.polygon.core_qbits
-            n = [(-1, k) if i == a else (i, k) for i, k in n]
-            n = [(i, -1) if k == a else (i, k) for i, k in n]
-            n = [(a, k) if i == b else (i, k) for i, k in n]
-            n = [(i, a) if k == b else (i, k) for i, k in n]
-            n = [(b, k) if i == -1 else (i, k) for i, k in n]
-            swapped_core_qbits = [(i, b) if k == -1 else (i, k) for i, k in n]
-            sorted_swapped_core_qbits = list(
-                map(lambda x: tuple(sorted(x)), swapped_core_qbits)
-            )
-            # detach core_coords from class
-            core_coords = [coord for coord in self.polygon.core_coords]
-            return sorted_swapped_core_qbits, core_coords
-        except AttributeError:
-            print('sets U and V arent defined yet, please define them to call this function')
-
-    def most_distant_qbit_from_core(self):
-        core_center = self.polygon.center_of_convex_hull(self.polygon.core_coords)
-        distances = list(
-            map(
-                lambda coord: LineString([core_center, coord]).length,
-                self.polygon.movable_coords,
-            )
-        )
-        most_distand_qbit = self.polygon.movable_coords[distances.index(max(distances))]
-        # TODO: add variance of distances, if small --> return None
-        return [
-            qbit
-            for qbit, coord in self.polygon.qbit_coord_dict.items()
-            if coord == most_distand_qbit
-        ]
+        possible_coords = self.energy.polygon_object.envelop_rect()    
+        return random.choice(possible_coords)
 
     def step(
         self,
         operation: str,
     ):
-        self.current_polygon = deepcopy(self.polygon)
-        current_energy = self.energy(self.polygon, self.energy_schedule)
-        if operation == "random":
-            qbits, coords = self.random_coord_on_grid()
-        if operation == "swap":
-            qbits, coords = self.swap_qbits()
-        if operation == "swap_lines_in_core":
-            qbits, coords = self.swap_lines_in_core()
-        self.polygon.update_qbits_coords(qbits, coords)
-        f = Path('coords_per_move.npy').open('ab')
-        np.save(f, list(self.polygon.qbit_coord_dict.values()))
-        new_energy = self.energy(self.polygon, self.energy_schedule)
+        self.current_qbits = deepcopy(self.energy.polygon_object.qbits)
+        qbits_to_move = self.select_move()
+        self.qbits_to_move = qbits_to_move
+        current_energy = self.energy(qbits_to_move)
+        self.apply_move(*qbits_to_move)
+        new_energy = self.energy(qbits_to_move)
         return current_energy, new_energy
-
-    def temperature(self, k: int=None):
-        if k is None:
-            k = self.n_total_steps
+    
+    # TODO: handle warning (overflow encountered)
+    @property
+    def temperature(self):
+        k = self.n_total_steps
         temperatur = lambda x: eval(str(self.temperatur_schedule))
-        return temperatur(k) + 1e-5
+        return temperatur(k + 1)
+    
+    def initial_temperature(self):
+        """
+        estimate the initial Temperature T_0
+        """
+        pass
 
     def metropolis(self, current_energy, new_energy):
         self.n_total_steps += 1
         delta_energy = new_energy - current_energy
-        acceptance_probability = lambda x, y: eval(str(self.acceptance))
-        if random.random() < min([1, acceptance_probability(delta_energy, self.temperature())]):
-            pass
+        if delta_energy < 0:
+            self.n_good_moves += 1
+            return
+        acceptance_probability = np.exp(- delta_energy / self.temperature)
+        if random.random() < acceptance_probability:
+            self.n_bad_moves += 1
+            return 
         else:
-            self.polygon = self.current_polygon
-        return delta_energy
+            self.check_sum += 1
+            self.energy.polygon_object.qbits = self.current_qbits
 
     def apply(
         self,
@@ -157,13 +92,12 @@ class MC:
         n_steps,
     ):
         for i in range(n_steps):
-            if self.polygon.n_found_plaqs() == self.polygon.C:# or break by minimum energy
-                break
+            if self.energy.polygon_object.number_of_plaqs == self.energy.polygon_object.graph.C:
+                return 0 # ? what is the best value np.nan, None, ?
             current_energy, new_energy = self.step(operation)
-            delta_energy = self.metropolis(current_energy, new_energy)
-        # update polygon in energy, still necessary?
-        self.energy(self.polygon)
-        return delta_energy
+            self.metropolis(current_energy, new_energy)
+        return new_energy - current_energy
+
 
     def optimization_schedule(
             self,
@@ -172,5 +106,5 @@ class MC:
         schedule is a dict = {operation:n_steps}
         set schedule for the optimization
         """
-        for operation, n_steps in self.schedule.items():
-            self.apply(operation, n_steps)
+        for operation, n_steps in self.operation_schedule.items():
+            self.apply(operation, n_steps)   
