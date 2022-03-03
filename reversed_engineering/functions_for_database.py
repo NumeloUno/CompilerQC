@@ -1,11 +1,8 @@
 import numpy as np
 import argparse
-import random
-from CompilerQC import Graph, paths
-from CompilerQC import Polygons
-from CompilerQC import Energy
 import os 
-from scipy.optimize import dual_annealing
+import random
+from CompilerQC import Graph, Qbits, Polygons, Energy, paths
 
 
 def problem_from_file(path_to_problem: str):
@@ -16,25 +13,26 @@ def problem_from_file(path_to_problem: str):
     read_dictionary = np.load(path_to_problem, allow_pickle='TRUE').item()
     return read_dictionary['graph_adj_matrix'], read_dictionary['qbit_coord_dict']
 
-def energy_from_problem(graph_adj_matrix: np.array, qbit_coord_dict: dict):
+# TODO: make this function more flexible, if one is for example interested in energy without qbits in core
+def energy_from_problem(graph_adj_matrix: np.array, qubit_coord_dict: dict):
     """
-    input: graph adj matrix and qbit_to_coord dict
-    returns the energy of a graph and its qbit to coord 
-    translation and the number of logical nodes N
+    input: graph adj matrix and qubit_to_coord dict
+    returns the scopes of nonplaqs3, nonplaqs4, plaqs3, plaqs4 of a graph and its qbit to coord 
+    translation and the number of logical nodes N, qbits K and constraints C
     """
     graph = Graph(adj_matrix=graph_adj_matrix)
-    polygon_object = Polygons(graph, qbit_coord_dict=qbit_coord_dict)
+    qbits = Qbits.init_qbits_from_dict(graph, qubit_coord_dict)
+    polygon_object = Polygons(qbits)
     energy = Energy(polygon_object=polygon_object)
-    energy(polygon_object=polygon_object) # just to initialize energy.polygon_coords
-    return energy.scopes_of_polygons(), [polygon_object.N, polygon_object.K, polygon_object.C]
+    return energy.scopes_of_polygons_for_analysis(), [graph.N, graph.K, graph.C]
 
-def get_files_to_problems(problem_folder: str="training_set", max_C: int=50):
+def get_files_to_problems(problem_folder: str="training_set", min_C: int=1, max_C: int=50):
     """
-    returns all files in problem_folder, if problem has less constraints C than max_C
+    returns all files in problem_folder, if problem has constraints C between min_C and max_C
     """
     filenames = []
     for path in os.listdir(paths.database_path / problem_folder):
-        if int(path.split('_')[-1]) <= max_C:
+        if min_C <= int(path.split('_')[-1]) <= max_C:
             for filename in os.listdir(paths.database_path  / problem_folder / path):
                 filenames.append(paths.database_path / problem_folder / path / filename)
     return filenames
