@@ -12,17 +12,30 @@ class MC:
         self,
         energy_object: Energy,
         temperatur_schedule: str = "1 / x",
-        T_0: float=10.
+        T_0: float=10.,
+        delta: float=1,
+        repetition_rate: int=None,
     ):
         self.energy = energy_object
         self.temperatur_schedule = temperatur_schedule
         self.n_total_steps = 0
-        self.n_good_moves = 0
-        self.n_bad_moves = 0
-        self.check_sum = 0
-        self.T_0 = T_0
+        # mean energy and variance energy are updatet on the fly
+        self.mean_energy, self.variance_energy = 0, 0
+        #self.T_0 = T_0
+        self.delta = delta
+        self.repetition_rate = repetition_rate
+        if self.repetition_rate is None:
+            # number of repetition rate from Eq. (4.17) Simulated Annealing and Boltzmann Machines
+            # size of neighbourhood approx bei K 
+            self.repetition_rate = self.energy.polygon_object.qbits.graph.K
+        # compute total energy once at the beginning
+        self.total_energy = self.energy(self.energy.polygon_object.qbits)
 
-
+        self.record_temperature, self.record_total_energy, self.record_mean_energy, self.record_variance_energy = (
+                [], [], [], []
+                )
+        self.record_good_moves, self.record_bad_moves, self.record_rejected_moves = [], [], []
+        self.record_acc_probability = []
     def select_move(self):
         """
         move random qbit to random coord
@@ -58,6 +71,10 @@ class MC:
         self,
         operation: str,
     ):
+        """
+        move qbit or swap qbits and return energy of old and new configuration
+        to expand this function for g(x) > 1, select_move() shouls use random.choices(k>1)
+        """
         self.current_qbits = deepcopy(self.energy.polygon_object.qbits)
         qbits_to_move = self.select_move()
         self.qbits_to_move = qbits_to_move
@@ -69,6 +86,8 @@ class MC:
     def initial_temperature(self, chi_0=0.8, size_of_S=100):
         """
         estimate the initial Temperature T_0,
+        chi_0 is the inital acceptance rate of bad moves 
+        (chi_0 should be close to 1 at the beginning)
         size of S is the number of states -> bad states,
         should converge with increasing size of S
         """
@@ -77,23 +96,58 @@ class MC:
         return T_0_estimation(positive_transitions, chi_0)
     
     @property
-    def temperature(self):
-        k = self.n_total_steps
+    def _temperature(self):
+        k = self.n_total_steps // self.repetition_rate 
         temperatur = lambda x: eval(str(self.temperatur_schedule))
         return self.T_0 * temperatur(k + 1)      
+    
+    @property
+    def temperature(self):
+        if self.n_total_steps % self.repetition_rate == 0:
+            new_temperature = self.current_temperature / (
+                    1 + self.current_temperature * np.log(1 + self.delta) / 1 #(3 * self.variance_energy)
+                    )
+            self.current_temperature = new_temperature
+        return self.current_temperature
+
+    def update_mean_and_variance(self):
+        self.mean_energy, self.variance_energy = self.update_mean_variance(
+                self.n_total_steps,
+                self.mean_energy,
+                self.variance_energy,
+                self.total_energy,
+                )
+        self.record_total_energy.append(self.total_energy)
+        self.record_mean_energy.append(self.mean_energy)
+        self.record_variance_energy.append(self.variance_energy)
+    
+    @staticmethod
+    def update_mean_variance(n, µ_m, s_m2, x_n):
+        """
+        update mean and variance on the fly according to Welford algorithm on wikipedia
+        m = n - 1"""
+        µ_n = µ_m + (x_n - µ_m) / (n + 1) 
+        s_n2 = s_m2 + (x_n - µ_m) ** 2 / (n + 1) - s_m2 / n
+        return µ_n, s_n2
 
     def metropolis(self, current_energy, new_energy):
         self.n_total_steps += 1
+        temp = self.temperature
+        self.record_temperature.append(temp)
         delta_energy = new_energy - current_energy
         if delta_energy < 0:
-            self.n_good_moves += 1
+            self.total_energy += delta_energy
+            self.record_good_moves.append(self.n_total_steps)
+            self.record_acc_probability.append(1)
             return
-        acceptance_probability = np.exp(- delta_energy / self.temperature)
+        acceptance_probability = np.exp(- delta_energy / temp)
+        self.record_acc_probability.append(acceptance_probability)
         if random.random() < acceptance_probability:
-            self.n_bad_moves += 1
+            self.total_energy += delta_energy
+            self.record_bad_moves.append(self.n_total_steps)
             return 
         else:
-            self.check_sum += 1
+            self.record_rejected_moves.append(self.n_total_steps)
             self.energy.polygon_object.qbits = self.current_qbits
 
     def apply(
@@ -106,6 +160,7 @@ class MC:
                 return 0 # ? what is the best value np.nan, None, ?
             current_energy, new_energy = self.step(operation)
             self.metropolis(current_energy, new_energy)
+            self.update_mean_and_variance()
         return new_energy - current_energy
 
 
