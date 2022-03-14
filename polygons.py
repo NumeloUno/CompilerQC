@@ -103,7 +103,6 @@ class Polygons:
     def number_of_plaqs(self):
         return len(self.found_plaqs())
     
-    
     def visualize(self, ax=None, zoom=1):
         if ax is None:
             _, ax = plt.subplots()
@@ -122,14 +121,3 @@ class Polygons:
         for qbit, coord in self.qbits.qubit_to_coord_dict.items():
             ax.annotate(str(qbit), coord)
             ax.scatter(*coord, color="red")
-
-        x_range = sorted(self.envelop_rect(), key=lambda x: x[0])
-        y_range = sorted(self.envelop_rect(), key=lambda y: y[1])
-        ax.set_xlim(
-            min(x_range[0][0], y_range[0][1]) - zoom,
-            max(x_range[-1][0], y_range[-1][1]) + zoom,
-        )
-        ax.set_ylim(
-            min(x_range[0][0], y_range[0][1]) - zoom,
-            max(x_range[-1][0], y_range[-1][1]) + zoom,
-        )
