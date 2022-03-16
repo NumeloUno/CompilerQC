@@ -114,6 +114,7 @@ class MC:
         if self.n_total_steps % self.repetition_rate == 0:
             
             if self.temperature_kirkpatrick:
+                alpha = 0.8
                 new_temperature = alpha * self.current_temperature
                 self.current_temperature = new_temperature   
             
