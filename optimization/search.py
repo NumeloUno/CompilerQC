@@ -14,7 +14,9 @@ class MC:
         self,
         energy_object: Energy,
         delta: float = 1,
+        chi_0: float = 0.8,
         repetition_rate: int = None,
+        recording: bool = False,
     ):
         """
         repetition rate: how many moves with constant temperature
@@ -23,7 +25,9 @@ class MC:
         """
         self.energy = energy_object
         self.n_total_steps = 0
+        self.chi_0 = chi_0
         self.delta = delta
+        self.temperature_kirkpatrick = False
         self.repetition_rate = repetition_rate
         if self.repetition_rate is None:
             # number of repetition rate from Eq. (4.17) Simulated Annealing and Boltzmann Machines
@@ -32,15 +36,17 @@ class MC:
         # compute total energy once at the beginning
         self.total_energy = self.energy(self.energy.polygon_object.qbits)
         # record
-        self.record_temperature = []
-        self.record_total_energy = []
-        self.record_mean_energy = []
-        self.record_variance_energy = []
-        self.record_good_moves = []
-        self.record_bad_moves = []
-        self.record_rejected_moves = []
-        self.record_acc_probability = []
-        self.record_delta_energy = []
+        self.recording = recording
+        if self.recording: 
+            self.record_temperature = []
+            self.record_total_energy = []
+            self.record_mean_energy = []
+            self.record_variance_energy = []
+            self.record_good_moves = []
+            self.record_bad_moves = []
+            self.record_rejected_moves = []
+            self.record_acc_probability = []
+            self.record_delta_energy = []
 
     def select_move(self):
         """
@@ -90,7 +96,7 @@ class MC:
         new_energy = self.energy(qbits_to_move)
         return current_energy, new_energy
 
-    def initial_temperature(self, chi_0=0.8, size_of_S=100):
+    def initial_temperature(self, size_of_S=100):
         """
         estimate the initial Temperature T_0,
         chi_0 is the inital acceptance rate of bad moves
@@ -101,18 +107,25 @@ class MC:
         positive_transitions = postive_transitions(
             self.energy.polygon_object.qbits.graph, size_of_S
         )
-        return T_0_estimation(positive_transitions, chi_0)
-
+        return T_0_estimation(positive_transitions, self.chi_0)
+    
     @property
     def temperature(self):
         if self.n_total_steps % self.repetition_rate == 0:
-            new_temperature = self.current_temperature / (
-                1
-                + self.current_temperature
-                * np.log(1 + self.delta)
-                / (3 * np.sqrt(self.variance_energy) + 1e-3)
-            )
-            self.current_temperature = new_temperature
+            
+            if self.temperature_kirkpatrick:
+                new_temperature = alpha * self.current_temperature
+                self.current_temperature = new_temperature   
+            
+            else:
+                new_temperature = self.current_temperature / (
+                    1
+                    + self.current_temperature
+                    * np.log(1 + self.delta)
+                    / (3 * np.sqrt(self.variance_energy) + 1e-3)
+                )
+                self.current_temperature = new_temperature
+                
         return self.current_temperature
 
     def update_mean_and_variance(self):
@@ -127,9 +140,10 @@ class MC:
             self.variance_energy,
             self.total_energy,
         )
-        self.record_total_energy.append(self.total_energy)
-        self.record_mean_energy.append(self.mean_energy)
-        self.record_variance_energy.append(self.variance_energy)
+        if self.recording:
+            self.record_total_energy.append(self.total_energy)
+            self.record_mean_energy.append(self.mean_energy)
+            self.record_variance_energy.append(self.variance_energy)
 
     def update_mean_variance(self, n, µ_m, s_m2, x_n):
         """
@@ -143,22 +157,23 @@ class MC:
     def metropolis(self, current_energy, new_energy):
         self.n_total_steps += 1
         temp = self.temperature
-        self.record_temperature.append(temp)
+        if self.recording: self.record_temperature.append(temp)
         delta_energy = new_energy - current_energy
-        self.record_delta_energy.append(delta_energy)
+        if self.recording: self.record_delta_energy.append(delta_energy)
         if delta_energy < 0:
             self.total_energy += delta_energy
-            self.record_good_moves.append(self.n_total_steps)
-            self.record_acc_probability.append(1)
+            if self.recording:
+                self.record_good_moves.append(self.n_total_steps)
+                self.record_acc_probability.append(1)
             return
         acceptance_probability = np.exp(-delta_energy / temp)
-        self.record_acc_probability.append(acceptance_probability)
+        if self.recording: self.record_acc_probability.append(acceptance_probability)
         if random.random() < acceptance_probability:
             self.total_energy += delta_energy
-            self.record_bad_moves.append(self.n_total_steps)
+            if self.recording: self.record_bad_moves.append(self.n_total_steps)
             return
         else:
-            self.record_rejected_moves.append(self.n_total_steps)
+            if self.recording: self.record_rejected_moves.append(self.n_total_steps)
             self.energy.polygon_object.qbits = self.current_qbits
 
     def apply(
