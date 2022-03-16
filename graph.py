@@ -14,7 +14,9 @@ class Graph:
         self.K = self.num_edges()
         self.C = self.num_constrains()
         self.clear()
-        self.cycles = self.get_cycles(3) + self.get_cycles(4)
+        three_cycles, four_cycles = self.get_cycles(3), self.get_cycles(4)
+        self.number_of_3_cycles, self.number_of_4_cycles = len(three_cycles), len(four_cycles)
+        self.cycles = three_cycles + four_cycles
         self.qbits = self.qbits_from_graph()
         
     def to_nx_graph(self):
