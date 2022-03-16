@@ -121,3 +121,15 @@ class Polygons:
         for qbit, coord in self.qbits.qubit_to_coord_dict.items():
             ax.annotate(str(qbit), coord)
             ax.scatter(*coord, color="red")
+            
+            
+# TODO: create function to analyse search 
+# for i in range(100):
+# #     delta_energy = 0#(mc.apply('',1))
+# #     print("delta energy {} temperature {}".format(delta_energy, mc.temperature))
+# #     if type(mc.qbits_to_move[1]) == tuple:
+# #         print(f'move {mc.qbits_to_move[0].qubit} to {mc.qbits_to_move[1]} with probability %2.f'% min(1, np.exp(- delta_energy / mc.temperature)))
+# #     else:
+# #         print(f'switch {mc.qbits_to_move[0].qubit} with {mc.qbits_to_move[1].qubit} with probability %2.f'% min(1, np.exp(- delta_energy / mc.temperature)))
+#     polygon_object.visualize()
+#     plt.show()

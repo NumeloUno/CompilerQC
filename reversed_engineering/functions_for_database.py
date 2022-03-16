@@ -24,7 +24,9 @@ def energy_from_problem(graph_adj_matrix: np.array, qubit_coord_dict: dict):
     qbits = Qbits.init_qbits_from_dict(graph, qubit_coord_dict)
     polygon_object = Polygons(qbits)
     energy = Energy(polygon_object=polygon_object)
-    return energy.scopes_of_polygons_for_analysis(), [graph.N, graph.K, graph.C]
+    return (energy.scopes_of_polygons_for_analysis(),
+            [graph.N, graph.K, graph.C],
+            [graph.number_of_3_cycles, graph.number_of_4_cycles])
 
 def get_files_to_problems(problem_folder: str="training_set", min_C: int=1, max_C: int=50):
     """
@@ -37,7 +39,7 @@ def get_files_to_problems(problem_folder: str="training_set", min_C: int=1, max_
                 filenames.append(paths.database_path / problem_folder / path / filename)
     return filenames
 
-def get_all_distances(problem_folder: str="training_set"):
+def get_all_distances(problem_folder: str="training_set", min_C: int=1, max_C: int=50):
     """
     returns energy_from_problem() for all problems in folder problem_folder,
     """
