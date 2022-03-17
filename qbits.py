@@ -14,24 +14,26 @@ class Qbits():
         self.qubits = {qbit.qubit:qbit for qbit in qbits} 
         
     @classmethod
-    def init_qbits_from_dict(cls, graph, qubit_coord_dict: dict):
+    def init_qbits_from_dict(cls, graph, qubit_coord_dict: dict=None):
         """
-        initialization of qbits according to qubit to coord dict
+        initialization of qbits according to qubit to coord dict, 
+        if dict is not complete, remaining qbits are initialized 
+        with random coordinates
         return: list ob qbit objects
         """
-        return cls(graph, [Qbit(qubit, coord) for qubit, coord in qubit_coord_dict.items()])
+        core_coords = list(qubit_coord_dict.values())
+        core_qubits = list(qubit_coord_dict.keys())
 
-    @classmethod
-    def init_qbits_randomly(cls, graph):
-        """
-        initialization of qbits with random coordinates
-        return: list ob qbit objects
-        """
-        init_grid_size = int(np.sqrt(graph.K)) + 1
-        coords = list(np.ndindex(init_grid_size, init_grid_size))
-        assert len(coords) > graph.K, "init qbits: more qbits than coords"
-        np.random.shuffle(coords)
-        qubit_coord_dict = dict(zip(graph.qbits, coords))
+        if len(qubit_coord_dict) < graph.K:
+            init_grid_size = int(np.sqrt(graph.K)) + 1
+            coords = list(np.ndindex(init_grid_size, init_grid_size))
+            assert len(coords) > graph.K, "init qbits: more qbits than coords"
+            remaining_coords = [coord for coord in coords if coord not in core_coords]
+            np.random.shuffle(remaining_coords)
+            remaining_qubits = [qubit for qubit in graph.qbits if qubit not in core_qubits]
+            remaining_qubit_coord_dict = dict(zip(remaining_qubits, remaining_coords))
+            qubit_coord_dict.update(remaining_qubit_coord_dict)
+        print(qubit_coord_dict)
         return cls(graph, [Qbit(qubit, coord) for qubit, coord in qubit_coord_dict.items()])
 
     def __getitem__(self, qbit):
@@ -66,6 +68,11 @@ class Qbits():
     @property  
     def core_qbits_(self):
         return [qbit for qubit, qbit in self.qubits if qbit.core == True]
+    
+    def assign_core_qbits(self, core_qubits):
+        for qubit, qbit in self.qubits.items():
+            if qubit in core_qubits:
+                qbit.core = True
     
     def set_all_polygons(self, all_polygons: list):
         """
