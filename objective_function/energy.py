@@ -44,13 +44,14 @@ class Energy(Polygons):
         return nonplaqs3, nonplaqs4, plaqs3, plaqs4
     
     def scaled_distance_to_plaquette(
-            self,
+        self,
+        scopes
             ):
         """
+        input: array of scopes of polygons
         return: array of scopes of polygons, if a polygon is a plaquette, 
         the scaling_for_plaq is substracted
         """
-        scopes = self.scopes_of_polygons()
         scopes[ scopes == self.polygon_object.unit_triangle_scope ] -= self.scaling_for_plaq3
         scopes[ scopes == self.polygon_object.unit_square_scope ] -= self.scaling_for_plaq4
         return scopes
@@ -70,10 +71,20 @@ class Energy(Polygons):
             qbits_of_interest,
             schedule=dict(),
                 ):
-        default_schedule.update(schedule)
-        if default_schedule['ignore_inside_polygons']:
-            pass
+        """
+        return the energy and number of plaquettes of the polygons belonging to 
+        qbits of interest
+        """
+#         default_schedule.update(schedule)
+#         if default_schedule['ignore_inside_polygons']:
+#             pass
         self.polygons_coords_of_interest = self.coords_of_changed_polygons(qbits_of_interest)
-        distances_to_plaquette = self.scaled_distance_to_plaquette()
-        return round(distances_to_plaquette.sum(), 5)
+        scopes = self.scopes_of_polygons()
+        #number of polygons in polygons of interest
+        number_of_plaquettes = len(scopes[
+            np.logical_or(scopes == self.polygon_object.unit_triangle_scope,
+                           scopes == self.polygon_object.unit_square_scope)])
+        
+        distances_to_plaquette = self.scaled_distance_to_plaquette(scopes)
+        return round(distances_to_plaquette.sum(), 5), number_of_plaquettes
 
