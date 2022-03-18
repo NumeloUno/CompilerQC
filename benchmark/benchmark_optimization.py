@@ -24,7 +24,6 @@ def update_mc(mc, mc_schedule) -> MC:
         mc.__setattr__(k, v)
     return mc
 
-
 def evaluate_optimization(
     energy: Energy, mc_schedule: dict, batch_size: int,
 ):
@@ -77,7 +76,7 @@ def run_benchmark(
     # evaluate schedule from yaml and save it
     file = open(path_to_results, "a")
     for name, mc_schedule in config.items():
-        check_update(energy, mc_schedule)
+#         check_update(energy, mc_schedule)
         succes_rate,  [chi_0, delta, repetition_rate, n_total_steps, initial_temperature] = evaluate_optimization(energy, mc_schedule, batch_size)
         N, C = energy.polygon_object.qbits.graph.N, energy.polygon_object.qbits.graph.C
         file.write("{} {} {} {} {} {} {} {} {}\n".format(name,
@@ -125,7 +124,7 @@ def benchmark_problem_folder(args):
         scaling_for_plaquette = predicted_energy / graph.C  
         
         # initialise energy_object
-        qbits = Qbits.init_qbits_randomly(graph)
+        qbits = Qbits.init_qbits_from_dict(graph,dict())
         polygon_object = Polygons(qbits=qbits)
         energy = Energy(
             polygon_object,

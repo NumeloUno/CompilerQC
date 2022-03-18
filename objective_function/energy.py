@@ -80,7 +80,6 @@ class Energy(Polygons):
 #             pass
         self.polygons_coords_of_interest = self.coords_of_changed_polygons(qbits_of_interest)
         scopes = self.scopes_of_polygons()
-        #number of polygons in polygons of interest
         number_of_plaquettes = len(scopes[
             np.logical_or(scopes == self.polygon_object.unit_triangle_scope,
                            scopes == self.polygon_object.unit_square_scope)])
