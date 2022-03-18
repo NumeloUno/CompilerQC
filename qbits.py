@@ -33,7 +33,6 @@ class Qbits():
             remaining_qubits = [qubit for qubit in graph.qbits if qubit not in core_qubits]
             remaining_qubit_coord_dict = dict(zip(remaining_qubits, remaining_coords))
             qubit_coord_dict.update(remaining_qubit_coord_dict)
-        print(qubit_coord_dict)
         return cls(graph, [Qbit(qubit, coord) for qubit, coord in qubit_coord_dict.items()])
 
     def __getitem__(self, qbit):
