@@ -9,9 +9,12 @@ class Qbits():
     """
     def __init__(self,
                  graph: Graph,
-                 qbits:'list of Qbit objects'):
+                 qbits:'list of Qbit objects'
+                ):
         self.graph = graph
         self.qubits = {qbit.qubit:qbit for qbit in qbits} 
+        self.update_core_shell()
+
         
     @classmethod
     def init_qbits_from_dict(cls, graph, qubit_coord_dict: dict=None):
@@ -64,14 +67,40 @@ class Qbits():
         assert len(set(list(qubit_to_coord_dict.keys()))) == len(set(list(qubit_to_coord_dict.values()))), 'non unique coords or qbits!'
         return qubit_to_coord_dict
     
-    @property  
-    def core_qbits_(self):
-        return [qbit for qubit, qbit in self.qubits if qbit.core == True]
+    def set_core_qbits(self):
+        """
+        the attribute core_qbits should not change over time
+        thus it is not a property object anymore, it will change only
+        when core_qbits_() is called
+        """
+        self.core_qbits = [qbit for qubit, qbit in self.qubits.items() if qbit.core == True]
+
+    def set_core_qbit_coords(self):
+        """see core_qbits_()"""
+        self.core_qbit_coords = [qbit.coord for qbit in self.core_qbits]
+        
+    def set_shell_qbits(self):
+        """see core_qbits_()"""
+        self.shell_qbits = [qbit for qubit, qbit in self.qubits.items() if qbit.core == False]
+    
+    def set_shell_qbit_coords(self):
+        """see core_qbits_()"""
+        self.shell_qbit_coords = [qbit.coord for qbit in self.shell_qbits]
     
     def assign_core_qbits(self, core_qubits):
-        for qubit, qbit in self.qubits.items():
-            if qubit in core_qubits:
-                qbit.core = True
+        assert set(core_qubits).issubset(self.qubits.keys()), 'core qubit not in qubits' 
+        for qubit in core_qubits:
+            self.qubits[qubit].core = True
+        self.update_core_shell()
+        
+    def update_core_shell(self):
+        """
+        set attributes like core_qbits/shell_qbits
+        and their coords: core_qbit_coords/shell_qbit_coors
+        """
+        self.set_core_qbits(), self.set_core_qbit_coords()
+        self.set_shell_qbits(), self.set_shell_qbit_coords()
+        
     
     def set_all_polygons(self, all_polygons: list):
         """
@@ -88,6 +117,12 @@ class Qbits():
         return random qbit
         """
         return random.choice(list(self.qubits.values()))
+
+    def random_shell_qbit(self):
+        """
+        return random qbit which is outside the core, in the shell
+        """
+        return random.choice(self.shell_qbits)
     
     def swap_qbits(self, qbit1, qbit2):
         """
@@ -112,6 +147,7 @@ class Qbit():
         ):
         self._qubit = qubit
         self.coord = coord
+        self.core = core
         # self.polygons is set with set_polygons(), this function is called in init of Polygons
         self.polygons = None
         
