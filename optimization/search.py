@@ -58,7 +58,7 @@ class MC:
         move random qbit to random coord
         if coord is already occupied, swap qbits
         """
-        qbit = self.energy.polygon_object.qbits.random()
+        qbit = self.energy.polygon_object.qbits.random_shell_qbit()
         target_coord = self.generate_coord()
         if target_coord in self.energy.polygon_object.qbits.coords:
             target_qbit = self.energy.polygon_object.qbits.qbit_from_coord(target_coord)
@@ -95,7 +95,9 @@ class MC:
         for running time reasons: only every repetition_rate times
         """
         if self.n_total_steps % self.repetition_rate == 0:
-            self.possible_coords = self.energy.polygon_object.envelop_rect()
+            possible_coords = self.energy.polygon_object.envelop_rect()
+            self.possible_coords = list(set(possible_coords) 
+                                        - set(self.energy.polygon_object.qbits.core_qbit_coords))
         return random.choice(self.possible_coords)
 
     def step(self, operation: str=None):
@@ -145,6 +147,7 @@ class MC:
         for i in range(n_steps):
             if self.number_of_plaquettes == C:
                 return 0  # ? what is the best value np.nan, None, ?
+            self.update_mean_and_variance()
             current_energy, new_energy = self.step(operation)
             self.metropolis(current_energy, new_energy)
             
@@ -164,13 +167,15 @@ class MC:
             self.apply(operation, n_steps)
             
             
-    def initial_temperature(self, size_of_S=100):
+    def initial_temperature(self, size_of_S=1):
         """
         estimate the initial Temperature T_0,
         chi_0 is the inital acceptance rate of bad moves
         (chi_0 should be close to 1 at the beginning)
         size of S is the number of states -> bad states,
         should converge with increasing size of S
+        comment: empirically one can see the the initial temperature
+        is already estimated quiet good by size_of_S=1
         """
         positive_transitions = postive_transitions(
             self.energy.polygon_object.qbits.graph, size_of_S
@@ -196,7 +201,7 @@ class MC:
                     1
                     + self.current_temperature
                     * np.log(1 + self.delta)
-                    / 3
+                    /  (3 * np.sqrt(self.variance_energy) + 1e-3)
                 )
                 self.current_temperature = new_temperature
                 
