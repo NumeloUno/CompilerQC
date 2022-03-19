@@ -131,6 +131,7 @@ class Polygons:
         ax.scatter(x, y, color="grey", s=0.6)
         ax.set_yticklabels([])
         ax.set_xticklabels([])
+        # color plaquettes
         for polygon in self.polygons_coords(
             self.qbits.qubit_to_coord_dict, self.polygons
         ):
@@ -141,9 +142,13 @@ class Polygons:
                 fill, facecolor = True, "indianred"
             patch = plt.Polygon(polygon, zorder=0, fill=fill, lw=0, facecolor=facecolor)
             ax.add_patch(patch)
-        for qbit, coord in self.qbits.qubit_to_coord_dict.items():
-            ax.annotate(str(qbit), coord)
-            ax.scatter(*coord, color="red")
+        # color qbits
+        for qbit in self.qbits:
+            ax.annotate(str(qbit.qubit), qbit.coord)
+            if qbit.core == False:
+                ax.scatter(*qbit.coord, color="red")
+            elif qbit.core == True:
+                ax.scatter(*qbit.coord, color="darkred")
 
 
 # TODO: create function to analyse search
