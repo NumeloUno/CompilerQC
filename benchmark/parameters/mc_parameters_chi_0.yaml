@@ -1,0 +1,67 @@
+mc_parameters1:
+        # number of moves to perform search
+        n_moves: 10000
+        # controls the slope of temperature schedule
+        delta: 0.01
+        # initial acceptance ratio, should be close to 1
+        chi_0: 0.3
+        # if current_temperature is 0, then initial temperature is estimated
+        current_temperature: 0
+        operation_schedule:
+                move: 1
+mc_parameters2:
+        # number of moves to perform search
+        n_moves: 10000
+        # controls the slope of temperature schedule
+        delta: 0.01
+        # initial acceptance ratio, should be close to 1
+        chi_0: 0.6
+        # if current_temperature is 0, then initial temperature is estimated
+        current_temperature: 0
+        operation_schedule:
+                move: 1
+  
+mc_parameters3:
+        # number of moves to perform search
+        n_moves: 10000
+        # controls the slope of temperature schedule
+        delta: 0.01
+        # initial acceptance ratio, should be close to 1
+        chi_0: 0.7
+        # if current_temperature is 0, then initial temperature is estimated
+        current_temperature: 0
+        operation_schedule:
+                move: 1
+mc_parameters4:
+        # number of moves to perform search
+        n_moves: 10000
+        # controls the slope of temperature schedule
+        delta: 0.01
+        # initial acceptance ratio, should be close to 1
+        chi_0: 0.8
+        # if current_temperature is 0, then initial temperature is estimated
+        current_temperature: 0
+        operation_schedule:
+                move: 1
+mc_parameters5:
+        # number of moves to perform search
+        n_moves: 10000
+        # controls the slope of temperature schedule
+        delta: 0.01
+        # initial acceptance ratio, should be close to 1
+        chi_0: 0.9
+        # if current_temperature is 0, then initial temperature is estimated
+        current_temperature: 0
+        operation_schedule:
+                move: 1
+mc_parameters6:
+        # number of moves to perform search
+        n_moves: 10000
+        # controls the slope of temperature schedule
+        delta: 0.01
+        # initial acceptance ratio, should be close to 1
+        chi_0: 0.9
+        # if current_temperature is 0, then initial temperature is estimated
+        current_temperature: 0
+        operation_schedule:
+                move: 1
