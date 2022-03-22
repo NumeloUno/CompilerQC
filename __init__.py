@@ -7,7 +7,7 @@ from . import core
 from .objective_function import Energy
 from . import optimization
 from .optimization import MC
-
-from . import benchmark
+from .benchmark import functions_for_benchmarking
+#from . import benchmark
 
 from .reversed_engineering import functions_for_database
