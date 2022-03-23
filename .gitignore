@@ -1,0 +1,10 @@
+.*
+*.ipynb
+__pycache__
+notebooks/Plots
+notebooks/check_grid_idea.ipynb
+literature
+#*.yaml
+*.txt
+*.npy
+database
