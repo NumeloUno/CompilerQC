@@ -4,51 +4,57 @@ from CompilerQC import Graph, Qbits, Polygons, Energy, MC, paths, core
 import numpy as np
 import pickle
 
-def benchmark_problem_folder_with_exact_scaling(args):
-    """
-    calculate the scaling for each 3er and 4er plaq such that 
-    the total energy of the compiled solution is zero,
-    if the same compiled solution is found as in the dataset
-    """
-    problems = get_files_to_problems(
-                problem_folder=args.problem_folder,
-                min_C=args.min_C,
-                max_C=args.max_C,
-                )
+def open_file(args):
     print(head)
-    for file in problems:
-        # read graph and qubit to coord translation from file
-        graph_adj_matrix, qubit_coord_dict = (
-            problem_from_file(file))
-        # scopes for nonplaqs and plaqs
-        polygon_scopes, NKC, n_cycles = energy_from_problem(graph_adj_matrix, qubit_coord_dict)
-        n3, n4, p3, p4 = polygon_scopes
-        graph = Graph(adj_matrix=graph_adj_matrix)
-        # contribution of nonplaqs to each constraint 
-        scaling_for_plaq3 = sum(n3) / len(p3)
-        scaling_for_plaq4 = sum(n4) / len(p4)
-        # initialise energy_object
-        qbits = Qbits.init_qbits_from_dict(graph,dict())
-        polygon_object = Polygons(qbits=qbits)
-        energy = Energy(
-            polygon_object,
-            scaling_for_plaq3=scaling_for_plaq3,
-            scaling_for_plaq4=scaling_for_plaq4,
-        )
-        run_benchmark(energy, args.batchsize, args.id_of_benchmark)
-        
+    path_to_results = (
+        paths.benchmark_results_path / f"mc_benchmark_results_{args.id_of_benchmark}.txt"
+    )
+    file = open(path_to_results, "a")
+    file.write(f"with core {args.with_core} \n")
+    file.write(head)
+    return file
+
+# def benchmark_problem_folder_with_exact_scaling(args):
+#     """
+#     calculate the scaling for each 3er and 4er plaq such that 
+#     the total energy of the compiled solution is zero,
+#     if the same compiled solution is found as in the dataset
+#     """
+#     problems = get_files_to_problems(
+#                 problem_folder=args.problem_folder,
+#                 min_C=args.min_C,
+#                 max_C=args.max_C,
+#                 )
+#     file = open_file(args)
+#     for file_ in problems:
+#         # read graph and qubit to coord translation from file
+#         graph_adj_matrix, qubit_coord_dict = (
+#             problem_from_file(file_))
+#         # scopes for nonplaqs and plaqs
+#         polygon_scopes, NKC, n_cycles = energy_from_problem(graph_adj_matrix, qubit_coord_dict)
+#         n3, n4, p3, p4 = polygon_scopes
+#         graph = Graph(adj_matrix=graph_adj_matrix)
+#         # contribution of nonplaqs to each constraint 
+#         scaling_for_plaq3 = sum(n3) / len(p3)
+#         scaling_for_plaq4 = sum(n4) / len(p4)
+#         # initialise energy_object
+#         qbits = Qbits.init_qbits_from_dict(graph,dict())
+#         polygon_object = Polygons(qbits=qbits)
+#         energy = Energy(
+#             polygon_object,
+#             scaling_for_plaq3=scaling_for_plaq3,
+#             scaling_for_plaq4=scaling_for_plaq4,
+#         )
+#         file = run_benchmark(file, energy, args.batchsize, args.id_of_benchmark)
+#     file.close()
+    
 def benchmark_energy_scaling_by_yaml(args):
     """
     benchmark the search of compiled graphs for 
     fully connected logical graphs, 
     scale plaqs by value in the yaml
     """
-    print(head)
-    path_to_results = (
-        paths.benchmark_results_path / f"mc_benchmark_results_{args.id_of_benchmark}.txt"
-    )
-    file = open(path_to_results, "a")
-    file.write(head)
+    file = open_file(args)
     for N in range(4, args.N +1):
         graph = Graph.complete(N)
         core_qubits, core_coords = [], []
@@ -73,7 +79,7 @@ def benchmark_MLP_energy_scaling(args):
     fully connected logical graphs,
     scale plaqs by prediction of MLP
     """
-    print(head)
+    file = open_file(args)
     for N in range(4, args.N +1):
         graph = Graph.complete(N)
         core_qubits, core_coords = [], []
@@ -96,8 +102,9 @@ def benchmark_MLP_energy_scaling(args):
             scaling_for_plaq3=scaling_for_plaq3,
             scaling_for_plaq4=scaling_for_plaq4,
         )
-        run_benchmark(energy, args.batchsize, args.id_of_benchmark)
-        
+        file = run_benchmark(file, energy, args.batchsize, args.id_of_benchmark)
+    file.close()
+    
 def benchmark_energy_scaling_by_max_C(args):
     """
     benchmark the search of compiled graphs for 
@@ -105,7 +112,7 @@ def benchmark_energy_scaling_by_max_C(args):
     scale by prediction of polynom fittet
     to max_C:energy dataset
     """
-    print(head)
+    file = open_file(args)
     for N in range(4, args.N +1):
         graph = Graph.complete(N)
         core_qubits, core_coords = [], []
@@ -130,8 +137,9 @@ def benchmark_energy_scaling_by_max_C(args):
             scaling_for_plaq3=scaling_for_plaq3,
             scaling_for_plaq4=scaling_for_plaq4,
         )
-        run_benchmark(energy, args.batchsize, args.id_of_benchmark)
-
+        file = run_benchmark(file, energy, args.batchsize, args.id_of_benchmark)
+    file.close()
+    
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
