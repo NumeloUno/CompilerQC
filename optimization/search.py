@@ -39,6 +39,8 @@ class MC:
         self.delta = delta
         self.alpha = alpha
         self.temperature_kirkpatrick = False
+        self.temperature_kirkpatrick_sigma = False
+        self.linear_in_moves = False
         self.temperature_C = False
         self.temperature_linearC = False
         self.repetition_rate = repetition_rate
