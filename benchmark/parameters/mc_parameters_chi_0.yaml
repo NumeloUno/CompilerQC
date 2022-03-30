@@ -4,7 +4,7 @@ mc_parameters1:
         # controls the slope of temperature schedule
         delta: 0.01
         # initial acceptance ratio, should be close to 1
-        chi_0: 0.3
+        chi_0: 0.01
         # if current_temperature is 0, then initial temperature is estimated
         current_temperature: 0
         operation_schedule:
@@ -15,7 +15,7 @@ mc_parameters2:
         # controls the slope of temperature schedule
         delta: 0.01
         # initial acceptance ratio, should be close to 1
-        chi_0: 0.6
+        chi_0: 0.1
         # if current_temperature is 0, then initial temperature is estimated
         current_temperature: 0
         operation_schedule:
@@ -27,7 +27,7 @@ mc_parameters3:
         # controls the slope of temperature schedule
         delta: 0.01
         # initial acceptance ratio, should be close to 1
-        chi_0: 0.7
+        chi_0: 0.2
         # if current_temperature is 0, then initial temperature is estimated
         current_temperature: 0
         operation_schedule:
@@ -38,7 +38,7 @@ mc_parameters4:
         # controls the slope of temperature schedule
         delta: 0.01
         # initial acceptance ratio, should be close to 1
-        chi_0: 0.8
+        chi_0: 0.3
         # if current_temperature is 0, then initial temperature is estimated
         current_temperature: 0
         operation_schedule:
@@ -49,7 +49,7 @@ mc_parameters5:
         # controls the slope of temperature schedule
         delta: 0.01
         # initial acceptance ratio, should be close to 1
-        chi_0: 0.9
+        chi_0: 0.4
         # if current_temperature is 0, then initial temperature is estimated
         current_temperature: 0
         operation_schedule:
@@ -60,8 +60,64 @@ mc_parameters6:
         # controls the slope of temperature schedule
         delta: 0.01
         # initial acceptance ratio, should be close to 1
+        chi_0: 0.5
+        # if current_temperature is 0, then initial temperature is estimated
+        current_temperature: 0
+        operation_schedule:
+                move: 1
+mc_parameters7:
+        # number of moves to perform search
+        n_moves: 10000
+        # controls the slope of temperature schedule
+        delta: 0.01
+        # initial acceptance ratio, should be close to 1
+        chi_0: 0.6
+        # if current_temperature is 0, then initial temperature is estimated
+        current_temperature: 0
+        operation_schedule:
+                move: 1
+mc_parameters8:
+        # number of moves to perform search
+        n_moves: 10000
+        # controls the slope of temperature schedule
+        delta: 0.01
+        # initial acceptance ratio, should be close to 1
+        chi_0: 0.7
+        # if current_temperature is 0, then initial temperature is estimated
+        current_temperature: 0
+        operation_schedule:
+                move: 1
+mc_parameters9:
+        # number of moves to perform search
+        n_moves: 10000
+        # controls the slope of temperature schedule
+        delta: 0.01
+        # initial acceptance ratio, should be close to 1
+        chi_0: 0.8
+        # if current_temperature is 0, then initial temperature is estimated
+        current_temperature: 0
+        operation_schedule:
+                move: 1
+mc_parameters10:
+        # number of moves to perform search
+        n_moves: 10000
+        # controls the slope of temperature schedule
+        delta: 0.01
+        # initial acceptance ratio, should be close to 1
         chi_0: 0.9
         # if current_temperature is 0, then initial temperature is estimated
         current_temperature: 0
         operation_schedule:
                 move: 1
+mc_parameters11:
+        # number of moves to perform search
+        n_moves: 10000
+        # controls the slope of temperature schedule
+        delta: 0.01
+        # initial acceptance ratio, should be close to 1
+        chi_0: 0.99
+        # if current_temperature is 0, then initial temperature is estimated
+        current_temperature: 0
+        operation_schedule:
+                move: 1
+                                                                                

@@ -1,0 +1,152 @@
+mc_parameters1:
+        n_moves: 1000
+        delta: 0.01
+        chi_0: 0.8
+        current_temperature: 0
+        linear_in_moves: True
+        operation_schedule:
+                move: 1
+mc_parameters2:
+        n_moves: 10000
+        delta: 0.01
+        chi_0: 0.8
+        current_temperature: 0
+        linear_in_moves: True
+        operation_schedule:
+                move: 1
+mc_parameters3:
+        n_moves: 20000
+        delta: 0.01
+        chi_0: 0.8
+        current_temperature: 0
+        linear_in_moves: True
+        operation_schedule:
+                move: 1
+mc_parameters4:
+        n_moves: 30000
+        delta: 0.01
+        chi_0: 0.8
+        current_temperature: 0
+        linear_in_moves: True
+        operation_schedule:
+                move: 1
+mc_parameters5:
+        n_moves: 40000
+        delta: 0.01
+        chi_0: 0.8
+        current_temperature: 0
+        linear_in_moves: True
+        operation_schedule:
+                move: 1
+mc_parameters6:
+        n_moves: 50000
+        delta: 0.01
+        chi_0: 0.8
+        current_temperature: 0
+        linear_in_moves: True
+        operation_schedule:
+                move: 1
+mc_parameters7:
+        n_moves: 60000
+        delta: 0.01
+        chi_0: 0.8
+        current_temperature: 0
+        linear_in_moves: True
+        operation_schedule:
+                move: 1
+mc_parameters8:
+        n_moves: 70000
+        delta: 0.01
+        chi_0: 0.8
+        current_temperature: 0
+        linear_in_moves: True
+        operation_schedule:
+                move: 1
+mc_parameters9:
+        n_moves: 80000
+        delta: 0.01
+        chi_0: 0.8
+        current_temperature: 0
+        linear_in_moves: True
+        operation_schedule:
+                move: 1
+mc_parameters10:
+        n_moves: 90000
+        delta: 0.01
+        chi_0: 0.8
+        current_temperature: 0
+        linear_in_moves: True
+        operation_schedule:
+                move: 1
+mc_parameters11:
+        n_moves: 100000
+        delta: 0.01
+        chi_0: 0.8
+        current_temperature: 0
+        linear_in_moves: True
+        operation_schedule:
+                move: 1
+mc_parameters12:
+        n_moves: 110000
+        delta: 0.01
+        chi_0: 0.8
+        current_temperature: 0
+        linear_in_moves: True
+        operation_schedule:
+                move: 1
+mc_parameters13:
+        n_moves: 120000
+        delta: 0.01
+        chi_0: 0.8
+        current_temperature: 0
+        linear_in_moves: True
+        operation_schedule:
+                move: 1
+mc_parameters14:
+        n_moves: 160000
+        delta: 0.01
+        chi_0: 0.8
+        current_temperature: 0
+        linear_in_moves: True
+        operation_schedule:
+                move: 1
+mc_parameters15:
+        n_moves: 200000
+        delta: 0.01
+        chi_0: 0.8
+        current_temperature: 0
+        linear_in_moves: True
+        operation_schedule:
+                move: 1
+mc_parameters16:
+        n_moves: 250000
+        delta: 0.01
+        chi_0: 0.8
+        current_temperature: 0
+        linear_in_moves: True
+        operation_schedule:
+                move: 1
+mc_parameters17:
+        n_moves: 300000
+        delta: 0.01
+        chi_0: 0.8
+        current_temperature: 0
+        linear_in_moves: True
+        operation_schedule:
+                move: 1
+mc_parameters18:
+        n_moves: 400000
+        delta: 0.01
+        chi_0: 0.8
+        current_temperature: 0
+        linear_in_moves: True
+        operation_schedule:
+                move: 1
+mc_parameters19:
+        n_moves: 500000
+        delta: 0.01
+        chi_0: 0.8
+        current_temperature: 0
+        linear_in_moves: True
+        operation_schedule:
+                move: 1
