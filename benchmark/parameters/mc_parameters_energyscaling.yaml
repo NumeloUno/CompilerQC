@@ -1,5 +1,5 @@
 mc_parameters1:
-        n_moves: 3000
+        n_moves: 10000
         delta: 0.05
         chi_0: 0.8
         current_temperature: 0
@@ -9,7 +9,7 @@ mc_parameters1:
                 scaling_for_plaq3: 0
                 scaling_for_plaq4: 0
 mc_parameters2:
-        n_moves: 3000
+        n_moves: 10000
         delta: 0.05
         chi_0: 0.8
         current_temperature: 0
@@ -19,7 +19,7 @@ mc_parameters2:
                 scaling_for_plaq3: 10
                 scaling_for_plaq4: 10
 mc_parameters3:
-        n_moves: 3000
+        n_moves: 10000
         delta: 0.05
         chi_0: 0.8
         current_temperature: 0
@@ -29,7 +29,7 @@ mc_parameters3:
                 scaling_for_plaq3: 100
                 scaling_for_plaq4: 100
 mc_parameters4:
-        n_moves: 3000
+        n_moves: 10000
         delta: 0.05
         chi_0: 0.8
         current_temperature: 0
@@ -39,7 +39,7 @@ mc_parameters4:
                 scaling_for_plaq3: 1000
                 scaling_for_plaq4: 1000
 mc_parameters5:
-        n_moves: 3000
+        n_moves: 10000
         delta: 0.05
         chi_0: 0.8
         current_temperature: 0
@@ -49,7 +49,7 @@ mc_parameters5:
                 scaling_for_plaq3: 100
                 scaling_for_plaq4: 300
 mc_parameters6:
-        n_moves: 3000
+        n_moves: 10000
         delta: 0.05
         chi_0: 0.8
         current_temperature: 0
@@ -59,7 +59,7 @@ mc_parameters6:
                 scaling_for_plaq3: 200
                 scaling_for_plaq4: 900
 mc_parameters7:
-        n_moves: 3000
+        n_moves: 10000
         delta: 0.05
         chi_0: 0.8
         current_temperature: 0
@@ -69,7 +69,7 @@ mc_parameters7:
                 scaling_for_plaq3: 800
                 scaling_for_plaq4: 1700
 mc_parameters8:
-        n_moves: 3000
+        n_moves: 10000
         delta: 0.05
         chi_0: 0.8
         current_temperature: 0
@@ -79,7 +79,7 @@ mc_parameters8:
                 scaling_for_plaq3: 1000
                 scaling_for_plaq4: 3000
 mc_parameters9:
-        n_moves: 3000
+        n_moves: 10000
         delta: 0.05
         chi_0: 0.8
         current_temperature: 0
@@ -89,7 +89,7 @@ mc_parameters9:
                 scaling_for_plaq3: 3000
                 scaling_for_plaq4: 12000
 mc_parameters10:
-        n_moves: 3000
+        n_moves: 10000
         delta: 0.05
         chi_0: 0.8
         current_temperature: 0

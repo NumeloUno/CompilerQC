@@ -1,0 +1,11 @@
+mc_parameters1:
+        # number of moves to perform search
+        n_moves: 10000
+        # if current_temperature is 0, then initial temperature is estimated
+        current_temperature: 0
+        # if kirkpatrick is True, we use the temp schedule c_k+1 = alpha * c_k
+        temperature_kirkpatrick_sigma: True
+        # c_k+1 = alpha * c_k
+        alpha: 0.95
+        operation_schedule:
+                move: 1                 
