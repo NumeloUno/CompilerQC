@@ -39,12 +39,14 @@ def evaluate_optimization(
     success_rate = []
     for iteration in range(batch_size):
         mc = MC(deepcopy(energy))
+        #print('HERE!')
         mc = update_mc(mc, mc_schedule)
-        if mc.current_temperature == 0:
+        initial_temperature = mc.current_temperature
+        if initial_temperature == 0:
             initial_temperature = mc.initial_temperature()
-            mc.T_0 = initial_temperature
-            mc.current_temperature = initial_temperature
-            mc.n_moves = mc_schedule['n_moves']
+        mc.T_0 = initial_temperature
+        mc.current_temperature = initial_temperature
+        mc.n_moves = mc_schedule['n_moves']
         for repetition in range(mc_schedule['n_moves']):
             mc.optimization_schedule()
         success_rate.append((mc.energy.polygon_object.qbits.graph.C
