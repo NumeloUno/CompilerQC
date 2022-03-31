@@ -116,10 +116,31 @@ class Polygons:
         # if there is a one in a 4er combi and its 3 combinations (for 3plaqs), its a 4 plaq
         # if there are two ones in a a 4er combi and its 3 combinations (for 3plaqs), the first one is a 3er plaq
         return [
-            possible_plaqs[i][j]
+            list(possible_plaqs[i][j])
             for i, j in [[i, l.index(1)] for i, l in enumerate(a) if 1 in l]
         ]
 
+    def set_plaquettes_of_qbits(self):
+        """
+        set the plaquettes of each qbit
+        """
+        found_plaquettes = self.found_plaqs()
+        for qbit in self.qbits:
+            qbit.plaquettes = [plaq for plaq in found_plaquettes if qbit.qubit in plaq]
+            
+    def neighbours(self, coord):
+        """
+        return the 8 neighbours of a coord, if the neighbour is (not) occupied by another 
+        qbit, (np.nan) the qbit object will be returned in a list of length 8
+        """
+        coord_to_qbit_dict = self.qbits.coord_to_qbit_dict
+        neighbours_ = lambda coord: [
+            coord_to_qbit_dict.get((coord[0] + i, coord[1] + j), np.nan)
+            for i in range(-1,2)
+            for j in range(-1,2)
+        ]
+        return neighbours_(coord)
+        
     @property
     def number_of_plaqs(self):
         return len(self.found_plaqs())
