@@ -202,34 +202,46 @@ class MC:
         if self.temperature_linearC:
             C = self.energy.polygon_object.qbits.graph.C
             p = self.number_of_plaquettes
-            self.current_temperature = self.rho * self.T_0 * (
-                    C - p) / C + 1e-2
+            self.current_temperature = self.rho * self.T_0 * (C - p) / C + 1e-2
             return self.current_temperature
+
         if self.temperature_C:
-            self.current_temperature = self.T_0 * np.exp(
-                - self.rho * self.number_of_plaquettes
-                / (
-                    self.energy.polygon_object.qbits.graph.C
-                    - self.number_of_plaquettes
-                    + 1e-2
+            self.current_temperature = (
+                self.T_0
+                * np.exp(
+                    -self.rho
+                    * self.number_of_plaquettes
+                    / (
+                        self.energy.polygon_object.qbits.graph.C
+                        - self.number_of_plaquettes
+                        + 1e-2
+                    )
                 )
-            ) + 1e-2
+                + 1e-2
+            )
             return self.current_temperature
+
         if self.linear_in_moves:
-            self.current_temperature = self.T_0 * (self.n_moves - self.n_total_steps) / self.n_moves + 1e-2
+            self.current_temperature = (
+                self.T_0 * (self.n_moves - self.n_total_steps) / self.n_moves + 1e-2
+            )
             return self.current_temperature
 
         if self.n_total_steps % self.repetition_rate == 0:
+
             if self.temperature_kirkpatrick:
                 new_temperature = self.alpha * self.current_temperature
-                self.current_temperature = new_temperature 
+                self.current_temperature = new_temperature
                 return self.current_temperature
 
             sigmoid = lambda x: 1 - 1 / (1 + np.exp(-x))
             if self.temperature_kirkpatrick_sigma:
                 new_temperature = self.alpha * self.current_temperature
-                self.current_temperature = new_temperature + sigmoid(self.variance_energy)
+                self.current_temperature = new_temperature + sigmoid(
+                    self.variance_energy
+                )
                 return self.current_temperature
+
             else:
                 new_temperature = self.current_temperature / (
                     1
@@ -238,8 +250,7 @@ class MC:
                     / (3 * np.sqrt(self.variance_energy) + 1e-3)
                 )
                 self.current_temperature = new_temperature
-
-        return self.current_temperature
+                return self.current_temperature
 
     def update_mean_and_variance(self):
         """
