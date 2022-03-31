@@ -18,9 +18,9 @@ def open_file(args):
     )
     if os.path.exists(path_to_results):
         file = open(path_to_results, "a")
-        file.write(head)
     else:
         file = open(path_to_results, "a")
+        file.write(head)
     return file
 
 def benchmark_problem_folder_with_exact_scaling(args):
@@ -252,25 +252,14 @@ if __name__ == "__main__":
         help="some extra name to add to result filename",
     )
     args = parser.parse_args()
+    if args.extra_id == 'exact_scaling':
+        benchmark_problem_folder_with_exact_scaling(args)
     if args.id_of_benchmark == 'maxCpolynom':
         benchmark_energy_scaling_by_max_C(args)
     if args.id_of_benchmark == 'LHZCpolynom':
         benchmark_energy_scaling_by_LHZ_C(args)
-    if args.id_of_benchmark == 'MLP':
-        benchmark_MLP_energy_scaling(args)
-    if args.id_of_benchmark == 'temp_schedule2':
-        args.extra_id = 'MLP'
-        benchmark_MLP_energy_scaling(args)
-    if args.id_of_benchmark == 'delta':
-        args.extra_id = 'MLP'
-        benchmark_MLP_energy_scaling(args)
-    if args.id_of_benchmark == 'chi_0':
-        args.extra_id = 'MLP'
-        benchmark_MLP_energy_scaling(args)    
     if args.id_of_benchmark == 'energyscaling':
         benchmark_energy_scaling_by_yaml(args)
-    if args.extra_id == 'exact_scaling':
-        benchmark_problem_folder_with_exact_scaling(args)
     if args.id_of_benchmark == 'nmoves':
         args.extra_id = 'MLP_linear_tempschedule_in_moves'
         benchmark_MLP_energy_scaling(args)
@@ -283,5 +272,18 @@ if __name__ == "__main__":
     if args.id_of_benchmark == 'temperature_kirkpatrick_sigma':
         args.extra_id = 'MLP'
         benchmark_MLP_energy_scaling(args)
+    if args.id_of_benchmark == 'MLP':
+        benchmark_MLP_energy_scaling(args)
+    if args.id_of_benchmark == 'temp_schedule2':
+        args.extra_id = 'MLP'
+        benchmark_MLP_energy_scaling(args)
+    if args.id_of_benchmark == 'delta':
+        args.extra_id = 'MLP'
+        benchmark_MLP_energy_scaling(args)
+    if args.id_of_benchmark == 'chi_0':
+        args.extra_id = 'MLP'
+        benchmark_MLP_energy_scaling(args)    
+    if args.extra_id == 'MLP':
+        benchmark_MLP_energy_scaling(args)  
     else:
         print("id not found in parameters folder")
