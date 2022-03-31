@@ -150,17 +150,14 @@ class Qbit():
         self.core = core
         # self.polygons is set with set_polygons(), this function is called in init of Polygons
         self.polygons = None
+        # self.plaquettes is set with set_plaquettes_of_qbits(), this function has to be called after Polygons is initialized
+        self.plaquettes = None
         
     @property
     def qubit(self):
         """ qubit cant be overwritten like this"""
         return self._qubit
         
-    def involved_in_plaqs(self, polygon_object):
-        """
-        returns list of plaquettes qbit is part of 
-        """
-        return [plaq for plaq in polygon_object.found_plaqs() if self.qubit in plaq]
     
     def set_polygons(self, all_polygons):
         """
