@@ -4,7 +4,7 @@ __pycache__
 notebooks/Plots
 notebooks/check_grid_idea.ipynb
 literature
-#*.yaml
+*.yaml
 *.txt
 *.npy
 database
