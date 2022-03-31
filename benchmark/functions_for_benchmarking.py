@@ -22,12 +22,8 @@ def update_mc(mc, mc_schedule) -> MC:
     for k, v in mc_schedule.items():
         if k == 'n_moves':
             continue
-        if k == 'energy_schedule':
-            mc.energy.__setattr__(k, v)
-            continue
-        if k == 'energy_scaling':
-            for name, scaling in v.items():
-                mc.energy.__setattr__(name, scaling)
+        if k.split('.')[0] == 'energy':
+            mc.energy.__setattr__(k.split('.')[1], v)
             continue
         mc.__setattr__(k, v)
     return mc
