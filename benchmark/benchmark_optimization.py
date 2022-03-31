@@ -240,7 +240,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-core",
         "--with_core",
-        type=bool,
+        action="store_true",
         default=False,
         help="start with bipartite core",
     )
