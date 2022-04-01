@@ -1,6 +1,6 @@
 import random
 import numpy as np
-from CompilerQC import Energy
+from CompilerQC import Energy, Qbits
 import cProfile
 
 """
@@ -19,33 +19,47 @@ class MC:
     def __init__(
         self,
         energy_object: Energy,
-        delta: float = 1,
+        delta: float = 0.05,
         chi_0: float = 0.8,
-        alpha: float = 0.8,
-        repetition_rate: int = None,
+        alpha: float = 0.95,
+        repetition_rate_factor: float = 1,
         recording: bool = False,
     ):
         """
         repetition rate: how many moves with constant temperature
         delta: how large are the jumps in temperature change
-        T_0: initial temperture, can be later set with initial_temperature()
+        T_0: initial temperature, can be later set with initial_temperature()
         alpha: decreasing paramter for kirkpatrick temperature schedule
         """
         # self.prof = cProfile.Profile()
 
         self.energy = energy_object
         self.n_total_steps = 0
+        
+        # choose qbits
+        self.isolation_weight = False
+        self.sparse_plaquette_density_weight = False
+        self.random_qbit = True
+        
+        # choose coords
+        self.neighbour_coords = False
+        self.finite_grid_size = False
+        self.padding_finite_grid = 0
+        self.infinite_grid_size = True
+        
+        # choose temperature
         self.chi_0 = chi_0
         self.delta = delta
         self.alpha = alpha
+        self.repetition_rate_factor = repetition_rate_factor
+
+        self.temperature_adaptive = False
         self.temperature_kirkpatrick = False
         self.temperature_kirkpatrick_sigma = False
         self.linear_in_moves = False
         self.temperature_C = False
         self.temperature_linearC = False
-        self.repetition_rate = repetition_rate
-        if self.repetition_rate is None:
-            self.repetition_rate = self.energy.polygon_object.qbits.graph.K
+        
         # compute total energy once at the beginning
         self.total_energy, self.number_of_plaquettes = self.energy(
             self.energy.polygon_object.qbits
@@ -62,14 +76,43 @@ class MC:
             self.record_rejected_moves = []
             self.record_acc_probability = []
             self.record_delta_energy = []
+    # TODO: !!!!        
+    def reset(self, current_temperature, with_core: bool):
+        """ reset complete MC search, check it!!!"""
+        self.n_total_steps = 0
+        self.total_energy, self.number_of_plaquettes = self.energy(
+            self.energy.polygon_object.qbits
+        )   
+        self.current_temperature = current_temperature
+        if not with_core:
+            Qbits.remove_core(self.energy.polygon_object.qbits)
+        else:
+            Qbits.reinit_coords(self.energy.polygon_object.qbits, with_core=True)
+            
 
-    def select_move(self):
+    def select_move(self, qbit=None, target_coord=None):
         """
         move random qbit to random coord
         if coord is already occupied, swap qbits
         """
-        qbit = self.energy.polygon_object.qbits.random_shell_qbit()
-        target_coord = self.generate_coord()
+        # select qbit
+        if self.isolation_weight:
+            isolation_weight = self.energy.penalty_for_isolated_qbits()
+            qbit = self.energy.polygon_object.qbits.random_weighted_shell_qbit(weights=isolation_weight)
+        if self.sparse_plaquette_density_weight:
+            sparse_plaquette_density_weight = self.energy.penalty_for_sparse_plaquette_density()
+            qbit = self.energy.polygon_object.qbits.random_weighted_shell_qbit(weights=sparse_plaquette_density_weight)
+        if self.random_qbit:
+            qbit = self.energy.polygon_object.qbits.random_shell_qbit()
+        # select coord
+        if self.neighbour_coords:
+            target_coord = self.coord_from_neighbour_coords()
+        if self.finite_grid_size:
+            target_coord = self.coord_from_finite_grid()
+        if self.infinite_grid_size:
+            target_coord = self.coord_from_infinite_grid()
+        assert qbit is not None and target_coord is not None, "oh! there is no qbit or targetcoord"
+        # return    
         if target_coord in self.energy.polygon_object.qbits.coords:
             target_qbit = self.energy.polygon_object.qbits.qbit_from_coord(target_coord)
             return qbit, target_qbit
@@ -81,9 +124,11 @@ class MC:
         move qbit to coord
         if coord is a qbit (occupied coord), swap qbits
         """
+        # move
         if type(coord_or_qbit) == tuple:
             self.old_coord = qbit.coord
             qbit.coord = coord_or_qbit
+        # swap
         else:
             self.energy.polygon_object.qbits.swap_qbits(qbit, coord_or_qbit)
             self.old_coord = None
@@ -92,13 +137,32 @@ class MC:
         """
         reverse move from apply_move()
         """
+        # move back
         if type(coord_or_qbit) == tuple:
             qbit.coord = self.old_coord
+        # swack back
         else:
             assert self.old_coord == None, "something went wrong"
             self.energy.polygon_object.qbits.swap_qbits(coord_or_qbit, qbit)
-
-    def generate_coord(self):
+    
+    def coord_from_neighbour_coords(self):
+        """
+        return random coord from neighbour coords
+        """
+        neighbour_coords = [coord for qbit in self.energy.polygon_object.qbits
+                for coord in Qbits.neighbour_coords(qbit.coord)]
+        self.possible_coords = list(
+                set(neighbour_coords)
+                - set(self.energy.polygon_object.qbits.core_qbit_coords)
+            )
+        return random.choice(self.possible_coords)
+    
+    @property
+    def repetition_rate(self):
+        """lenght of markov chain"""
+        return self.repetition_rate_factor * self.energy.polygon_object.qbits.graph.K    
+    
+    def coord_from_infinite_grid(self):
         """
         generate random coord in grid
         sample from envelop rectengular of compiled graph
@@ -111,6 +175,15 @@ class MC:
                 - set(self.energy.polygon_object.qbits.core_qbit_coords)
             )
         return random.choice(self.possible_coords)
+    
+    def coord_from_finite_grid(self):
+        if self.n_total_steps == 0:
+            possible_coords = self.energy.polygon_object.envelop_rect(self.padding_finite_grid)
+            self.possible_coords = list(
+                set(possible_coords)
+                - set(self.energy.polygon_object.qbits.core_qbit_coords)
+            )
+        return random.choice(self.possible_coords)        
 
     def step(self, operation: str = None):
         """
@@ -154,9 +227,7 @@ class MC:
     def apply(
         self, operation, n_steps,
     ):
-
         # self.prof.enable()
-
         C = self.energy.polygon_object.graph.C
         for i in range(n_steps):
             if self.number_of_plaquettes == C:
@@ -164,9 +235,7 @@ class MC:
             self.update_mean_and_variance()
             current_energy, new_energy = self.step(operation)
             self.metropolis(current_energy, new_energy)
-
         # self.prof.disable()
-
         return new_energy - current_energy
 
     def optimization_schedule(self,):
@@ -177,7 +246,7 @@ class MC:
         for operation, n_steps in self.operation_schedule.items():
             self.apply(operation, n_steps)
 
-    def initial_temperature(self, size_of_S=1):
+    def initial_temperature(self, size_of_S=50):
         """
         estimate the initial Temperature T_0,
         chi_0 is the inital acceptance rate of bad moves
@@ -186,52 +255,57 @@ class MC:
         should converge with increasing size of S
         comment: empirically one can see the the initial temperature
         is already estimated quiet good by size_of_S=1
+        benchmark: just T_1, T_0_estimation, or estimate_standard_deviation() / ln(chi0)
         """
-        positive_transitions = postive_transitions(
-            self.energy.polygon_object.qbits.graph, size_of_S
-        )
-        return T_0_estimation(positive_transitions, self.chi_0)
+        energy_values = positive_transitions(
+            self, size_of_S)
+        E_min, E_max = energy_values.T
+        # to slightly accelerate the T_0_estimation process, we use Eq. 7 from the paper
+        T_1 = - (E_max - E_min).mean() / np.log(self.chi_0)
+        return T_0_estimation(energy_values, chi_0=self.chi_0, T_1=T_1)
 
     @property
     def temperature(self):
         """
         call this function 
         after n_total_steps > 1,
-        since welford needs it like this
+        since welford needs it like this,
+        + 1e-2 to avoid warning in np.exp
         """
-        if self.temperature_linearC:
-            C = self.energy.polygon_object.qbits.graph.C
-            p = self.number_of_plaquettes
-            self.current_temperature = self.rho * self.T_0 * (C - p) / C + 1e-2
-            return self.current_temperature
-
-        if self.temperature_C:
-            self.current_temperature = (
-                self.T_0
-                * np.exp(
-                    -self.rho
-                    * self.number_of_plaquettes
-                    / (
-                        self.energy.polygon_object.qbits.graph.C
-                        - self.number_of_plaquettes
-                        + 1e-2
-                    )
-                )
-                + 1e-2
-            )
-            return self.current_temperature
-
-        if self.linear_in_moves:
-            self.current_temperature = (
-                self.T_0 * (self.n_moves - self.n_total_steps) / self.n_moves + 1e-2
-            )
-            return self.current_temperature
-
         if self.n_total_steps % self.repetition_rate == 0:
+
+            if self.temperature_linearC:
+                C = self.energy.polygon_object.qbits.graph.C
+                p = self.number_of_plaquettes
+                self.current_temperature = self.T_0 * (C - p) / C + 1e-2
+                return self.current_temperature
+
+            if self.temperature_C:
+                self.current_temperature = (
+                    self.T_0
+                    * np.exp(
+                        -self.rho
+                        * self.number_of_plaquettes
+                        / (
+                            self.energy.polygon_object.qbits.graph.C
+                            - self.number_of_plaquettes
+                            + 1e-2
+                        )
+                    )
+                    + 1e-2
+                )
+                return self.current_temperature
+
+            if self.linear_in_moves:
+                self.current_temperature = (
+                    self.T_0 * (self.n_moves - self.n_total_steps) / self.n_moves + 1e-2
+                )
+                return self.current_temperature
+
 
             if self.temperature_kirkpatrick:
                 new_temperature = self.alpha * self.current_temperature
-                self.current_temperature = new_temperature
+                self.current_temperature = new_temperature + 1e-2
                 return self.current_temperature
 
             sigmoid = lambda x: 1 - 1 / (1 + np.exp(-x))
@@ -239,18 +313,19 @@ class MC:
                 new_temperature = self.alpha * self.current_temperature
                 self.current_temperature = new_temperature + sigmoid(
                     self.variance_energy
-                )
+                ) + 1e-2
                 return self.current_temperature
 
-            else:
+            if self.temperature_adaptive:
                 new_temperature = self.current_temperature / (
                     1
                     + self.current_temperature
                     * np.log(1 + self.delta)
                     / (3 * np.sqrt(self.variance_energy) + 1e-3)
-                )
-                self.current_temperature = new_temperature
-                return self.current_temperature
+                ) 
+                self.current_temperature = new_temperature + 1e-2
+                
+        return self.current_temperature
 
     def update_mean_and_variance(self):
         """
@@ -283,38 +358,29 @@ from copy import deepcopy
 from CompilerQC import Qbits, Polygons, Energy
 
 
-def postive_transitions(graph, size_of_S=100, E=[]):
+def positive_transitions(mc_object, size_of_S=50):
     """
     create states and for each state, it takes one bad neighbour (state with higher energy)
     return list: [[state, bad_neighbour_state]] of length size_of_S
     """
+    E=[]
+    mc = deepcopy(mc_object)
     for i in range(size_of_S):
-        # initialise state
-        qbits = Qbits.init_qbits_from_dict(graph, dict())
-        polygon_object = Polygons(qbits)
-        energy = Energy(polygon_object, scaling_for_plaq3=0, scaling_for_plaq4=0)
-        mc = MC(energy)
-        mc_min = deepcopy(mc)
-        mc_min.energy(mc_min.energy.polygon_object.qbits)
-
+        E_start, _ = mc.energy(mc.energy.polygon_object.qbits)
         # find bad neighbour state
         not_found = True
         while not_found:
-            current_energy, new_energy = mc.step("")
+            current_energy, new_energy = mc.step()
             delta_energy = new_energy - current_energy
             if delta_energy > 0:
-                mc_max = mc
+                E_plus = E_start + delta_energy
                 not_found = False
+                Qbits.remove_core(mc.energy.polygon_object.qbits)
             else:
-                mc_max = deepcopy(mc_min)
-
+                mc.reverse_move(*mc.qbits_to_move)
+                mc.number_of_plaquettes = mc.current_number_of_plaquettes
         # append energy of state and bad neighbour state
-        E.append(
-            [
-                mc_min.energy(mc_min.energy.polygon_object.qbits)[0],
-                mc_max.energy(mc_max.energy.polygon_object.qbits)[0],
-            ]
-        )
+        E.append([E_start, E_plus])
     return np.array(E)
 
 
@@ -324,16 +390,25 @@ def chi(T, E):
     return np.exp(-E_max / T).sum() / np.exp(-E_min / T).sum()
 
 
-def new_T(chi_0, T, E, p=0.5):
+def new_T(chi_0, T, E, p=2):
     """formula (6) from https://doi.org/10.1023/B:COAP.0000044187.23143.bd"""
-    return T * (np.log(chi(T, E)) / np.log(chi_0)) ** 1 / p
+    return T * (np.log(chi(T, E)) / np.log(chi_0)) ** (1 / p)
 
 
-def T_0_estimation(E, chi_0=0.8, T_1=1000, epsilon=0.0001):
+def T_0_estimation(E, chi_0, T_1, epsilon=0.01):
     """Computing the temperature of simulated annealing"""
-    difference = epsilon + 1
+    difference = np.abs(chi(T_1, E) - chi_0)
     while difference > epsilon:
         T_n = new_T(chi_0, T_1, E)
-        difference = np.abs(chi(T_n, E) - chi(T_1, E))
+        difference = np.abs(chi(T_n, E) - chi_0)
         T_1 = T_n
     return T_1
+
+def estimate_standard_deviation(mc_object, number_of_samples: int=100):
+    """return the standard deviation of the energies of number_of_samples
+    randomly generated configurations"""
+    energies = []
+    for i in range(number_of_samples):
+        Qbits.remove_core(mc_object.energy.polygon_object.qbits)
+        energies.append(mc.energy(mc_object.energy.polygon_object.qbits)[0])
+    return np.std(energies)
