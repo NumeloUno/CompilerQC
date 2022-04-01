@@ -127,20 +127,12 @@ class Polygons:
         found_plaquettes = self.found_plaqs()
         for qbit in self.qbits:
             qbit.plaquettes = [plaq for plaq in found_plaquettes if qbit.qubit in plaq]
-            
-    def neighbours(self, coord):
-        """
-        return the 8 neighbours of a coord, if the neighbour is (not) occupied by another 
-        qbit, (np.nan) the qbit object will be returned in a list of length 8
-        """
-        coord_to_qbit_dict = self.qbits.coord_to_qbit_dict
-        neighbours_ = lambda coord: [
-            coord_to_qbit_dict.get((coord[0] + i, coord[1] + j), np.nan)
-            for i in range(-1,2)
-            for j in range(-1,2)
-        ]
-        return neighbours_(coord)
         
+    def set_numbers_of_qbits_neighbours(self):
+        """"set number of neighbours each qbit has"""
+        for qbit in self.qbits:
+            self.qbits.set_number_of_qbit_neighbours(qbit) 
+           
     @property
     def number_of_plaqs(self):
         return len(self.found_plaqs())
