@@ -1,4 +1,4 @@
-from functions_for_benchmarking import update_mc, evaluate_optimization, run_benchmark, head
+from functions_for_benchmarking import update_mc, evaluate_optimization, run_benchmark
 from CompilerQC import functions_for_database as dataset
 from tqdm import tqdm
 from CompilerQC import Graph, Qbits, Polygons, Energy, MC, paths, core
@@ -6,35 +6,26 @@ import numpy as np
 import pickle
 import argparse
 import os.path
+import pandas as pd
 
-def open_file(args):
-    """
-    open txt where benchmark results will be saved,
-    if file does not exist yet, create it and append head
-    """
-    print(head)
-    path_to_results = (
-        paths.benchmark_results_path / f"mc_benchmark_results_{args.id_of_benchmark}_{args.extra_id}.txt"
+path_to_results = lambda args: (
+        paths.benchmark_results_path / f"mc_benchmark_results_{args.id_of_benchmark}_{args.extra_id}.csv"
     )
-    if os.path.exists(path_to_results):
-        file = open(path_to_results, "a")
-    else:
-        file = open(path_to_results, "a")
-        file.write(head)
-    return file
-
+    
 def benchmark_problem_folder_with_exact_scaling(args):
     """
     calculate the scaling for each 3er and 4er plaq such that 
     the total energy of the compiled solution is zero,
     if the same compiled solution is found as in the dataset
     """
+    
     problems = dataset.get_files_to_problems(
                 problem_folder=args.problem_folder,
                 min_C=args.min_C,
                 max_C=args.max_C,
                 )
-    file = open_file(args)
+    
+    benchmark_df = pd.DataFrame()
     for file_ in problems:
         # read graph and qubit to coord translation from file
         graph_adj_matrix, qubit_coord_dict = (
@@ -53,8 +44,8 @@ def benchmark_problem_folder_with_exact_scaling(args):
             scaling_for_plaq3=scaling_for_plaq3,
             scaling_for_plaq4=scaling_for_plaq4,
         )
-        file = run_benchmark(file, energy, args)
-    file.close()
+        benchmark_df = run_benchmark(benchmark_df, energy, args)
+    benchmark_df.to_csv(path_to_results(args))
     
 def benchmark_energy_scaling_by_yaml(args):
     """
@@ -62,7 +53,7 @@ def benchmark_energy_scaling_by_yaml(args):
     fully connected logical graphs, 
     scale plaqs by value in the yaml
     """
-    file = open_file(args)
+    benchmark_df = pd.DataFrame()
     for N in range(args.min_N, args.max_N +1):
         graph = Graph.complete(N)
         core_qubits, core_coords = [], []
@@ -78,16 +69,16 @@ def benchmark_energy_scaling_by_yaml(args):
             qbits.assign_core_qbits(core_qubits)
         polygon_object = Polygons(qbits)
         energy = Energy(polygon_object)
-        file = run_benchmark(file, energy, args)
-    file.close()
-       
+        benchmark_df = run_benchmark(benchmark_df, energy, args)
+    benchmark_df.to_csv(path_to_results(args))
+        
 def benchmark_MLP_energy_scaling(args):
     """
     benchmark the search of compiled graphs for 
     fully connected logical graphs,
     scale plaqs by prediction of MLP
     """
-    file = open_file(args)
+    benchmark_df = pd.DataFrame()
     for N in range(args.min_N, args.max_N +1):
         graph = Graph.complete(N)
         core_qubits, core_coords = [], []
@@ -110,8 +101,8 @@ def benchmark_MLP_energy_scaling(args):
             scaling_for_plaq3=scaling_for_plaq3,
             scaling_for_plaq4=scaling_for_plaq4,
         )
-        file = run_benchmark(file, energy, args)
-    file.close()
+        benchmark_df = run_benchmark(benchmark_df, energy, args)
+    benchmark_df.to_csv(path_to_results(args), mode='a', header=True)
     
 def benchmark_energy_scaling_by_max_C(args):
     """
@@ -120,7 +111,7 @@ def benchmark_energy_scaling_by_max_C(args):
     scale by prediction of polynom fittet
     to max_C:energy dataset
     """
-    file = open_file(args)
+    benchmark_df = pd.DataFrame()
     for N in range(args.min_N, args.max_N +1):
         graph = Graph.complete(N)
         core_qubits, core_coords = [], []
@@ -145,8 +136,8 @@ def benchmark_energy_scaling_by_max_C(args):
             scaling_for_plaq3=scaling_for_plaq3,
             scaling_for_plaq4=scaling_for_plaq4,
         )
-        file = run_benchmark(file, energy, args)
-    file.close()
+        benchmark_df = run_benchmark(benchmark_df, energy, args)
+    benchmark_df.to_csv(path_to_results(args))
     
 def benchmark_energy_scaling_by_LHZ_C(args):
     """
@@ -155,7 +146,7 @@ def benchmark_energy_scaling_by_LHZ_C(args):
     scale by prediction of polynom fittet
     to LHZ solutions
     """
-    file = open_file(args)
+    benchmark_df = pd.DataFrame()
     for N in range(args.min_N, args.max_N +1):
         graph = Graph.complete(N)
         core_qubits, core_coords = [], []
@@ -180,8 +171,8 @@ def benchmark_energy_scaling_by_LHZ_C(args):
             scaling_for_plaq3=scaling_for_plaq3,
             scaling_for_plaq4=scaling_for_plaq4,
         )
-        file = run_benchmark(file, energy, args)
-    file.close()
+        benchmark_df = run_benchmark(benchmark_df, energy, args)
+    benchmark_df.to_csv(path_to_results(args))
     
 if __name__ == "__main__":
 
@@ -241,7 +232,7 @@ if __name__ == "__main__":
         "-core",
         "--with_core",
         action="store_true",
-        default=False,
+        default=True,
         help="start with bipartite core",
     )
     parser.add_argument(
@@ -254,36 +245,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.extra_id == 'exact_scaling':
         benchmark_problem_folder_with_exact_scaling(args)
-    if args.id_of_benchmark == 'maxCpolynom':
-        benchmark_energy_scaling_by_max_C(args)
-    if args.id_of_benchmark == 'LHZCpolynom':
-        benchmark_energy_scaling_by_LHZ_C(args)
     if args.id_of_benchmark == 'energyscaling':
         benchmark_energy_scaling_by_yaml(args)
-    if args.id_of_benchmark == 'nmoves':
-        args.extra_id = 'MLP_linear_tempschedule_in_moves'
-        benchmark_MLP_energy_scaling(args)
-    if args.id_of_benchmark == 'temperature_C':
-        args.extra_id = 'MLP'
-        benchmark_MLP_energy_scaling(args)
-    if args.id_of_benchmark == 'temperature_linearC':
-        args.extra_id = 'MLP'
-        benchmark_MLP_energy_scaling(args)
-    if args.id_of_benchmark == 'temperature_kirkpatrick_sigma':
-        args.extra_id = 'MLP'
-        benchmark_MLP_energy_scaling(args)
-    if args.id_of_benchmark == 'MLP':
-        benchmark_MLP_energy_scaling(args)
-    if args.id_of_benchmark == 'temp_schedule2':
-        args.extra_id = 'MLP'
-        benchmark_MLP_energy_scaling(args)
-    if args.id_of_benchmark == 'delta':
-        args.extra_id = 'MLP'
-        benchmark_MLP_energy_scaling(args)
-    if args.id_of_benchmark == 'chi_0':
-        args.extra_id = 'MLP'
-        benchmark_MLP_energy_scaling(args)    
     if args.extra_id == 'MLP':
         benchmark_MLP_energy_scaling(args)  
+    if args.extra_id == 'maxC':
+        benchmark_energy_scaling_by_max_C(args)
+    if args.extra_id == 'LHZ':
+        benchmark_energy_scaling_by_LHZ_C(args)
     else:
         print("id not found in parameters folder")
