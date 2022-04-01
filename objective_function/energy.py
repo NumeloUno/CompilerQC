@@ -9,8 +9,12 @@ class Energy(Polygons):
         scaling_for_plaq4: float=0,
     ):
         self.polygon_object = polygon_object
+        
+        # scaling for plaquettes
         self.scaling_for_plaq3 = scaling_for_plaq3
         self.scaling_for_plaq4 = scaling_for_plaq4
+        
+        # polygon weights
         self.subset_weight = False
         self.subset_weight_offset = 0
         self.threshold_weight = False
@@ -127,19 +131,26 @@ class Energy(Polygons):
     
     def penalty_for_sparse_plaquette_density(self):
         """
-        there is a penelity
+        there is a penalty
         if a qbit has a lot of neighbours,
         but is involved only in few plaquettes.
         """
         # update plaquettes of each qbit
         self.polygon_object.set_plaquettes_of_qbits()
+        self.polygon_object.set_numbers_of_qbits_neighbours()
 
         # if a qbit is involved in n plaquettes, it has in average qbits_per_plaq[n] neighbours which build these plaquettes
         qbits_per_plaq = [0, 2.5, 5, 6.5, 8]
         
         # the number of neighbour qbits (8-count(nan)) minus the avg. number of qbits which are in plaquettes
-        return sum([(8 - self.polygon_object.neighbours(qbit.coord).count(np.nan))
-                    - qbits_per_plaq[len(qbit.plaquettes)] for qbit in self.polygon_object.qbits])
+        return ([qbit.number_of_qbit_neighbours
+                 - qbits_per_plaq[len(qbit.plaquettes)] for qbit in self.polygon_object.qbits])
+    
+    def penalty_for_isolated_qbits(self):
+        """penalty"""
+        self.polygon_object.set_numbers_of_qbits_neighbours()
+        return 8 - np.array([qbit.number_of_qbit_neighbours for qbit in self.polygon_object.qbits])
+ 
     
     def __call__(self, qbits_of_interest):
         """
@@ -172,7 +183,7 @@ class Energy(Polygons):
             return (
                 round(distances_to_plaquette.sum(), 5) 
                 + self.sparse_density_factor
-                * self.penalty_for_sparse_plaquette_density()
+                * sum(self.penalty_for_sparse_plaquette_density())
             ), number_of_plaquettes
         
         if self.square_scope:
