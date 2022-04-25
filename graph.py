@@ -96,6 +96,16 @@ class Graph:
     def complete(cls, n):
         """generates complete connected graph with n nodes"""
         return cls(np.ones((n, n)) - np.identity(n))
+    
+    @classmethod
+    def init_without_edges(cls, n, edges_to_remove: list):
+        """generate graph without edges in edges_to_remove"""
+        adj_matrix = np.ones((n, n)) - np.identity(n)
+        for edge in edges_to_remove:
+            adj_matrix[edge], adj_matrix[edge[::-1]] = 0, 0
+        return cls(adj_matrix)
+       
+            
 
     # TODO: random graph may have no cycles, fix this-> check if C,K,N are compatibe, add density parameter
     @classmethod
