@@ -195,11 +195,8 @@ class Qbits():
         swap two qubits with each other
         """
         self.qubits[qbit1.qubit].coord, self.qubits[qbit2.qubit].coord = self.qubits[qbit2.qubit].coord ,self.qubits[qbit1.qubit].coord
-    
 
-    
-    
-    
+
 class Qbit():
     """
     each qbit is an object with a name (qubit) and a coord.
@@ -231,8 +228,8 @@ class Qbit():
         set polyons which belong to this qbit, this function is called
         in the init of Polygons()
         """
-        if self.polygons is None:
-             self.polygons = [polygon for polygon in all_polygons if self.qubit in polygon]
+        #if self.polygons is None: warum war dieses if statement überhaupt hier?
+        self.polygons = [polygon for polygon in all_polygons if self.qubit in polygon]
         
     def polygons_coords(self, qubit_to_coord_dict: dict):
         """ return coords of polygons which belong to this qbit"""
