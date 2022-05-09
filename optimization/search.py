@@ -39,13 +39,19 @@ class MC:
         # choose qbits
         self.isolation_weight = False
         self.sparse_plaquette_density_weight = False
-        self.random_qbit = True
+        self.random_qbit = False
         
         # choose coords
         self.neighbour_coords = False
         self.finite_grid_size = False
         self.padding_finite_grid = 0
-        self.infinite_grid_size = True
+        self.infinite_grid_size = False
+        self.greedy = False
+        
+        # initial temperature
+        self.init_T_by_std = False
+        self.T_1 = False
+        self.T_0_estimation = False
         
         # choose temperature
         self.chi_0 = chi_0
@@ -76,19 +82,21 @@ class MC:
             self.record_rejected_moves = []
             self.record_acc_probability = []
             self.record_delta_energy = []
-    # TODO: !!!!        
+            
+    def init_search_from_yaml(self):
+        pass
+
     def reset(self, current_temperature, with_core: bool):
-        """ reset complete MC search, check it!!!"""
+        """ reset complete MC search"""
+        if not with_core:
+            Qbits.remove_core(self.energy.polygon_object.qbits)
+        else:
+            Qbits.reinit_coords(self.energy.polygon_object.qbits, with_core=True)
         self.n_total_steps = 0
         self.total_energy, self.number_of_plaquettes = self.energy(
             self.energy.polygon_object.qbits
         )   
         self.current_temperature = current_temperature
-        if not with_core:
-            Qbits.remove_core(self.energy.polygon_object.qbits)
-        else:
-            Qbits.reinit_coords(self.energy.polygon_object.qbits, with_core=True)
-            
 
     def select_move(self, qbit=None, target_coord=None):
         """
@@ -112,7 +120,7 @@ class MC:
         if self.infinite_grid_size:
             target_coord = self.coord_from_infinite_grid()
         assert qbit is not None and target_coord is not None, "oh! there is no qbit or targetcoord"
-        # return    
+        # return  
         if target_coord in self.energy.polygon_object.qbits.coords:
             target_qbit = self.energy.polygon_object.qbits.qbit_from_coord(target_coord)
             return qbit, target_qbit
@@ -144,6 +152,9 @@ class MC:
         else:
             assert self.old_coord == None, "something went wrong"
             self.energy.polygon_object.qbits.swap_qbits(coord_or_qbit, qbit)
+        # reset number of plaquettes
+        self.number_of_plaquettes = self.current_number_of_plaquettes
+
     
     def coord_from_neighbour_coords(self):
         """
@@ -199,6 +210,34 @@ class MC:
         self.n_total_steps += 1
         return current_energy, new_energy
 
+    def greedy_step(self):
+        self.coord_from_neighbour_coords()
+        qbit, _ = self.select_move()
+        nop = [] # number of plaquettes
+        for coord in self.possible_coords:
+            if coord in self.energy.polygon_object.qbits.coords:
+                coord = self.energy.polygon_object.qbits.coord_to_qbit_dict.get(coord)
+            self.qbits_to_move = qbit, coord
+            current_energy, current_n_plaqs = self.energy(self.qbits_to_move)
+            self.apply_move(*self.qbits_to_move)
+            new_energy, new_n_plaqs = self.energy(self.qbits_to_move)
+            self.current_number_of_plaquettes = self.number_of_plaquettes
+            self.number_of_plaquettes += new_n_plaqs - current_n_plaqs
+            nop.append(self.number_of_plaquettes)
+            self.reverse_move(*self.qbits_to_move)
+        greedy_coord = self.possible_coords[nop.index(max(nop))]
+        if greedy_coord in self.energy.polygon_object.qbits.coords:
+            greedy_coord = self.energy.polygon_object.qbits.coord_to_qbit_dict.get(greedy_coord)       
+        self.qbits_to_move = qbit, greedy_coord
+        current_energy, current_n_plaqs = self.energy(self.qbits_to_move)
+        self.apply_move(*self.qbits_to_move)
+        new_energy, new_n_plaqs = self.energy(self.qbits_to_move)
+        self.current_number_of_plaquettes = self.number_of_plaquettes
+        self.number_of_plaquettes += new_n_plaqs - current_n_plaqs
+        self.n_total_steps += 1
+        return current_energy, new_energy
+
+
     def metropolis(self, current_energy, new_energy):
         temperature = self.temperature
         delta_energy = new_energy - current_energy
@@ -220,7 +259,6 @@ class MC:
             return
         else:
             self.reverse_move(*self.qbits_to_move)
-            self.number_of_plaquettes = self.current_number_of_plaquettes
             if self.recording:
                 self.record_rejected_moves.append(self.n_total_steps)
 
@@ -233,8 +271,12 @@ class MC:
             if self.number_of_plaquettes == C:
                 return 0  # ? what is the best value np.nan, None, ?
             self.update_mean_and_variance()
-            current_energy, new_energy = self.step(operation)
+            if self.greedy:
+                current_energy, new_energy = self.greedy_step()
+            else:
+                current_energy, new_energy = self.step(operation)
             self.metropolis(current_energy, new_energy)
+
         # self.prof.disable()
         return new_energy - current_energy
 
@@ -246,7 +288,7 @@ class MC:
         for operation, n_steps in self.operation_schedule.items():
             self.apply(operation, n_steps)
 
-    def initial_temperature(self, size_of_S=50):
+    def initial_temperature(self, chi_0: float=None, size_of_S=50):
         """
         estimate the initial Temperature T_0,
         chi_0 is the inital acceptance rate of bad moves
@@ -257,12 +299,22 @@ class MC:
         is already estimated quiet good by size_of_S=1
         benchmark: just T_1, T_0_estimation, or estimate_standard_deviation() / ln(chi0)
         """
+        if chi_0 is None:
+            chi_0 = self.chi_0
+        if self.init_T_by_std:
+            return - estimate_standard_deviation(self) / np.log(chi_0)
+        
         energy_values = positive_transitions(
             self, size_of_S)
-        E_min, E_max = energy_values.T
+        E_start, E_plus = energy_values.T
         # to slightly accelerate the T_0_estimation process, we use Eq. 7 from the paper
-        T_1 = - (E_max - E_min).mean() / np.log(self.chi_0)
-        return T_0_estimation(energy_values, chi_0=self.chi_0, T_1=T_1)
+        T_1 = - (E_plus - E_start).mean() / np.log(chi_0)
+        if self.T_1:
+            return T_1
+        if self.T_0_estimation:
+            return T_0_estimation(energy_values, chi_0=chi_0, T_1=T_1)
+        else:
+            print('No initial temperature has been choosen')
 
     @property
     def temperature(self):
@@ -284,8 +336,7 @@ class MC:
                 self.current_temperature = (
                     self.T_0
                     * np.exp(
-                        -self.rho
-                        * self.number_of_plaquettes
+                        self.number_of_plaquettes
                         / (
                             self.energy.polygon_object.qbits.graph.C
                             - self.number_of_plaquettes
@@ -378,7 +429,6 @@ def positive_transitions(mc_object, size_of_S=50):
                 Qbits.remove_core(mc.energy.polygon_object.qbits)
             else:
                 mc.reverse_move(*mc.qbits_to_move)
-                mc.number_of_plaquettes = mc.current_number_of_plaquettes
         # append energy of state and bad neighbour state
         E.append([E_start, E_plus])
     return np.array(E)
@@ -407,6 +457,7 @@ def T_0_estimation(E, chi_0, T_1, epsilon=0.01):
 def estimate_standard_deviation(mc_object, number_of_samples: int=100):
     """return the standard deviation of the energies of number_of_samples
     randomly generated configurations"""
+    mc = deepcopy(mc_object)
     energies = []
     for i in range(number_of_samples):
         Qbits.remove_core(mc_object.energy.polygon_object.qbits)
