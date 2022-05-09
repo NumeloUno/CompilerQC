@@ -156,7 +156,7 @@ class Energy(Polygons):
     def penalty_for_sparse_plaquette_density(self):
         """
         there is a penalty
-        if a qbit has a lot of neighbours,
+        if a shell qbit has a lot of neighbours,
         but is involved only in few plaquettes.
         """
         # update plaquettes of each qbit
@@ -168,12 +168,12 @@ class Energy(Polygons):
         
         # the number of neighbour qbits (8-count(nan)) minus the avg. number of qbits which are in plaquettes
         return ([qbit.number_of_qbit_neighbours
-                 - qbits_per_plaq[len(qbit.plaquettes)] for qbit in self.polygon_object.qbits])
+                 - qbits_per_plaq[len(qbit.plaquettes)] for qbit in self.polygon_object.qbits.shell_qbits])
     
     def penalty_for_isolated_qbits(self):
-        """penalty"""
+        """penatly for isolated shell qbits"""
         self.polygon_object.set_numbers_of_qbits_neighbours()
-        return 8 - np.array([qbit.number_of_qbit_neighbours for qbit in self.polygon_object.qbits])
+        return 8 - np.array([qbit.number_of_qbit_neighbours for qbit in self.polygon_object.qbits.shell_qbits])
  
     
     def __call__(self, qbits_of_interest):

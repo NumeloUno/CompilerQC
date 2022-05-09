@@ -45,7 +45,7 @@ def benchmark_problem_folder_with_exact_scaling(args):
             scaling_for_plaq4=scaling_for_plaq4,
         )
         benchmark_df = run_benchmark(benchmark_df, energy, args)
-    benchmark_df.to_csv(path_to_results(args))
+    benchmark_df.to_csv(path_to_results(args), mode='a', header=True, index=False)
     
 def benchmark_energy_scaling_by_yaml(args):
     """
@@ -70,7 +70,7 @@ def benchmark_energy_scaling_by_yaml(args):
         polygon_object = Polygons(qbits)
         energy = Energy(polygon_object)
         benchmark_df = run_benchmark(benchmark_df, energy, args)
-    benchmark_df.to_csv(path_to_results(args))
+    benchmark_df.to_csv(path_to_results(args), mode='a', header=True, index=False)
         
 def benchmark_MLP_energy_scaling(args):
     """
@@ -102,7 +102,7 @@ def benchmark_MLP_energy_scaling(args):
             scaling_for_plaq4=scaling_for_plaq4,
         )
         benchmark_df = run_benchmark(benchmark_df, energy, args)
-    benchmark_df.to_csv(path_to_results(args), mode='a', header=True)
+    benchmark_df.to_csv(path_to_results(args), mode='a', header=True, index=False)
     
 def benchmark_energy_scaling_by_max_C(args):
     """
@@ -137,7 +137,7 @@ def benchmark_energy_scaling_by_max_C(args):
             scaling_for_plaq4=scaling_for_plaq4,
         )
         benchmark_df = run_benchmark(benchmark_df, energy, args)
-    benchmark_df.to_csv(path_to_results(args))
+    benchmark_df.to_csv(path_to_results(args), mode='a', header=True, index=False)
     
 def benchmark_energy_scaling_by_LHZ_C(args):
     """
@@ -172,7 +172,7 @@ def benchmark_energy_scaling_by_LHZ_C(args):
             scaling_for_plaq4=scaling_for_plaq4,
         )
         benchmark_df = run_benchmark(benchmark_df, energy, args)
-    benchmark_df.to_csv(path_to_results(args))
+    benchmark_df.to_csv(path_to_results(args), mode='a', header=True, index=False)
     
 if __name__ == "__main__":
 
