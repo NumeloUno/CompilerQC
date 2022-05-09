@@ -18,13 +18,15 @@ class Polygons:
     unit_triangle_scope = round((np.sqrt(2) + 2) / 3, 5)
     unit_square_scope = round((2 * np.sqrt(2) + 4) / 4, 5)
 
-    def __init__(self, qbits: "Qbits"):
+    def __init__(self, qbits: "Qbits", polygons: "list of polygons" = None):
         """
         logical_graph: logical graph with N nodes and K edges
         """
         self.qbits = qbits
         self.graph = self.qbits.graph
-        self.polygons = Polygons.create_polygons(self.graph.cycles)
+        if polygons is None:
+            polygons = Polygons.create_polygons(self.graph.cycles)
+        self.polygons = polygons
         self.qbits.set_all_polygons(self.polygons)
 
     @staticmethod
@@ -137,9 +139,9 @@ class Polygons:
     def number_of_plaqs(self):
         return len(self.found_plaqs())
 
-    def visualize(self, ax=None, zoom=1):
+    def visualize(self, ax=None, zoom=1, figsize=(15,15)):
         if ax is None:
-            _, ax = plt.subplots()
+            _, ax = plt.subplots(figsize=figsize)
         x, y = list(zip(*self.envelop_rect()))
         ax.scatter(x, y, color="grey", s=0.6)
         ax.set_yticklabels([])
@@ -148,21 +150,49 @@ class Polygons:
         for polygon in self.polygons_coords(
             self.qbits.qubit_to_coord_dict, self.polygons
         ):
-            fill, facecolor = False, None
+            fill, facecolor, lw = False, None, 0
             if self.scope_of_polygon(polygon) == self.unit_square_scope:
-                fill, facecolor = True, "lightblue"
+                fill, facecolor, lw = True, "#3A6B35", 14
             if self.scope_of_polygon(polygon) == self.unit_triangle_scope:
-                fill, facecolor = True, "indianred"
-            patch = plt.Polygon(polygon, zorder=0, fill=fill, lw=0, facecolor=facecolor)
+                fill, facecolor, lw = True, "#CBD18F", 14
+            patch = plt.Polygon(polygon, zorder=0, fill=fill, lw=lw, edgecolor='white', facecolor=facecolor)
             ax.add_patch(patch)
         # color qbits
         for qbit in self.qbits:
-            ax.annotate(str(qbit.qubit), qbit.coord)
+            label = ax.annotate(
+                    r"{},{}".format(*qbit.qubit),
+                    xy=qbit.coord, ha="center", va="center",
+                    fontsize=13
+                    )
             if qbit.core == False:
-                ax.scatter(*qbit.coord, color="red")
+                circle = plt.Circle(
+                        qbit.coord, radius=0.2, alpha=1.0, lw=0.7,
+                        ec='black', fc='#FFC57F'
+                        )
             elif qbit.core == True:
-                ax.scatter(*qbit.coord, color="darkred")
+                circle = plt.Circle(
+                        qbit.coord, radius=0.2, alpha=1.0, lw=0.7,
+                        ec='black', fc='#E3B448'
+                        )
+            ax.add_patch(circle)        
 
+
+    #####################################################
+    ################# node to core ######################
+    ##################################################### 
+    
+    
+    def qbits_to_node(self, i, xy):
+        """returns the qbits to node i on side xy"""
+        return [qbit for qbit in self.qbits if qbit.qubit[xy] == i]
+
+    def node_coord(self, i, xy):
+        node_qbits =  self.qbits_to_node(i, xy)
+        # in case of nonsymmetiry swap, it could return None
+        if len(node_qbits) > 0:
+            return node_qbits[0].coord[xy]
+        else:
+            return None
 
 # TODO: create function to analyse search
 # for i in range(100):
