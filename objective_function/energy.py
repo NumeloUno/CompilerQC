@@ -24,11 +24,35 @@ class Energy(Polygons):
         self.sparse_density_penalty = False
         self.sparse_density_factor = 0
         self.square_scope = False
+        self.min_4_scopes = False
+        self.min_4_scope_weight = 1
         
     def scopes_of_polygons(self):
         """ return array of the scopes of all changed polygons,
         """
         return np.array(list(map(self.scope_of_polygon, self.polygons_coords_of_interest)))
+    
+    def rectengular_energy(self, qbits_of_interest):
+        """consider only scopes of rectengular shape"""
+        polygons_of_interest = self.changed_polygons(qbits_of_interest)
+        self.polygons_coords_of_interest = self.coords_of_changed_polygons(polygons_of_interest)
+#         self.polygons_coords_of_interest = [
+# polygon for polygon in e.polygons_coords_of_interest
+# if len({coord[0] for coord in polygon}) == 2 & len({coord[1] for coord in polygon}) == 2
+# ]
+        self.polygons_coords_of_interest = [
+                polygon for polygon in self.polygons_coords_of_interest
+                if (
+                        polygon[0][0] == polygon[3][0]
+                    and polygon[0][1] == polygon[1][1]
+                    and polygon[1][0] == polygon[2][0]
+                    and polygon[2][1] == polygon[3][1]
+                ) ]
+        scopes = np.array(list(map(self.scope_of_polygon, self.polygons_coords_of_interest)))
+        number_of_plaquettes = len(scopes[
+            np.logical_or(scopes == self.polygon_object.unit_triangle_scope,
+                           scopes == self.polygon_object.unit_square_scope)])
+        return scopes, number_of_plaquettes
     
     def scopes_of_polygons_for_analysis(self):
         """
@@ -77,7 +101,7 @@ class Energy(Polygons):
                                    for polygon in qbit.polygons]      
         # remove duplicates (only unique polygons)
         return [list(k) for k in set(changed_polygons)]
-
+    
     def threshold_weights(self, scopes, threshold = 2):
         """
         give the polygons a weigth,
@@ -161,7 +185,35 @@ class Energy(Polygons):
         if self.min_C_scope:
             scopes, number_of_plaquettes = self.min_C_scopes(self.min_C_scopes_factor)
             return round(sum(scopes), 5), number_of_plaquettes
+        
+        if self.min_4_scopes:
+            #scope
+            polygons_of_interest = [[tuple(polygon) for polygon in qbit.polygons] 
+                                    for qbit in qbits_of_interest if not isinstance(qbit, tuple)]  
+            qubit_to_coord_dict = self.polygon_object.qbits.qubit_to_coord_dict
+            polygons_coords_of_interest = [Polygons.polygons_coords(qubit_to_coord_dict, polygons)
+                                           for polygons in polygons_of_interest]
+            scopes = ([(sorted(list(map(self.scope_of_polygon, polygon_coords))))
+                    for polygon_coords in polygons_coords_of_interest])
+            
 
+            scopes = np.array([self.scaled_distance_to_plaquette(np.array(scope))
+                      * np.exp(-self.min_4_scope_weight*np.arange(len(scope)))
+                      for scope in scopes])
+            
+            distances_to_plaquette = scopes.sum()
+
+            #number of plaquettes
+            polygons_of_interest = self.changed_polygons(qbits_of_interest)
+            self.polygons_coords_of_interest = self.coords_of_changed_polygons(polygons_of_interest)
+            scopes = self.scopes_of_polygons()
+            number_of_plaquettes = len(scopes[
+                np.logical_or(scopes == self.polygon_object.unit_triangle_scope,
+                               scopes == self.polygon_object.unit_square_scope)])
+
+            return round(distances_to_plaquette, 5) , number_of_plaquettes
+
+        
         polygons_of_interest = self.changed_polygons(qbits_of_interest)
         self.polygons_coords_of_interest = self.coords_of_changed_polygons(polygons_of_interest)
         scopes = self.scopes_of_polygons()
