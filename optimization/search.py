@@ -412,3 +412,147 @@ def estimate_standard_deviation(mc_object, number_of_samples: int=100):
         Qbits.remove_core(mc_object.energy.polygon_object.qbits)
         energies.append(mc.energy(mc_object.energy.polygon_object.qbits)[0])
     return np.std(energies)
+
+class MC_core(MC):
+    
+    def __init__(
+        self,
+        energy_object: Energy,
+        delta: float = 0.05,
+        chi_0: float = 0.8,
+        alpha: float = 0.95,
+        repetition_rate_factor: float = 1,
+        recording: bool = False,
+    ):
+        self.energy = energy_object
+        self.n_total_steps = 0
+        
+        # choose temperature
+        self.chi_0 = chi_0
+        self.delta = delta
+        self.alpha = alpha
+        self.repetition_rate_factor = repetition_rate_factor
+
+        self.temperature_adaptive = False
+        self.temperature_kirkpatrick = False
+        self.temperature_kirkpatrick_sigma = False
+        self.linear_in_moves = False
+        self.temperature_C = False
+        self.temperature_linearC = False
+        
+        # compute total energy once at the beginning
+        self.total_energy, self.number_of_plaquettes = self.energy(
+            self.energy.polygon_object.qbits
+        )
+        
+        self.swap_symmetric = True
+        
+        self.recording = recording
+        if self.recording:
+            self.record_temperature = []
+            self.record_total_energy = []
+            self.record_mean_energy = []
+            self.record_variance_energy = []
+            self.record_good_moves = []
+            self.record_bad_moves = []
+            self.record_rejected_moves = []
+            self.record_acc_probability = []
+            self.record_delta_energy = []
+    
+    def select_nodes(self, nodes=None):
+        """
+        return node i and node j from nodes
+        and x or y, where xy is 0 (x) or 1(y)
+        """
+        if nodes is None:
+            nodes = self.energy.polygon_object.qbits.graph.nodes
+        node_i, node_j = random.sample(nodes, 2)
+        xy = random.choice([0,1])
+        return node_i, node_j, xy
+
+
+
+    def swap_nodes(self, node_i, node_j , xy):
+        node_i_coord = self.energy.polygon_object.node_coord(node_i, xy)
+        node_j_coord = self.energy.polygon_object.node_coord(node_j, xy)
+        if node_i_coord is not None and node_j_coord is not None:
+            for qbit_i in self.energy.polygon_object.qbits_to_node(node_i, xy):
+                qbit_i.coord = list(qbit_i.coord)
+                qbit_i.coord[xy] = node_j_coord
+                qbit_i.coord = tuple(qbit_i.coord)
+            for qbit_j in self.energy.polygon_object.qbits_to_node(node_j, xy):
+                qbit_j.coord = list(qbit_j.coord)
+                qbit_j.coord[xy] = node_i_coord
+                qbit_j.coord = tuple(qbit_j.coord)
+        if self.swap_symmetric:
+            if node_i_coord is not None and node_j_coord is not None:
+                for qbit_i in self.energy.polygon_object.qbits_to_node(node_i, (xy+1)%2):
+                    qbit_i.coord = list(qbit_i.coord)
+                    qbit_i.coord[(xy+1)%2] = node_j_coord
+                    qbit_i.coord = tuple(qbit_i.coord)
+                for qbit_j in self.energy.polygon_object.qbits_to_node(node_j, (xy+1)%2):
+                    qbit_j.coord = list(qbit_j.coord)
+                    qbit_j.coord[(xy+1)%2] = node_i_coord
+                    qbit_j.coord = tuple(qbit_j.coord)
+    
+    def reverse_swap(self, node_i, node_j, xy):
+        self.swap_nodes(node_j, node_i, xy)
+
+    def step(self, operation: str = None):
+        """
+        move qbit or swap qbits and return energy of old and new configuration
+        to expand this function for g(x) > 1, select_move() shouls use random.choices(k>1)
+        """
+        node_i, node_j, xy = self.select_nodes()
+        self.nodes_to_move = node_i, node_j, xy
+        qbits_to_move = (
+            self.energy.polygon_object.qbits_to_node(node_i, xy)
+            + self.energy.polygon_object.qbits_to_node(node_j, xy)
+        )
+        current_energy, current_n_plaqs = self.energy(qbits_to_move)
+        self.swap_nodes(*self.nodes_to_move)
+        new_energy, new_n_plaqs = self.energy(qbits_to_move)
+        self.current_number_of_plaquettes = self.number_of_plaquettes
+        self.number_of_plaquettes += new_n_plaqs - current_n_plaqs
+        self.n_total_steps += 1
+        return current_energy, new_energy
+    
+    def metropolis(self, current_energy, new_energy):
+        temperature = self.temperature
+        delta_energy = new_energy - current_energy
+        if self.recording:
+            self.record_temperature.append(temperature)
+        if delta_energy < 0:
+            self.total_energy += delta_energy
+            if self.recording:
+                self.record_good_moves.append(self.n_total_steps)
+                self.record_acc_probability.append(1)
+            return
+        acceptance_probability = np.exp(-delta_energy / temperature)
+        if self.recording:
+            self.record_acc_probability.append(acceptance_probability)
+        if random.random() < acceptance_probability:
+            self.total_energy += delta_energy
+            if self.recording:
+                self.record_bad_moves.append(self.n_total_steps)
+            return
+        else:
+            self.reverse_swap(*self.nodes_to_move)
+            self.number_of_plaquettes = self.current_number_of_plaquettes
+            if self.recording:
+                self.record_rejected_moves.append(self.n_total_steps)
+        
+        
+    def apply(
+        self, operation, n_steps,
+    ):
+        # self.prof.enable()
+        C = self.energy.polygon_object.graph.C
+        for i in range(n_steps):
+            if self.number_of_plaquettes == 2 * C:
+                return 0  # ? what is the best value np.nan, None, ?
+            self.update_mean_and_variance()
+            current_energy, new_energy = self.step(operation)
+            self.metropolis(current_energy, new_energy)
+        # self.prof.disable()
+        return new_energy - current_energy
