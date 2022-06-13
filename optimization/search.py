@@ -83,7 +83,7 @@ class MC:
             self.record_acc_probability = []
             self.record_delta_energy = []
             
-    def init_search_from_yaml(self):
+    def init_from_yaml(self):
         pass
 
     def reset(self, current_temperature, with_core: bool):
@@ -249,7 +249,7 @@ class MC:
                 self.record_good_moves.append(self.n_total_steps)
                 self.record_acc_probability.append(1)
             return
-        acceptance_probability = np.exp(-delta_energy / temperature)
+        acceptance_probability = np.exp(-delta_energy / (temperature + 1e-2))
         if self.recording:
             self.record_acc_probability.append(acceptance_probability)
         if random.random() < acceptance_probability:
@@ -329,7 +329,7 @@ class MC:
             if self.temperature_linearC:
                 C = self.energy.polygon_object.qbits.graph.C
                 p = self.number_of_plaquettes
-                self.current_temperature = self.T_0 * (C - p) / C + 1e-2
+                self.current_temperature = self.T_0 * (C - p) / C
                 return self.current_temperature
 
             if self.temperature_C:
@@ -343,20 +343,19 @@ class MC:
                             + 1e-2
                         )
                     )
-                    + 1e-2
-                )
+                 )
                 return self.current_temperature
 
             if self.linear_in_moves:
                 self.current_temperature = (
-                    self.T_0 * (self.n_moves - self.n_total_steps) / self.n_moves + 1e-2
+                    self.T_0 * (self.n_moves - self.n_total_steps) / self.n_moves
                 )
                 return self.current_temperature
 
 
             if self.temperature_kirkpatrick:
                 new_temperature = self.alpha * self.current_temperature
-                self.current_temperature = new_temperature + 1e-2
+                self.current_temperature = new_temperature
                 return self.current_temperature
 
             sigmoid = lambda x: 1 - 1 / (1 + np.exp(-x))
@@ -364,7 +363,7 @@ class MC:
                 new_temperature = self.alpha * self.current_temperature
                 self.current_temperature = new_temperature + sigmoid(
                     self.variance_energy
-                ) + 1e-2
+                )
                 return self.current_temperature
 
             if self.temperature_adaptive:
@@ -374,7 +373,7 @@ class MC:
                     * np.log(1 + self.delta)
                     / (3 * np.sqrt(self.variance_energy) + 1e-3)
                 ) 
-                self.current_temperature = new_temperature + 1e-2
+                self.current_temperature = new_temperature
                 
         return self.current_temperature
 
@@ -460,8 +459,8 @@ def estimate_standard_deviation(mc_object, number_of_samples: int=100):
     mc = deepcopy(mc_object)
     energies = []
     for i in range(number_of_samples):
-        Qbits.remove_core(mc_object.energy.polygon_object.qbits)
-        energies.append(mc.energy(mc_object.energy.polygon_object.qbits)[0])
+        Qbits.remove_core(mc.energy.polygon_object.qbits)
+        energies.append(mc.energy(mc.energy.polygon_object.qbits)[0])
     return np.std(energies)
 
 class MC_core(MC):
@@ -509,7 +508,19 @@ class MC_core(MC):
             self.record_rejected_moves = []
             self.record_acc_probability = []
             self.record_delta_energy = []
-    
+ 
+    def reset(self, current_temperature):
+        """ reset complete MC search"""
+        qubit_coord_dict = self.energy.polygon_object.graph.qbit_to_coord_from_nodes(N_x=None, N_y=None)
+        for qubit, coord in qubit_coord_dict.items():
+            self.energy.polygon_object.qbits[qubit].coord = coord
+
+        self.n_total_steps = 0
+        self.total_energy, self.number_of_plaquettes = self.energy(
+            self.energy.polygon_object.qbits
+        )   
+        self.current_temperature = current_temperature
+        
     def select_nodes(self, nodes=None):
         """
         return node i and node j from nodes
@@ -520,8 +531,6 @@ class MC_core(MC):
         node_i, node_j = random.sample(nodes, 2)
         xy = random.choice([0,1])
         return node_i, node_j, xy
-
-
 
     def swap_nodes(self, node_i, node_j , xy):
         node_i_coord = self.energy.polygon_object.node_coord(node_i, xy)
@@ -556,10 +565,8 @@ class MC_core(MC):
         """
         node_i, node_j, xy = self.select_nodes()
         self.nodes_to_move = node_i, node_j, xy
-        qbits_to_move = (
-            self.energy.polygon_object.qbits_to_node(node_i, xy)
-            + self.energy.polygon_object.qbits_to_node(node_j, xy)
-        )
+        qbits_to_move = [qbit for qbit in self.energy.polygon_object.qbits
+                         if (node_i in qbit.qubit) or (node_j in qbit.qubit)]
         current_energy, current_n_plaqs = self.energy(qbits_to_move)
         self.swap_nodes(*self.nodes_to_move)
         new_energy, new_n_plaqs = self.energy(qbits_to_move)
@@ -579,7 +586,7 @@ class MC_core(MC):
                 self.record_good_moves.append(self.n_total_steps)
                 self.record_acc_probability.append(1)
             return
-        acceptance_probability = np.exp(-delta_energy / temperature)
+        acceptance_probability = np.exp(-delta_energy / (temperature + 1e-2))
         if self.recording:
             self.record_acc_probability.append(acceptance_probability)
         if random.random() < acceptance_probability:
@@ -607,3 +614,29 @@ class MC_core(MC):
             self.metropolis(current_energy, new_energy)
         # self.prof.disable()
         return new_energy - current_energy
+
+       
+    def initial_temperature(self, chi_0: float=None, number_of_samples=25):
+        """
+        estimate the initial Temperature T_0,
+        chi_0 is the inital acceptance rate of bad moves
+        (chi_0 should be close to 1 at the beginning)
+        size of S is the number of states -> bad states,
+        should converge with increasing size of S
+        comment: empirically one can see the the initial temperature
+        is already estimated quiet good by size_of_S=1
+        benchmark: just T_1, T_0_estimation, or estimate_standard_deviation() / ln(chi0)
+        """
+        if chi_0 is None:
+            chi_0 = self.chi_0   
+        mc = deepcopy(self)
+        energies = []
+        for i in range(number_of_samples):
+            # reset mc_core
+            qubit_coord_dict = mc.energy.polygon_object.graph.qbit_to_coord_from_nodes(N_x=None, N_y=None)
+            for qubit, coord in qubit_coord_dict.items():
+                mc.energy.polygon_object.qbits[qubit].coord = coord
+
+            energies.append(mc.energy(mc.energy.polygon_object.qbits)[0])
+        return - np.std(energies) / np.log(chi_0)
+   
