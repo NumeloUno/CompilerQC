@@ -1,7 +1,7 @@
 import numpy as np
 import random
 from itertools import combinations
-from math import dist
+from math import dist, atan2
 from matplotlib import pyplot as plt
 
 
@@ -18,9 +18,12 @@ class Polygons:
     unit_triangle_scope = round((np.sqrt(2) + 2) / 3, 5)
     unit_square_scope = round((2 * np.sqrt(2) + 4) / 4, 5)
 
-    def __init__(self, qbits: "Qbits", polygons: "list of polygons" = None):
+    def __init__(self, qbits: "Qbits", polygons: "list of polygons" = None, line_scaling:float=0):
         """
-        logical_graph: logical graph with N nodes and K edges
+        qbits: qbits object, qbits represent connections in logical grpah
+        polygons:
+        line_scaling: if the distance between two qbits is 1.0 or sqrt(2), hence the qbits are
+        adjacent, set their distance to line_scaling
         """
         self.qbits = qbits
         self.graph = self.qbits.graph
@@ -28,6 +31,8 @@ class Polygons:
             polygons = Polygons.create_polygons(self.graph.cycles)
         self.polygons = polygons
         self.qbits.set_all_polygons(self.polygons)
+        
+        self.line_scaling = line_scaling
 
     @staticmethod
     def create_polygon_from_cycle(cycle: list):
@@ -82,7 +87,18 @@ class Polygons:
             np.arange(min(y) - padding, max(y) + (padding + 1)),
         )
         return list(zip(x.flatten(), y.flatten()))
-
+    
+    @staticmethod
+    def center_of_coords(coords):
+        """
+        returns the center of the envelop
+        of coords
+        """
+        x_coords, y_coords = list(zip(*coords))
+        c_x = (min(x_coords) + max(x_coords)) / 2
+        c_y = (min(y_coords) + max(y_coords)) / 2
+        return c_x, c_y
+    
     def found_plaqs(self):
         """
         listing all plaquettes in current compilation,
@@ -174,9 +190,88 @@ class Polygons:
                         qbit.coord, radius=0.2, alpha=1.0, lw=0.7,
                         ec='black', fc='#E3B448'
                         )
-            ax.add_patch(circle)        
+            ax.add_patch(circle)  
+        return ax
+     
+    def draw_lines(self, ax):
+        """draw lines of nodes in plot"""
+        for node in self.qbits.graph.nodes:
+            qbits_path, _ = self.line_to_node(node)
+            ax.plot([qbit.coord[0] for qbit in qbits_path],
+                   [qbit.coord[1] for qbit in qbits_path])
 
+    def modified_distance(self, x, y):
+        """ distance between coord x and coord y
+        if coords are adjacent, set line_scaling as distance"""
+        distance = dist(x, y)
+        # include 1.0 and diagonal distances
+        if distance < 1.45:
+            distance = self.line_scaling
+        return distance
+           
+    @staticmethod
+    def angle_between(point1, point2):
+        """points are coords"""
+        x1, y1 = point1
+        x2, y2 = point2
+        return - atan2(-(x2 - x1), y2 - y1)
+    
+    def get_closest_qbit(self, qbit, temporar_qbits):
+        """ get closest qbit to qbits in temporat qbits"""
+        qbits_by_distance = np.array([[qbit_, self.modified_distance(qbit.coord, qbit_.coord)] 
+                                      for qbit_ in temporar_qbits if qbit!=qbit_])
+        # get minimum distance
+        minimum = min(qbits_by_distance, key=lambda x: x[1])[1]
+        # are there several closest qbits with this minium distance
+        qbits_by_distance = qbits_by_distance[qbits_by_distance.T[1] == minimum]
+        # take closest qbit, sort them clockwise starting from 18:00
+        qbits_by_distance = [(Polygons.angle_between(qbit.coord, close_qbit.coord), close_qbit, d) for close_qbit, d in qbits_by_distance]
+        closest_qbit, distance = min(qbits_by_distance)[1:]
+        return closest_qbit, distance
+    
+#         qbits_by_distance = [(qbit_,modified_distance(qbit.coord, qbit_.coord)) for qbit_ in temporar_qbits if qbit!=qbit_]
+#         return min(qbits_by_distance, key=lambda x: x[1])
 
+    def length_of_line_node(self, i):
+        """
+        computes the length of node i, 
+        if qbits adjacent, the length is set to line_scaling
+        """
+        _, distances = self.line_to_node(i)
+        return sum(distances)
+        
+    def line_to_node(self, i):
+        """
+        returns a line to a node in terms of its qbits,
+        and the distance between these qbits
+        if qbits adjacent, the length is set to line_scaling
+        this function can be seen as an approximation to TSP
+        """
+        if i not in self.qbits.graph.nodes:
+            return 0
+        node_qbits = self.qbits_of_node(i)
+        temporar_qbits = node_qbits[:]
+        # cycle is starting with start_qbit (qbit with the most free neighbours, top and leftmost )
+        start_qbit = min([((qbit.number_of_qbit_neighbours-8), -qbit.coord[1], -qbit.coord[0], qbit) for qbit in node_qbits])[-1]
+        qbit = start_qbit
+        distances = []
+        qbit_path = [qbit]
+        # loop through qbits, find closest qbit, remove start qbit, search from closest qbit again...
+        for idx in range(len(node_qbits)):
+            # if end of line is reached, connect starting qbit to form a cyle
+            if len(temporar_qbits) == 1:
+                temporar_qbits.append(start_qbit)
+            closest_qbit, distance = self.get_closest_qbit(qbit, temporar_qbits)
+            temporar_qbits.remove(qbit)
+            qbit = closest_qbit
+            distances.append(distance)
+            qbit_path.append(qbit)
+        # remove max distance from distances and cut path at max distance
+        max_distance = distances.index(max(distances)) + 1 # +1 for proper use in list
+        distances = distances[max_distance:] + distances[:max_distance-1]
+        qbit_path = qbit_path[max_distance : -1] + qbit_path[:max_distance]
+        return qbit_path, distances
+    
     #####################################################
     ################# node to core ######################
     ##################################################### 
@@ -185,6 +280,10 @@ class Polygons:
     def qbits_to_node(self, i, xy):
         """returns the qbits to node i on side xy"""
         return [qbit for qbit in self.qbits if qbit.qubit[xy] == i]
+
+    def qbits_of_node(self, i):
+        """returns the qbits to node i"""
+        return [qbit for qbit in self.qbits if i in qbit.qubit]
 
     def node_coord(self, i, xy):
         node_qbits =  self.qbits_to_node(i, xy)
