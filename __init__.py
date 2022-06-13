@@ -3,6 +3,7 @@ from .graph import Graph
 # init Polygons before Qbits, since in Qbits there are some staticmehtod functions from Polygons used
 from .polygons import Polygons
 from .qbits import Qbits, Qbit
+from nodes import Node, Nodes
 from . import core
 from .objective_function import Energy, Energy_core
 from . import optimization
