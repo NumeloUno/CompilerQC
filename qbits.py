@@ -25,6 +25,18 @@ class Qbits():
     ):
         """
         initialization of qbits according to qubit to coord dict, 
+        return Qbits object
+        """
+        qbits = Qbits.qbits_from_dict(graph, qubit_coord_dict, assign_to_core)
+        return cls(graph, qbits)
+    
+    @staticmethod
+    def qbits_from_dict(
+        graph,
+        qubit_coord_dict: dict=None,
+        assign_to_core: bool=True,
+    ):
+        """
         if dict is not complete, remaining qbits are initialized 
         with random coordinates
         return: list ob qbit objects
@@ -48,8 +60,23 @@ class Qbits():
             for qbit in qbits:
                 if qbit.qubit in core_qubits:
                     qbit.core = True
-
-        return cls(graph, qbits)
+        return qbits
+        
+    def update_qbits_from_dict(
+        self,
+        qubit_coord_dict: dict=None,
+        assign_to_core: bool=True,
+    ):
+        """
+        if Qbits object is already initialized,
+        use this function to update the core and move
+        qbits somewhere else to make some space
+        """
+        qbits = Qbits.qbits_from_dict(self.graph, qubit_coord_dict, assign_to_core)
+        for qbit in qbits:
+            self.qubits[qbit.qubit].coord = qbit.coord
+            self.qubits[qbit.qubit].core = qbit.core
+        self.update_core_shell()
 
     def __getitem__(self, qbit):
         return self.qubits[qbit]
@@ -221,7 +248,6 @@ class Qbit():
     def qubit(self):
         """ qubit cant be overwritten like this"""
         return self._qubit
-        
     
     def set_polygons(self, all_polygons):
         """
