@@ -1,7 +1,6 @@
-from functions_for_benchmarking import update_mc, evaluate_optimization, run_benchmark
-from CompilerQC import functions_for_database as dataset
+#from functions_for_benchmarking import *
 from tqdm import tqdm
-from CompilerQC import Graph, Qbits, Polygons, Energy, MC, paths, core
+from CompilerQC import *
 import numpy as np
 import pickle
 import argparse
@@ -12,167 +11,50 @@ path_to_results = lambda args: (
         paths.benchmark_results_path / f"mc_benchmark_results_{args.id_of_benchmark}_{args.extra_id}.csv"
     )
     
-def benchmark_problem_folder_with_exact_scaling(args):
+def graphs_to_benchmark(args):
     """
-    calculate the scaling for each 3er and 4er plaq such that 
-    the total energy of the compiled solution is zero,
-    if the same compiled solution is found as in the dataset
+    given a folder with problems,
+    return a list of adjacency matrices of these 
+    logical problems
     """
-    
-    problems = dataset.get_files_to_problems(
+    problems = functions_for_database.get_files_to_problems(
                 problem_folder=args.problem_folder,
                 min_C=args.min_C,
                 max_C=args.max_C,
                 )
-    
-    benchmark_df = pd.DataFrame()
-    for file_ in problems:
+    graphs = []
+    for file in problems:
         # read graph and qubit to coord translation from file
         graph_adj_matrix, qubit_coord_dict = (
-            dataset.problem_from_file(file_))
-        # scopes for nonplaqs and plaqs
-        polygon_scopes, NKC, n_cycles = dataset.energy_from_problem(graph_adj_matrix, qubit_coord_dict)
-        n3, n4, p3, p4 = polygon_scopes
-        graph = Graph(adj_matrix=graph_adj_matrix)
-        # contribution of nonplaqs to each constraint 
-        scaling_for_plaq3 = scaling_for_plaq4 = (sum(n4)+sum(n3)) / graph.C          
-        # initialise energy_object
-        qbits = Qbits.init_qbits_from_dict(graph, dict())
-        polygon_object = Polygons(qbits=qbits)
-        energy = Energy(
-            polygon_object,
-            scaling_for_plaq3=scaling_for_plaq3,
-            scaling_for_plaq4=scaling_for_plaq4,
-        )
-        benchmark_df = run_benchmark(benchmark_df, energy, args)
-    benchmark_df.to_csv(path_to_results(args), mode='a', header=True, index=False)
-    
-def benchmark_energy_scaling_by_yaml(args):
-    """
-    benchmark the search of compiled graphs for 
-    fully connected logical graphs, 
-    scale plaqs by value in the yaml
-    """
-    benchmark_df = pd.DataFrame()
-    for N in range(args.min_N, args.max_N +1):
-        graph = Graph.complete(N)
-        core_qubits, core_coords = [], []
-        if args.with_core:
-            #nn = core.largest_complete_bipartite_graph(graph)
-            nn = (N // 2, N - (N // 2))
-            K_nn = core.complete_bipartite_graph(*nn)
-            U, V = core.parts_of_complete_bipartite_graph(graph.to_nx_graph(), K_nn)
-            core_qubits, core_coords = core.qbits_and_coords_of_core(U, V)
-        # initialise energy_object
-        qbits = Qbits.init_qbits_from_dict(graph, dict(zip(core_qubits, core_coords)))
-        if args.with_core:
-            qbits.assign_core_qbits(core_qubits)
-        polygon_object = Polygons(qbits)
-        energy = Energy(polygon_object)
-        benchmark_df = run_benchmark(benchmark_df, energy, args)
-    benchmark_df.to_csv(path_to_results(args), mode='a', header=True, index=False)
+            functions_for_database.problem_from_file(file))
+        graphs.append(graph_adj_matrix)
+        if len(graphs) == args.max_size:
+            break
+    return graphs
         
-def benchmark_MLP_energy_scaling(args):
+def benchmark_energy_scaling(args):
     """
     benchmark the search of compiled graphs for 
     fully connected logical graphs,
     scale plaqs by prediction of MLP
     """
     benchmark_df = pd.DataFrame()
-    for N in range(args.min_N, args.max_N +1):
-        graph = Graph.complete(N)
-        core_qubits, core_coords = [], []
-        if args.with_core:
-            #nn = core.largest_complete_bipartite_graph(graph)
-            nn = (N // 2, N - (N // 2))
-            K_nn = core.complete_bipartite_graph(*nn)
-            U, V = core.parts_of_complete_bipartite_graph(graph.to_nx_graph(), K_nn)
-            core_qubits, core_coords = core.qbits_and_coords_of_core(U, V)
-        loaded_model = pickle.load(open(paths.energy_scalings / 'MLPregr_model.sav', 'rb'))
-        predicted_energy = loaded_model.predict([[graph.N, graph.K, graph.C, graph.number_of_3_cycles, graph.number_of_4_cycles]])[0]
-        scaling_for_plaq3 = scaling_for_plaq4 = predicted_energy / graph.C  
-        # initialise energy_object
-        qbits = Qbits.init_qbits_from_dict(graph, dict(zip(core_qubits, core_coords)))
-        if args.with_core:
-            qbits.assign_core_qbits(core_qubits)
-        polygon_object = Polygons(qbits)
-        energy = Energy(
-            polygon_object,
-            scaling_for_plaq3=scaling_for_plaq3,
-            scaling_for_plaq4=scaling_for_plaq4,
-        )
-        benchmark_df = run_benchmark(benchmark_df, energy, args)
+        
+    logger = logging.getLogger()
+    fhandler = logging.FileHandler(filename=paths.logger_path / f"{args.id_of_benchmark}.log", mode='a')
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    fhandler.setFormatter(formatter)
+    logger.addHandler(fhandler)
+    logger.setLevel(logging.INFO)
+    logger.info("=================================================================")
+    logger.info(f"benchmark {args.max_size} problems from {args.problem_folder} folder")
+    logger.info("=================================================================")
+
+    for adj_matrix in graphs_to_benchmark(args):
+        graph = Graph(adj_matrix = adj_matrix)
+        benchmark_df = functions_for_benchmarking.run_benchmark(benchmark_df, graph, args, logger)
     benchmark_df.to_csv(path_to_results(args), mode='a', header=True, index=False)
-    
-def benchmark_energy_scaling_by_max_C(args):
-    """
-    benchmark the search of compiled graphs for 
-    fully connected logical graphs,
-    scale by prediction of polynom fittet
-    to max_C:energy dataset
-    """
-    benchmark_df = pd.DataFrame()
-    for N in range(args.min_N, args.max_N +1):
-        graph = Graph.complete(N)
-        core_qubits, core_coords = [], []
-        if args.with_core:
-            #nn = core.largest_complete_bipartite_graph(graph)
-            nn = (N // 2, N - (N // 2))
-            K_nn = core.complete_bipartite_graph(*nn)
-            U, V = core.parts_of_complete_bipartite_graph(graph.to_nx_graph(), K_nn)
-            core_qubits, core_coords = core.qbits_and_coords_of_core(U, V)
-
-        poly_coeffs = np.load(paths.energy_scalings / 'energy_max_C_fit.npy')
-        poly_function = np.poly1d(poly_coeffs)
-        scaling_for_plaq3 = scaling_for_plaq4 = poly_function(graph.C) / graph.C  
-
-        # initialise energy_object
-        qbits = Qbits.init_qbits_from_dict(graph, dict(zip(core_qubits, core_coords)))
-        if args.with_core:
-            qbits.assign_core_qbits(core_qubits)
-        polygon_object = Polygons(qbits)
-        energy = Energy(
-            polygon_object,
-            scaling_for_plaq3=scaling_for_plaq3,
-            scaling_for_plaq4=scaling_for_plaq4,
-        )
-        benchmark_df = run_benchmark(benchmark_df, energy, args)
-    benchmark_df.to_csv(path_to_results(args), mode='a', header=True, index=False)
-    
-def benchmark_energy_scaling_by_LHZ_C(args):
-    """
-    benchmark the search of compiled graphs for 
-    fully connected logical graphs,
-    scale by prediction of polynom fittet
-    to LHZ solutions
-    """
-    benchmark_df = pd.DataFrame()
-    for N in range(args.min_N, args.max_N +1):
-        graph = Graph.complete(N)
-        core_qubits, core_coords = [], []
-        if args.with_core:
-            #nn = core.largest_complete_bipartite_graph(graph)
-            nn = (N // 2, N - (N // 2))
-            K_nn = core.complete_bipartite_graph(*nn)
-            U, V = core.parts_of_complete_bipartite_graph(graph.to_nx_graph(), K_nn)
-            core_qubits, core_coords = core.qbits_and_coords_of_core(U, V)
-
-        poly_coeffs = np.load(paths.energy_scalings / 'LHZ_energy_C_fit.npy')
-        poly_function = np.poly1d(poly_coeffs)
-        scaling_for_plaq3 = scaling_for_plaq4 = poly_function(graph.C) / graph.C  
-
-        # initialise energy_object
-        qbits = Qbits.init_qbits_from_dict(graph, dict(zip(core_qubits, core_coords)))
-        if args.with_core:
-            qbits.assign_core_qbits(core_qubits)
-        polygon_object = Polygons(qbits)
-        energy = Energy(
-            polygon_object,
-            scaling_for_plaq3=scaling_for_plaq3,
-            scaling_for_plaq4=scaling_for_plaq4,
-        )
-        benchmark_df = run_benchmark(benchmark_df, energy, args)
-    benchmark_df.to_csv(path_to_results(args), mode='a', header=True, index=False)
+   
     
 if __name__ == "__main__":
 
@@ -194,32 +76,11 @@ if __name__ == "__main__":
         help="how many times each schedule is evaluated default is 100",
     )
     parser.add_argument(
-        "-id",
-        "--id_of_benchmark",
+        "-yp",
+        "--yaml_path",
         type=str,
         default="",
-        help="save results using id (which is also in filename of mc_parameters.yaml) in filename",
-    )
-    parser.add_argument(
-        "-minC",
-        "--min_C",
-        type=int,
-        default=1,
-        help="set the minimum C, for which benchmarks should be done",
-    )
-    parser.add_argument(
-	"-maxN",
-        "--max_N",
-        type=int,
-        default=12,
-        help="benchmark_LHZ up to N",
-    )
-    parser.add_argument(
-	"-minN",
-        "--min_N",
-        type=int,
-        default=4,
-        help="benchmark_LHZ from minimum N",
+        help="get config from yaml_path",
     )
     parser.add_argument(
         "-maxC",
@@ -229,29 +90,117 @@ if __name__ == "__main__":
         help="set the maximum C, for which benchmarks should be done",
     )
     parser.add_argument(
-        "-core",
-        "--with_core",
-        action="store_true",
-        default=True,
-        help="start with bipartite core",
+        "-minC",
+        "--min_C",
+        type=int,
+        default=10,
+        help="set the minimum C, for which benchmarks should be done",
+    )
+    parser.add_argument(
+	"-maxN",
+        "--max_N",
+        type=int,
+        default=10,
+        help="benchmark_LHZ up to N",
+    )
+    parser.add_argument(
+	"-minN",
+        "--min_N",
+        type=int,
+        default=8,
+        help="benchmark_LHZ from minimum N",
     )
     parser.add_argument(
         "-ed",
         "--extra_id",
         type=str,
-        default="",
+        default="MLP",
         help="some extra name to add to result filename",
     )
+    parser.add_argument(
+        "--max_size",
+        type=int,
+        default=100,
+        help="number of different problems to benchmark on",
+    )
     args = parser.parse_args()
-    if args.extra_id == 'exact_scaling':
-        benchmark_problem_folder_with_exact_scaling(args)
-    if args.id_of_benchmark == 'energyscaling':
-        benchmark_energy_scaling_by_yaml(args)
-    if args.extra_id == 'MLP':
-        benchmark_MLP_energy_scaling(args)  
-    if args.extra_id == 'maxC':
-        benchmark_energy_scaling_by_max_C(args)
-    if args.extra_id == 'LHZ':
-        benchmark_energy_scaling_by_LHZ_C(args)
-    else:
-        print("id not found in parameters folder")
+    
+    # save results using id (which is also in filename of mc_parameters.yaml) in filename
+    args.id_of_benchmark = args.yaml_path.split('_')[2]
+    benchmark_energy_scaling(args)
+        
+# def benchmark_problem_folder_with_exact_scaling(args):
+#     """
+#     calculate the scaling for each 3er and 4er plaq such that 
+#     the total energy of the compiled solution is zero,
+#     if the same compiled solution is found as in the dataset
+#     """
+    
+#     problems = dataset.get_files_to_problems(
+#                 problem_folder=args.problem_folder,
+#                 min_C=args.min_C,
+#                 max_C=args.max_C,
+#                 )
+    
+#     benchmark_df = pd.DataFrame()
+#     for ar in problems:
+#         # read graph and qubit to coord translation from file
+#         graph_adj_matrix, qubit_coord_dict = (
+#             dataset.problem_from_file(file_))
+#         # scopes for nonplaqs and plaqs
+#         polygon_scopes, NKC, n_cycles = dataset.energy_from_problem(graph_adj_matrix, qubit_coord_dict)
+#         n3, n4, p3, p4 = polygon_scopes
+#         graph = Graph(adj_matrix=graph_adj_matrix)
+#         # contribution of nonplaqs to each constraint 
+#         scaling_for_plaq3 = scaling_for_plaq4 = (sum(n4)+sum(n3)) / graph.C          
+#         # initialise energy_object
+#         qbits = Qbits.init_qbits_from_dict(graph, dict())
+#         polygon_object = Polygons(qbits=qbits)
+#         energy = Energy(
+#             polygon_object,
+#             scaling_for_plaq3=scaling_for_plaq3,
+#             scaling_for_plaq4=scaling_for_plaq4,
+#         )
+#         benchmark_df = run_benchmark(benchmark_df, energy, args)
+#     benchmark_df.to_csv(path_to_results(args), mode='a', header=True, index=False)
+#   def from_graph_to_polygon_object(graph: Graph, with_core: bool=None):
+#     """returns a polygon_object"""
+#     core_qubits, core_coords = [], []
+#     if with_core:
+#         #nn = core.largest_complete_bipartite_graph(graph)
+#         nn = (graph.N // 2, graph.N - (graph.N // 2))
+#         K_nn = core.complete_bipartite_graph(*nn)
+#         U, V = core.parts_of_complete_bipartite_graph(graph.to_nx_graph(), K_nn)
+#         core_qubits, core_coords = core.qbits_and_coords_of_core(U, V)
+#     # initialise energy_object
+#     qbits = Qbits.init_qbits_from_dict(graph, dict(zip(core_qubits, core_coords)))
+#     if with_core:
+#         qbits.assign_core_qbits(core_qubits)
+#     polygon_object = Polygons(qbits)
+#     return polygon_object
+
+# def load_scaling_from_model(graph, args):
+#     """load scaling for plaquettes 
+#     from different models"""
+#     if args.extra_id == 'MLP':
+#         loaded_model = pickle.load(open(paths.energy_scalings / 'MLPregr_model.sav', 'rb'))
+#         predicted_energy = loaded_model.predict([[graph.N, graph.K, graph.C, graph.number_of_3_cycles, graph.number_of_4_cycles]])[0]
+#         scaling_for_plaq3 = scaling_for_plaq4 = predicted_energy / graph.C  
+#         return scaling_for_plaq3, scaling_for_plaq4
+    
+#     if args.extra_id == 'maxC':
+#         poly_coeffs = np.load(paths.energy_scalings / 'energy_max_C_fit.npy')
+#         poly_function = np.poly1d(poly_coeffs)
+#         scaling_for_plaq3 = scaling_for_plaq4 = poly_function(graph.C) / graph.C  
+#         return scaling_for_plaq3, scaling_for_plaq4
+
+#     if args.extra_id == 'LHZ':
+#         poly_coeffs = np.load(paths.energy_scalings / 'LHZ_energy_C_fit.npy')
+#         poly_function = np.poly1d(poly_coeffs)
+#         scaling_for_plaq3 = scaling_for_plaq4 = poly_function(graph.C) / graph.C  
+#         return scaling_for_plaq3, scaling_for_plaq4
+    
+#     if args.extra_id == 'yamlscaling':
+#         return None, None # will be set by yaml
+    
+#     else: print('no model for energy scaling selected')  
