@@ -316,9 +316,20 @@ class Energy_core(Energy):
         self.only_rectangulars = False
         self.only_number_of_plaquettes = False
         self.size_of_max_core = False
+        
+    @staticmethod
+    def is_rectengular(polygon_coord):
+        """
+        check if a given polygon forms a rectengular
+        """
+        return sum([len(set(coords)) == 2 for coords in list(zip(*polygon_coord))]) == 2
 
     def rectengular_energy(self, qbits_of_interest):
-        """consider only scopes of rectengular shape"""
+        """
+        consider only scopes of rectengular shape
+        note: to find a minimal energy configuration, 
+        it will simply find a config with as least rectengulars as possible
+        """
         polygons_of_interest = self.changed_polygons(qbits_of_interest)
         self.polygons_coords_of_interest = self.coords_of_changed_polygons(
             polygons_of_interest
@@ -326,12 +337,7 @@ class Energy_core(Energy):
         self.polygons_coords_of_interest = [
             polygon
             for polygon in self.polygons_coords_of_interest
-            if (
-                polygon[0][0] == polygon[3][0]
-                and polygon[0][1] == polygon[1][1]
-                and polygon[1][0] == polygon[2][0]
-                and polygon[2][1] == polygon[3][1]
-            )
+            if Energy_core.is_rectengular(polygon)
         ]
 
     def qbits_in_max_core(self):
@@ -379,14 +385,6 @@ class Energy_core(Energy):
         qbits of interest
         """
 
-        # self.only_largest_core = False
-
-#         if self.size_of_max_core:
-#             return (
-#                 len(self.qbits_in_max_core()),
-#                 self.polygon_object.number_of_plaqs,
-#             )
-
         if self.only_rectangulars:
             self.rectengular_energy(qbits_of_interest)
         else:
@@ -414,16 +412,3 @@ class Energy_core(Energy):
             return round((distances_to_plaquette ** 2).sum(), 5), number_of_plaquettes
         else:
             return round((distances_to_plaquette).sum(), 5), number_of_plaquettes
-        
-        
-# def scaling_for_plaquettes_MLP(graph, MLP_model:str='MLPregr_model.sav'):      
-#     """return the scalings for 3 and 4 plaquettes obtained by the 
-#     MultiLayerPerceptron fitted to the database"""
-    
-#     loaded_model = pickle.load(open(paths.energy_scalings / MLP_model, 'rb'))
-#     predicted_energy = loaded_model.predict([[graph.N, graph.K, graph.C, graph.number_of_3_cycles, graph.number_of_4_cycles]])[0]
-#     scaling_for_plaq3 = scaling_for_plaq4 = predicted_energy / graph.C 
-#     return scaling_for_plaq3, scaling_for_plaq4
-
-
-
