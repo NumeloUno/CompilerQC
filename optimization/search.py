@@ -1,6 +1,6 @@
 import random
 import numpy as np
-from CompilerQC import Energy, Qbits
+from CompilerQC import *
 import cProfile
 
 """
@@ -510,65 +510,31 @@ class MC_core(MC):
             self.record_delta_energy = []
  
     def reset(self, current_temperature):
-        """ reset complete MC search"""
-        qubit_coord_dict = self.energy.polygon_object.graph.qbit_to_coord_from_nodes(N_x=None, N_y=None)
-        for qubit, coord in qubit_coord_dict.items():
-            self.energy.polygon_object.qbits[qubit].coord = coord
-
+        """ reset complete MC search,
+        first part sets qbit coords new, but keeps other qbits 
+        attributes"""
+        self.energy.polygon_object.nodes_object = (
+            Nodes(self.energy.polygon_object.nodes_object.qbits)
+        )
         self.n_total_steps = 0
         self.total_energy, self.number_of_plaquettes = self.energy(
             self.energy.polygon_object.qbits
         )   
         self.current_temperature = current_temperature
         
-    def select_nodes(self, nodes=None):
-        """
-        return node i and node j from nodes
-        and x or y, where xy is 0 (x) or 1(y)
-        """
-        if nodes is None:
-            nodes = self.energy.polygon_object.qbits.graph.nodes
-        node_i, node_j = random.sample(nodes, 2)
-        xy = random.choice([0,1])
-        return node_i, node_j, xy
-
-    def swap_nodes(self, node_i, node_j , xy):
-        node_i_coord = self.energy.polygon_object.node_coord(node_i, xy)
-        node_j_coord = self.energy.polygon_object.node_coord(node_j, xy)
-        if node_i_coord is not None and node_j_coord is not None:
-            for qbit_i in self.energy.polygon_object.qbits_to_node(node_i, xy):
-                qbit_i.coord = list(qbit_i.coord)
-                qbit_i.coord[xy] = node_j_coord
-                qbit_i.coord = tuple(qbit_i.coord)
-            for qbit_j in self.energy.polygon_object.qbits_to_node(node_j, xy):
-                qbit_j.coord = list(qbit_j.coord)
-                qbit_j.coord[xy] = node_i_coord
-                qbit_j.coord = tuple(qbit_j.coord)
-        if self.swap_symmetric:
-            if node_i_coord is not None and node_j_coord is not None:
-                for qbit_i in self.energy.polygon_object.qbits_to_node(node_i, (xy+1)%2):
-                    qbit_i.coord = list(qbit_i.coord)
-                    qbit_i.coord[(xy+1)%2] = node_j_coord
-                    qbit_i.coord = tuple(qbit_i.coord)
-                for qbit_j in self.energy.polygon_object.qbits_to_node(node_j, (xy+1)%2):
-                    qbit_j.coord = list(qbit_j.coord)
-                    qbit_j.coord[(xy+1)%2] = node_i_coord
-                    qbit_j.coord = tuple(qbit_j.coord)
-    
-    def reverse_swap(self, node_i, node_j, xy):
-        self.swap_nodes(node_j, node_i, xy)
+    def reverse_swap(self, node_i, node_j):
+        self.energy.polygon_object.nodes_object.swap_nodes(node_j, node_i)
 
     def step(self, operation: str = None):
         """
         move qbit or swap qbits and return energy of old and new configuration
         to expand this function for g(x) > 1, select_move() shouls use random.choices(k>1)
         """
-        node_i, node_j, xy = self.select_nodes()
-        self.nodes_to_move = node_i, node_j, xy
-        qbits_to_move = [qbit for qbit in self.energy.polygon_object.qbits
-                         if (node_i in qbit.qubit) or (node_j in qbit.qubit)]
+        node_i, node_j = self.energy.polygon_object.nodes_object.nodes_to_swap()
+        self.nodes_to_move = node_i, node_j
+        qbits_to_move = self.energy.polygon_object.nodes_object.qbits_of_nodes(self.nodes_to_move)
         current_energy, current_n_plaqs = self.energy(qbits_to_move)
-        self.swap_nodes(*self.nodes_to_move)
+        self.energy.polygon_object.nodes_object.swap_nodes(*self.nodes_to_move)
         new_energy, new_n_plaqs = self.energy(qbits_to_move)
         self.current_number_of_plaquettes = self.number_of_plaquettes
         self.number_of_plaquettes += new_n_plaqs - current_n_plaqs
@@ -629,14 +595,9 @@ class MC_core(MC):
         """
         if chi_0 is None:
             chi_0 = self.chi_0   
-        mc = deepcopy(self)
         energies = []
         for i in range(number_of_samples):
-            # reset mc_core
-            qubit_coord_dict = mc.energy.polygon_object.graph.qbit_to_coord_from_nodes(N_x=None, N_y=None)
-            for qubit, coord in qubit_coord_dict.items():
-                mc.energy.polygon_object.qbits[qubit].coord = coord
-
-            energies.append(mc.energy(mc.energy.polygon_object.qbits)[0])
+            energies.append(self.total_energy)
+            self.reset(current_temperature=None)
         return - np.std(energies) / np.log(chi_0)
    
