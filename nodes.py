@@ -83,7 +83,7 @@ class Nodes():
         """
         return list(
         set(qbit for node_name in nodes_of_interest
-            for qbit in nodes_object.nodes[node_name].qbits)
+            for qbit in self.nodes[node_name].qbits)
         )
 
     def update_qbits_after_swap(self, nodes_of_interest: list):
@@ -96,5 +96,5 @@ class Nodes():
         """
         return [node for coord, node in 
                 list(sorted(
-                    [(node_obj.coord, name) for name, node_obj in nodes_object.nodes.items()]
+                    [(node_obj.coord, name) for name, node_obj in self.nodes.items()]
                 ))]
