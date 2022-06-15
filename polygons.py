@@ -272,26 +272,9 @@ class Polygons:
         qbit_path = qbit_path[max_distance : -1] + qbit_path[:max_distance]
         return qbit_path, distances
     
-    #####################################################
-    ################# node to core ######################
-    ##################################################### 
-    
-    
-    def qbits_to_node(self, i, xy):
-        """returns the qbits to node i on side xy"""
-        return [qbit for qbit in self.qbits if qbit.qubit[xy] == i]
-
     def qbits_of_node(self, i):
         """returns the qbits to node i"""
         return [qbit for qbit in self.qbits if i in qbit.qubit]
-
-    def node_coord(self, i, xy):
-        node_qbits =  self.qbits_to_node(i, xy)
-        # in case of nonsymmetiry swap, it could return None
-        if len(node_qbits) > 0:
-            return node_qbits[0].coord[xy]
-        else:
-            return None
 
 # TODO: create function to analyse search
 # for i in range(100):
