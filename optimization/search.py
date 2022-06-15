@@ -46,7 +46,6 @@ class MC:
         self.finite_grid_size = False
         self.padding_finite_grid = 0
         self.infinite_grid_size = False
-        self.greedy = False
         
         # initial temperature
         self.init_T_by_std = False
@@ -196,49 +195,83 @@ class MC:
             )
         return random.choice(self.possible_coords)        
 
+    def qbits_of_coord(self, coord, xy):
+        """
+        the core is defined by the core qbits, 
+        but also by its corners. the corners form 
+        an envelop rectengular, with a side x and a side y,
+        we can access each row (y) or column (x) by 
+        the coordinate coord.
+        TODO: instead of corner, we could consider only 
+        the corner of the part we want to swap
+        """
+        corner = self.energy.polygon_object.core_corner
+        return [qbit for qbit in self.energy.polygon_object.qbits
+                if qbit.coord[xy] == coord
+                and corner[(xy+1)%2][0] <= qbit.coord[(xy+1)%2] <= corner[(xy+1)%2][1]]
+
+    def select_lines_in_core(self):
+        """
+        sample first the side of the core (x or y)
+        and then two coords on this side,
+        determine the qbits belonging to these coords,
+        note: the corner is coming from Polygons.corner_of_core()
+        it returns the minx, maxx, miny, maxy from the rect_envelop
+        of the core
+        """
+        corner = self.energy.polygon_object.core_corner
+        xy = random.randint(0,1)
+        i, j = random.sample(range(corner[xy][0], corner[xy][1] + 1), 2)
+        qbits_i = self.qbits_of_coord(i, xy)
+        qbits_j = self.qbits_of_coord(j, xy)  
+        return qbits_i, qbits_j, i, j, xy
+
+    def swap_lines_in_core(self, i, j, xy):
+        """
+        given a side of the core (x or y), 
+        and two coordinates (i and j)
+        this function will swap
+        these coords with each other
+        """ 
+        for qbit in self.qbits_i:
+            coord = list(qbit.coord)
+            coord[xy] = j
+            qbit.coord = tuple(coord)
+        for qbit in self.qbits_j:
+            coord = list(qbit.coord)
+            coord[xy] = i
+            qbit.coord = tuple(coord)
+    
+    def reverse_swap_lines_in_core(self, i, j, xy):
+        self.swap_lines_in_core(j, i, xy)
+
     def step(self, operation: str = None):
         """
         move qbit or swap qbits and return energy of old and new configuration
         to expand this function for g(x) > 1, select_move() shouls use random.choices(k>1)
         """
-        self.qbits_to_move = self.select_move()
-        current_energy, current_n_plaqs = self.energy(self.qbits_to_move)
-        self.apply_move(*self.qbits_to_move)
-        new_energy, new_n_plaqs = self.energy(self.qbits_to_move)
-        self.current_number_of_plaquettes = self.number_of_plaquettes
-        self.number_of_plaquettes += new_n_plaqs - current_n_plaqs
-        self.n_total_steps += 1
-        return current_energy, new_energy
-
-    def greedy_step(self):
-        self.coord_from_neighbour_coords()
-        qbit, _ = self.select_move()
-        nop = [] # number of plaquettes
-        for coord in self.possible_coords:
-            if coord in self.energy.polygon_object.qbits.coords:
-                coord = self.energy.polygon_object.qbits.coord_to_qbit_dict.get(coord)
-            self.qbits_to_move = qbit, coord
+        
+        if operation == 'move':
+            self.qbits_to_move = self.select_move()
             current_energy, current_n_plaqs = self.energy(self.qbits_to_move)
             self.apply_move(*self.qbits_to_move)
             new_energy, new_n_plaqs = self.energy(self.qbits_to_move)
-            self.current_number_of_plaquettes = self.number_of_plaquettes
-            self.number_of_plaquettes += new_n_plaqs - current_n_plaqs
-            nop.append(self.number_of_plaquettes)
-            self.reverse_move(*self.qbits_to_move)
-        greedy_coord = self.possible_coords[nop.index(max(nop))]
-        if greedy_coord in self.energy.polygon_object.qbits.coords:
-            greedy_coord = self.energy.polygon_object.qbits.coord_to_qbit_dict.get(greedy_coord)       
-        self.qbits_to_move = qbit, greedy_coord
-        current_energy, current_n_plaqs = self.energy(self.qbits_to_move)
-        self.apply_move(*self.qbits_to_move)
-        new_energy, new_n_plaqs = self.energy(self.qbits_to_move)
+
+        if operation == 'swap':
+            self.qbits_i, self.qbits_j, i, j, xy = self.select_lines_in_core()
+            qbits_to_move = self.qbits_i + self.qbits_j
+            current_energy, current_n_plaqs = self.energy(qbits_to_move)
+            self.lines_in_core_to_swap = (i, j, xy)
+            self.swap_lines_in_core(*self.lines_in_core_to_swap)
+            new_energy, new_n_plaqs = self.energy(qbits_to_move)
+            
         self.current_number_of_plaquettes = self.number_of_plaquettes
         self.number_of_plaquettes += new_n_plaqs - current_n_plaqs
         self.n_total_steps += 1
         return current_energy, new_energy
 
 
-    def metropolis(self, current_energy, new_energy):
+    def metropolis(self, current_energy, new_energy, operation):
         temperature = self.temperature
         delta_energy = new_energy - current_energy
         if self.recording:
@@ -258,7 +291,11 @@ class MC:
                 self.record_bad_moves.append(self.n_total_steps)
             return
         else:
-            self.reverse_move(*self.qbits_to_move)
+            if operation == 'move':
+                self.reverse_move(*self.qbits_to_move)
+            if operation == 'swap':
+                self.reverse_swap_lines_in_core(*self.lines_in_core_to_swap)
+
             if self.recording:
                 self.record_rejected_moves.append(self.n_total_steps)
 
@@ -271,11 +308,8 @@ class MC:
             if self.number_of_plaquettes == C:
                 return 0  # ? what is the best value np.nan, None, ?
             self.update_mean_and_variance()
-            if self.greedy:
-                current_energy, new_energy = self.greedy_step()
-            else:
-                current_energy, new_energy = self.step(operation)
-            self.metropolis(current_energy, new_energy)
+            current_energy, new_energy = self.step(operation)
+            self.metropolis(current_energy, new_energy, operation)
 
         # self.prof.disable()
         return new_energy - current_energy
@@ -541,7 +575,7 @@ class MC_core(MC):
         self.n_total_steps += 1
         return current_energy, new_energy
     
-    def metropolis(self, current_energy, new_energy):
+    def metropolis(self, current_energy, new_energy, operation):
         temperature = self.temperature
         delta_energy = new_energy - current_energy
         if self.recording:
@@ -565,21 +599,6 @@ class MC_core(MC):
             self.number_of_plaquettes = self.current_number_of_plaquettes
             if self.recording:
                 self.record_rejected_moves.append(self.n_total_steps)
-        
-        
-    def apply(
-        self, operation, n_steps,
-    ):
-        # self.prof.enable()
-        C = self.energy.polygon_object.graph.C
-        for i in range(n_steps):
-            if self.number_of_plaquettes == 2 * C:
-                return 0  # ? what is the best value np.nan, None, ?
-            self.update_mean_and_variance()
-            current_energy, new_energy = self.step(operation)
-            self.metropolis(current_energy, new_energy)
-        # self.prof.disable()
-        return new_energy - current_energy
 
        
     def initial_temperature(self, chi_0: float=None, number_of_samples=25):

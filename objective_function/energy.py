@@ -348,7 +348,7 @@ class Energy_core(Energy):
             nx.add_path(G, l)
         list_of_cores = list(nx.connected_components(G))
         if list_of_cores == []:
-            return dict()
+            return dict(), ((0, 0), (0, 0))
         max_core_qbits = max(list_of_cores, key=lambda x:len(x))
 
         qubit_coord_dict = {
@@ -359,25 +359,15 @@ class Energy_core(Energy):
         # move core to center of later initialization
         core_center_x, core_center_y = Polygons.center_of_coords(qubit_coord_dict.values())
         center_envelop_of_all_coord = (int(np.sqrt(self.polygon_object.qbits.graph.K)) + 1) / 2
-        
+
         cx, cy = int(center_envelop_of_all_coord-core_center_x), int(center_envelop_of_all_coord-core_center_y)
         for qubit, coord in qubit_coord_dict.items():
             qubit_coord_dict[qubit] = tuple(np.add(coord, (cx, cy)))
-    
-        return qubit_coord_dict
-
-    def four_polygons_energy(self, qbits_of_interest):
-        """consider only scopes of four sided polygons"""
-        polygons_of_interest = self.changed_polygons(qbits_of_interest)
-        self.polygons_coords_of_interest = self.coords_of_changed_polygons(
-            polygons_of_interest
-        )
-        self.polygons_coords_of_interest = [
-            coords for coords in self.polygons_coords_of_interest if len(coords) == 4
-        ]
-
-    def complete_energy_(self, qbits_of_interest):
-        """consider all scopes"""
+        # coords of envelop of core
+        core_coords = list(qubit_coord_dict.values())
+        corner = Polygons.corner_of_coords(core_coords)
+            
+        return qubit_coord_dict, corner
 
     def __call__(self, qbits_of_interest):
         """

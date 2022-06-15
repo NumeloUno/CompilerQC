@@ -6,7 +6,7 @@ import yaml
 import argparse
 import pickle
 from copy import deepcopy 
-from CompilerQC import *#Graph, Qbits, Polygons, Energy, Energy_core, MC, MC_core, paths
+from CompilerQC import *
 import logging
 
 import warnings
@@ -46,22 +46,12 @@ def update_mc(mc, mc_schedule, core: bool=False) -> MC:
         return mc
 
 def init_energy_core(graph: Graph):
-    # init qbits according to node ordering
-    qubit_coord_dict = graph.qbit_to_coord_from_nodes(N_x=None, N_y=None)
-    qbits_for_core = Qbits.init_qbits_from_dict(
-        graph,
-        qubit_coord_dict=qubit_coord_dict,
-        assign_to_core=False
-    )
-    # introduce mirror qbits and connect them accordingly
+    qbits = Qbits.init_qbits_from_dict(graph, dict())
+    nodes_object = Nodes(qbits)
     polygons_4 = Polygons.create_polygons(graph.get_cycles(4))
-    for qbit in graph.qbits:
-        mirror_qbit = tuple(reversed(qbit))
-        for polygon in polygons_4:
-            if qbit in polygon:
-                 polygons_4.append([mirror_qbit if qubit == qbit else qubit for qubit in polygon])
-    polygon_object_for_core = Polygons(qbits_for_core, polygons=polygons_4)
-    energy_core = Energy_core(polygon_object_for_core)
+    polygon_object = Polygons(nodes_object.qbits, polygons=polygons_4)
+    polygon_object.nodes_object = nodes_object
+    energy_core = Energy_core(polygon_object)
     return energy_core
 
 def init_energy(graph: Graph):
@@ -69,6 +59,9 @@ def init_energy(graph: Graph):
     polygon_object = Polygons(qbits)
     energy = Energy(polygon_object)
     return energy
+
+# we could combine init_energy_core and intit_energy by removing Energy_core class
+# and in evaluate_optimization() we would have to add graph.get_cycles(3) to polygon_object
 
 def initialize_MC_object(graph: Graph, mc_schedule: dict, core: bool=False):
     """
@@ -105,9 +98,11 @@ def evaluate_optimization(
     configuration distribution, ...) is
     """ 
     logger.info('Initialize mc object')
+    mc = initialize_MC_object(graph, mc_schedule)
     if mc_schedule['with_core']:
         mc_core = initialize_MC_object(graph, mc_schedule, core=True)
-    mc = initialize_MC_object(graph, mc_schedule)
+    else:
+        mc.operation_schedule.pop('swap', None)
     # benchmark    
     success_rate = np.zeros(batch_size)
     record_n_total_steps = np.zeros(batch_size)
@@ -117,15 +112,18 @@ def evaluate_optimization(
     for iteration in range(batch_size):
         if mc_schedule['with_core']:
             logger.info(f"search core in iteration {iteration}")
-            qubit_coord_dict = search_max_core(mc_core)
-            logger.info(f"found core with {mc_core.number_of_plaquettes / 2} / {graph.C} plaquettes")
+            qubit_coord_dict, mc.energy.polygon_object.core_corner = search_max_core(mc_core)
+            logger.info(f"found core with {mc_core.number_of_plaquettes} / {graph.C} plaquettes")
+            record_n_core_qbits[iteration] = len(qubit_coord_dict)
+            record_core_size[iteration] = mc_core.number_of_plaquettes
+            # if core is empty, dont allow swaps
+            if len(qubit_coord_dict) == 0:
+                mc.operation_schedule.pop('swap', None)
+            # reset mc core
+            mc_core.reset(mc_core.T_0)
             # update core (reset is part of update)
             mc.energy.polygon_object.qbits.update_qbits_from_dict(qubit_coord_dict)
             mc.reset(mc.T_0, with_core=True)      
-            record_n_core_qbits[iteration] = len(qubit_coord_dict)
-            record_core_size[iteration] = mc_core.number_of_plaquettes / 2
-            # reset mc core
-            mc_core.reset(mc_core.T_0)
         
         # check if there are still some qbits left to place
         remaining_qbits = (
@@ -145,6 +143,7 @@ def evaluate_optimization(
         #reset mc object
         mc.reset(current_temperature=mc.T_0, with_core=False)
     # save resutls in dataframe 
+    print(record_n_missing_C)
     mc_schedule.update(
         {'success_rate': np.mean(success_rate),
          'avg_n_missing_C': np.mean(record_n_missing_C),
@@ -163,7 +162,7 @@ def evaluate_optimization(
          'name': name,
         })
     dataframe = dataframe.append(mc_schedule, ignore_index=True)
-    return dataframe
+    return dataframe, mc
             
 def run_benchmark(
     benchmark_df: pd.DataFrame,
@@ -191,8 +190,8 @@ def run_benchmark(
 def search_max_core(mc_core): 
     for repetition in range(mc_core.n_moves):
         mc_core.optimization_schedule()
-    core_qubit_coord_dict = mc_core.energy.qbits_in_max_core()
-    return core_qubit_coord_dict
+    core_qubit_coord_dict, core_corner = mc_core.energy.qbits_in_max_core()
+    return core_qubit_coord_dict, core_corner
 
 # def evaluate_optimization_with_core(
 #     graph: Graph, name: str,mc_schedule: dict, dataframe: pd.DataFrame,  batch_size: int,
