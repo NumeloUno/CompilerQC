@@ -33,6 +33,7 @@ class Polygons:
         self.qbits.set_all_polygons(self.polygons)
         
         self.line_scaling = line_scaling
+        self.core_corner = None
 
     @staticmethod
     def create_polygon_from_cycle(cycle: list):
@@ -87,6 +88,19 @@ class Polygons:
             np.arange(min(y) - padding, max(y) + (padding + 1)),
         )
         return list(zip(x.flatten(), y.flatten()))
+ 
+    @staticmethod
+    def corner_of_coords(coords):
+        """
+        returns the center of the envelop
+        of coords
+        returns: ((min_x, max_x), (min_y, max_y))
+        """
+        x_coords, y_coords = list(zip(*coords))
+        min_x, max_x = (min(x_coords), max(x_coords))
+        min_y, max_y = (min(y_coords), max(y_coords))
+        corner = ((min_x, max_x), (min_y, max_y))
+        return corner
     
     @staticmethod
     def center_of_coords(coords):
@@ -94,9 +108,9 @@ class Polygons:
         returns the center of the envelop
         of coords
         """
-        x_coords, y_coords = list(zip(*coords))
-        c_x = (min(x_coords) + max(x_coords)) / 2
-        c_y = (min(y_coords) + max(y_coords)) / 2
+        ((min_x, max_x), (min_y, max_y)) = Polygons.corner_of_coords(coords)
+        c_x = (min_x + max_x) / 2
+        c_y = (min_y + max_y) / 2
         return c_x, c_y
     
     def found_plaqs(self):
