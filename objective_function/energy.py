@@ -34,8 +34,7 @@ class Energy(Polygons):
         self.line = False
         self.line_exponent = 1
         self.bad_line_penalty = 100  
-        
-        
+                
     def set_scaling_from_model(self, scaling_model:str):
         """load and set plaquette scaling from given model"""
         assert scaling_model in ['MLP', 'maxC', 'LHZ'], "selected model does not exist, choose from ['MLP', 'maxC', 'LHZ']"
@@ -316,7 +315,10 @@ class Energy_core(Energy):
         self.only_rectangulars = False
         self.only_number_of_plaquettes = False
         self.size_of_max_core = False
-        
+
+        # search for largest conncected core
+        self.only_squares_in_core = False
+
     @staticmethod
     def is_rectengular(polygon_coord):
         """
@@ -342,9 +344,15 @@ class Energy_core(Energy):
 
     def qbits_in_max_core(self):
         """return the number of qbits
-        in the maximum connected core"""
+        in the maximum connected core
+        if only_squares_in_core is True,
+        triangulars are not considered 
+        by choosing the largest core"""
         G = nx.Graph()
-        for l in self.polygon_object.found_plaqs():
+        plaquettes = self.polygon_object.found_plaqs()
+        if self.only_squares_in_core:
+            plaquettes = [plaq for plaq in plaquettes if len(plaq)==4]
+        for l in plaquettes:
             nx.add_path(G, l)
         list_of_cores = list(nx.connected_components(G))
         if list_of_cores == []:

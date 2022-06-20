@@ -46,6 +46,7 @@ class MC:
         self.finite_grid_size = False
         self.padding_finite_grid = 0
         self.infinite_grid_size = False
+        # TODO: only coords which have node as neighbozr -> form a line
         
         # initial temperature
         self.init_T_by_std = False
@@ -85,9 +86,9 @@ class MC:
     def init_from_yaml(self):
         pass
 
-    def reset(self, current_temperature, with_core: bool):
+    def reset(self, current_temperature, keep_core: bool):
         """ reset complete MC search"""
-        if not with_core:
+        if not keep_core:
             Qbits.remove_core(self.energy.polygon_object.qbits)
         else:
             Qbits.reinit_coords(self.energy.polygon_object.qbits, with_core=True)
