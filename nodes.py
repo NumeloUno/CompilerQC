@@ -37,6 +37,9 @@ class Nodes():
         self.nodes = dict(zip(logical_nodes, node_objects))
         self.set_qbits_of_nodes()
         self.place_qbits_in_lines()
+        
+        # for ancillas
+        self.diagonal_coords = set([(i, i) for i in range(self.qbits.graph.N)])
 
     def place_qbits_in_lines(self):
         """
@@ -98,3 +101,76 @@ class Nodes():
                 list(sorted(
                     [(node_obj.coord, name) for name, node_obj in self.nodes.items()]
                 ))]
+    
+    @staticmethod
+    def boolean_neighbours(qbits_coords, coord):
+        """
+        return list of booleans for the 8 neighbours of a coord,
+        if the neighbour is occupied
+        """
+        neighbours_ = lambda coord: [
+            (coord[0] + i, coord[1] + j) in qbits_coords
+            for i in range(-1,2)
+            for j in range(-1,2)
+        ]
+        return neighbours_(coord)
+
+    @staticmethod
+    def number_of_plaquettes_of_ancilla(qbits_coords, coord):
+        """
+        if an ancilla would be placed at coord, 
+        number_of_possible_plaquettes tells you how many
+        plaquettes this ancilla generates
+        """
+        neighbours = Nodes.boolean_neighbours(qbits_coords, coord)
+        number_of_possible_plaquettes = sum(
+            [
+                sum([neighbours[0], neighbours[1], neighbours[3]]) == 3,
+                sum([neighbours[2], neighbours[1], neighbours[5]]) == 3,
+                sum([neighbours[8], neighbours[7], neighbours[5]]) == 3,
+                sum([neighbours[6], neighbours[7], neighbours[3]]) == 3
+
+            ]
+        )
+        return number_of_possible_plaquettes
+
+    def name_of_ancilla(self, coord):
+        """
+        given a coord,
+        return the qubit/name of the 
+        possible ancilla
+        """
+        if 0 <= coord[0] < self.qbits.graph.N  and 0 <= coord[1] < self.qbits.graph.N:
+            return tuple(sorted([self.order[coord[0]], self.order[coord[1]]]))
+        else:
+            return None
+    
+    def propose_coords(self):
+        """
+        return qbits coords (call it here to reduce running time,
+        return coords for ancillas (coords which have at least one neighbour,
+        all other coords makes no sense
+        """
+        qbit_coords = self.qbits.coords
+        coords_for_ancillas = list(set(
+            [coord for coords in qbit_coords
+             for coord in self.qbits.neighbour_coords(coords)])
+                                   - set(qbit_coords)
+                                   - self.diagonal_coords
+                                  )
+        return qbit_coords, coords_for_ancillas
+    
+    def propose_ancillas(self, allowed_number):
+        """
+        returns a list of [number_of_new_plaqs, coord, qubit_ancilla) 
+        of length of allowed_number of ancillas
+        """
+        qbit_coords, coords_for_ancillas = self.propose_coords()
+        ancillas = []
+        for coord in coords_for_ancillas:
+            number_of_new_plaqs = Nodes.number_of_plaquettes_of_ancilla(qbit_coords, coord)
+            # if below 2, this ancilla makes no sense
+            if number_of_new_plaqs > 1:
+                ancillas.append((number_of_new_plaqs, self.name_of_ancilla(coord), coord))
+        ancillas.sort(reverse=True)
+        return {ancilla: coord for _, ancilla, coord in ancillas[:allowed_number]}

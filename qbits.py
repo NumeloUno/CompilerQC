@@ -77,6 +77,9 @@ class Qbits():
         """
         qbits = Qbits.qbits_from_dict(self.graph, qubit_coord_dict, assign_to_core)
         for qbit in qbits:
+            # for adding ancilla
+            if qbit.qubit not in self.qubits.keys():
+                self.qubits.update({qbit.qubit:qbit})
             self.qubits[qbit.qubit].coord = qbit.coord
             self.qubits[qbit.qubit].core = qbit.core
         self.update_core_shell()
@@ -125,6 +128,13 @@ class Qbits():
     
     def update(self, qubit, coord):
         self.qubits[qubit].coord = coord
+        
+    def mark_ancillas(self, ancilla_names):
+        """
+        mark all ancillas in ancilla_names as such
+        """
+        for qubit in ancilla_names:
+            self.qubits[qubit].ancilla = True
         
     @property     
     def qubit_to_coord_dict(self):
@@ -241,6 +251,7 @@ class Qbit():
         self._qubit = qubit
         self.coord = coord
         self.core = core
+        self.ancilla = False
         # self.polygons is set with set_polygons(), this function is called in init of Polygons
         self.polygons = None
         # self.plaquettes is set with set_plaquettes_of_qbits(), this function has to be called after Polygons is initialized
