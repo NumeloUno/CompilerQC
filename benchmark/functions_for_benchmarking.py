@@ -85,7 +85,7 @@ def initialize_MC_object(graph: Graph, mc_schedule: dict, core: bool=False):
     if core:
         mc.reset(current_temperature=initial_temperature)
     else:
-        mc.reset(current_temperature=initial_temperature, with_core=False)
+        mc.reset(current_temperature=initial_temperature, keep_core=False)
         
     return mc
 
@@ -110,6 +110,7 @@ def evaluate_optimization(
     record_core_size = np.zeros(batch_size)
     record_n_core_qbits = np.zeros(batch_size)
     for iteration in range(batch_size):
+        # search for core
         if mc_schedule['with_core']:
             logger.info(f"search core in iteration {iteration}")
             qubit_coord_dict, mc.energy.polygon_object.core_corner = search_max_core(mc_core)
@@ -123,7 +124,7 @@ def evaluate_optimization(
             mc_core.reset(mc_core.T_0)
             # update core (reset is part of update)
             mc.energy.polygon_object.qbits.update_qbits_from_dict(qubit_coord_dict)
-            mc.reset(mc.T_0, with_core=True)      
+            mc.reset(mc.T_0, keep_core=True)      
         
         # check if there are still some qbits left to place
         remaining_qbits = (
@@ -141,7 +142,7 @@ def evaluate_optimization(
         record_n_missing_C[iteration] = n_missing_C
         success_rate[iteration] = (n_missing_C == 0)
         #reset mc object
-        mc.reset(current_temperature=mc.T_0, with_core=False)
+        mc.reset(current_temperature=mc.T_0, keep_core=False)
     # save resutls in dataframe 
     print(record_n_missing_C)
     mc_schedule.update(
@@ -158,12 +159,12 @@ def evaluate_optimization(
          'C': graph.C,
          'energy.scaling_for_plaq3': mc.energy.scaling_for_plaq3,
          'energy.scaling_for_plaq4': mc.energy.scaling_for_plaq4,
-         'initial_temperature': mc.T_0,
+         'init_temperature': mc.T_0,
          'name': name,
         })
     dataframe = dataframe.append(mc_schedule, ignore_index=True)
-    return dataframe, mc
-            
+    return dataframe
+
 def run_benchmark(
     benchmark_df: pd.DataFrame,
     graph: Graph,
@@ -192,70 +193,3 @@ def search_max_core(mc_core):
         mc_core.optimization_schedule()
     core_qubit_coord_dict, core_corner = mc_core.energy.qbits_in_max_core()
     return core_qubit_coord_dict, core_corner
-
-# def evaluate_optimization_with_core(
-#     graph: Graph, name: str,mc_schedule: dict, dataframe: pd.DataFrame,  batch_size: int,
-# ):
-#     """
-#     evaluate monte carlo/ simulated annealing schedule for batch_size timed and returns
-#     a success probability -> measure of how good the choosen schedule (temperature, 
-#     configuration distribution, ...) is
-#     """ 
-    
-#     energy_core = init_energy_core(graph)
-
-#     # benchmark    
-#     success_rate = []
-#     record_n_total_steps = []
-#     record_n_missing_C = []
-#     for iteration in range(batch_size):
-#         core_qubit_coord_dict, core_initial_temperature = search_max_core(deepcopy(energy_core), mc_schedule)
-#         energy = init_energy(graph, core_qubit_coord_dict)
-#         mc, initial_temperature = initialize_MC_object(energy, mc_schedule)
-#         for repetition in range(mc.n_moves):
-#             mc.optimization_schedule()
-#         C = mc.energy.polygon_object.qbits.graph.C
-#         n_missing_C = (C - mc.number_of_plaquettes)
-#         if n_missing_C == 0:
-#             avg_n_total_steps += mc.n_total_steps
-#         avg_n_missing_C += n_missing_C
-#         success_rate.append(n_missing_C == 0)
-#         #reset mc object
-#         mc.reset(current_temperature=initial_temperature, with_core=mc.with_core)
-#         # append to dataframe   
-
-
-#     #if len(record_n_total_steps) == 0:
-#     #record_n_total_steps.append(mc.n_total_steps)
-    
-#     record_n_total_steps = np.array(record_n_total_steps)
-
-#     #if len(record_n_missing_C) == 0:
-#     #record_n_missing_C.append(0)    
-        
-#     record_n_missing_C = np.array(record_n_missing_C)
-    
-#     if not mc_schedule['with_core']:
-#         record_core_size.append(0)
-#     record_core_size = np.array(record_core_size)
-        
-    
-    
-    
-#         mc_schedule.update(
-#             {'success_rate':sum(success_rate) / batch_size,
-#              'avg_n_missing_C': avg_n_missing_C / batch_size, 
-#              'core_size': len(core_qubit_coord_dict),
-#              'N':mc.energy.polygon_object.qbits.graph.N,
-#              'C':mc.energy.polygon_object.qbits.graph.C,
-#              'avg_n_total_steps':avg_n_total_steps / batch_size,
-#              'energy.scaling_for_plaq3':mc.energy.scaling_for_plaq3,
-#              'energy.scaling_for_plaq4':mc.energy.scaling_for_plaq4,
-#              'initial_temperature': initial_temperature,
-#              'initial_temperature': core_initial_temperature,
-#              'name': name,
-#             })
-#         dataframe = dataframe.append(mc_schedule, ignore_index=True)
-#         return dataframe
-
-#             # append mc_core_schedule also to df, run_benchmark_with_core...
