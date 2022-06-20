@@ -41,6 +41,9 @@ class Qbits():
         with random coordinates
         return: list ob qbit objects
         """
+        # change what the dicts point to - otherwise some annoying behaviour
+        qubit_coord_dict = qubit_coord_dict.copy()
+        
         core_coords = list(qubit_coord_dict.values())
         core_qubits = list(qubit_coord_dict.keys())
 
