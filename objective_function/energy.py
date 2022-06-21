@@ -366,15 +366,14 @@ class Energy_core(Energy):
         
         # move core to center of later initialization
         core_center_x, core_center_y = Polygons.center_of_coords(qubit_coord_dict.values())
-        center_envelop_of_all_coord = (int(np.sqrt(self.polygon_object.qbits.graph.K)) + 1) / 2
-
-        cx, cy = int(center_envelop_of_all_coord-core_center_x), int(center_envelop_of_all_coord-core_center_y)
+        center_envelop_of_all_coord = np.sqrt(self.polygon_object.qbits.graph.K) / 2
+        delta_cx, delta_cy = int(center_envelop_of_all_coord-core_center_x), int(center_envelop_of_all_coord-core_center_y)
+        
         for qubit, coord in qubit_coord_dict.items():
-            qubit_coord_dict[qubit] = tuple(np.add(coord, (cx, cy)))
+            qubit_coord_dict[qubit] = tuple(np.add(coord, (delta_cx, delta_cy)))
         # coords of envelop of core
         core_coords = list(qubit_coord_dict.values())
-        corner = Polygons.corner_of_coords(core_coords)
-            
+        corner = Polygons.corner_of_coords(core_coords)            
         return qubit_coord_dict, corner
 
     def __call__(self, qbits_of_interest):
