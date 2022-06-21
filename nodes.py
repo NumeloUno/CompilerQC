@@ -173,4 +173,9 @@ class Nodes():
             if number_of_new_plaqs > 1:
                 ancillas.append((number_of_new_plaqs, self.name_of_ancilla(coord), coord))
         ancillas.sort(reverse=True)
-        return {ancilla: coord for _, ancilla, coord in ancillas[:allowed_number]}
+        best_ancillas = {ancilla: coord for number_of_new_plaqs, ancilla, coord 
+                in ancillas[:allowed_number] if number_of_new_plaqs == 4}
+        if len(best_ancillas) == 0:
+            best_ancillas = {ancilla: coord for _, ancilla, coord 
+                in ancillas[:1]}
+        return best_ancillas
