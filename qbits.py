@@ -187,6 +187,17 @@ class Qbits():
         for qbit in self.qubits.values():
             qbit.set_polygons(all_polygons)
             
+    def append_polygons(self, new_polygons: list):
+        """
+        new polygons which are added due to e.g.
+        adding an ancilla, are added to the coresponding
+        polygons attribute of each qbit object
+        """
+        for polygon in new_polygons:
+            for qbit in self.qubits.values():
+                if qbit.qubit in polygon:
+                    qbit.polygons.append(polygon)
+            
     def neighbours(self, coord):
         """
         return the 8 neighbours of a coord, if the neighbour is (not) occupied by another 
@@ -253,7 +264,7 @@ class Qbit():
         self.core = core
         self.ancilla = False
         # self.polygons is set with set_polygons(), this function is called in init of Polygons
-        self.polygons = None
+        self.polygons = []
         # self.plaquettes is set with set_plaquettes_of_qbits(), this function has to be called after Polygons is initialized
         self.plaquettes = None
         self.number_of_qbit_neighbours = None
