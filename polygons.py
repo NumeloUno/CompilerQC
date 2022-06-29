@@ -169,7 +169,7 @@ class Polygons:
     def number_of_plaqs(self):
         return len(self.found_plaqs())
 
-    def visualize(self, ax=None, zoom=1, figsize=(15,15), core_corner=None):
+    def visualize(self, ax=None, zoom=1, figsize=(15,15), core_corner=None, check_ancilla_in_core: bool=True):
         if ax is None:
             _, ax = plt.subplots(figsize=figsize)
         x, y = list(zip(*self.envelop_rect()))
@@ -209,7 +209,8 @@ class Polygons:
                         qbit.coord, radius=0.2, alpha=1.0, lw=0.7,
                         ec='black', fc='#FF7b7b'
                         )     
-                assert qbit.ancilla == True and qbit.core == True, "ancilla is not part of the core ?!"
+                if check_ancilla_in_core:
+                    assert qbit.ancilla == True and qbit.core == True, "ancilla is not part of the core ?!"
             ax.add_patch(circle)  
             
         if core_corner is not None:

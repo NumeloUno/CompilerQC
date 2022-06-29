@@ -29,12 +29,12 @@ class Nodes():
         qbits are placed according to the coords of the nodes
         """
         self.qbits = qbits
-        logical_nodes = list(range(self.qbits.graph.N))
+        self.logical_nodes = list(range(self.qbits.graph.N))
         if coords is None:
-            coords = logical_nodes[:]
+            coords = self.logical_nodes[:]
             np.random.shuffle(coords)
-        node_objects = [Node(n, coord) for n, coord in zip(logical_nodes, coords)]
-        self.nodes = dict(zip(logical_nodes, node_objects))
+        node_objects = [Node(n, coord) for n, coord in zip(self.logical_nodes, coords)]
+        self.nodes = dict(zip(self.logical_nodes, node_objects))
         self.set_qbits_of_nodes()
         self.place_qbits_in_lines()
         

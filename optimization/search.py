@@ -2,7 +2,9 @@ import random
 import numpy as np
 from CompilerQC import *
 import cProfile
-
+# for convolution in cluster search
+from scipy import signal, misc
+from scipy.ndimage.measurements import label
 """
 number of repetition rate from Eq. (4.17)
 Simulated Annealing and Boltzmann Machines,
@@ -500,6 +502,14 @@ def estimate_standard_deviation(mc_object, number_of_samples: int=100):
 
 class MC_core(MC):
     
+    square_filter = np.array(
+        [[1,1],
+         [1,1]]) 
+    structure = np.array(
+        [[1,1,1],
+         [1,1,1],
+         [1,1,1]])
+    
     def __init__(
         self,
         energy_object: Energy,
@@ -508,6 +518,7 @@ class MC_core(MC):
         alpha: float = 0.95,
         repetition_rate_factor: float = 1,
         recording: bool = False,
+        cluster_shuffling_probability: float=0.0
     ):
         self.energy = energy_object
         self.n_total_steps = 0
@@ -525,13 +536,16 @@ class MC_core(MC):
         self.temperature_C = False
         self.temperature_linearC = False
         
+        # cluster swap
+        self.shape_x = self.shape_y = self.energy.polygon_object.qbits.graph.N
+        self.indices = np.indices((self.shape_x + 2, self.shape_y + 2)).T[:,:,]
+        self.cluster_shuffling_probability = cluster_shuffling_probability
+        
         # compute total energy once at the beginning
         self.total_energy, self.number_of_plaquettes = self.energy(
             self.energy.polygon_object.qbits
         )
-        
-        self.swap_symmetric = True
-        
+                
         self.recording = recording
         if self.recording:
             self.record_temperature = []
@@ -565,6 +579,10 @@ class MC_core(MC):
         move qbit or swap qbits and return energy of old and new configuration
         to expand this function for g(x) > 1, select_move() shouls use random.choices(k>1)
         """
+        if random.random() < self.cluster_shuffling_probability:
+            self.clusters_swap()
+            #self.greedy_clusters_swap(number_of_cluster_swaps=10)
+        
         node_i, node_j = self.energy.polygon_object.nodes_object.nodes_to_swap()
         self.nodes_to_move = node_i, node_j
         qbits_to_move = self.energy.polygon_object.nodes_object.qbits_of_nodes(self.nodes_to_move)
@@ -620,4 +638,138 @@ class MC_core(MC):
             energies.append(self.total_energy)
             self.reset(current_temperature=None)
         return - np.std(energies) / np.log(chi_0)
-   
+    
+    
+    @staticmethod
+    def consolidate(sets):
+        """from stackoverflow, used in unique_clusters()"""
+        # http://rosettacode.org/wiki/Set_consolidation#Python:_Iterative
+        setlist = [s for s in sets if s]
+        for i, s1 in enumerate(setlist):
+            if s1:
+                for s2 in setlist[i+1:]:
+                    intersection = s1.intersection(s2)
+                    if intersection:
+                        s2.update(s1)
+                        s1.clear()
+                        s1 = s2
+        return [s for s in setlist if s]
+
+    @staticmethod
+    def wrapper(seqs):
+        """from stackoverflow, used in unique_clusters()"""
+        consolidated = MC_core.consolidate(map(set, seqs))
+        groupmap = {x: i for i,seq in enumerate(consolidated) for x in seq}
+        output = {}
+        for seq in seqs:
+            target = output.setdefault(groupmap[seq[0]], [])
+            target.append(seq)
+        return list(output.values())
+    
+    def get_clusters(self):
+        """
+        a clusters is simply a list of nodes of a conncected set of plaquettes,
+        this function returns all clusters in form of the nodes order,
+        a and b are the sides of a cluster
+        you can visualize square_plaquette_featuremap.T and labeled.T
+        with plt.imshow()
+        """
+        grid = np.zeros(shape = (self.shape_x + 1, self.shape_y + 1))
+        for (i, j) in self.energy.polygon_object.nodes_object.qbits.coords:
+            grid[i, j] = 1
+        square_plaquette_featuremap = signal.convolve2d(grid, self.square_filter)
+        square_plaquette_featuremap[square_plaquette_featuremap<4]=0
+        labeled, num = label(square_plaquette_featuremap, self.structure)
+
+        clusters = []
+        for i in range(1, num+1):
+            a, b = self.indices[labeled.T==i].T
+            a, b = list(a), list(b)
+            a, b = [min(a)-1]+a, [min(b)-1]+b
+            clusters.append([self.energy.polygon_object.nodes_object.order[i] for i in sorted(set(a))])
+            clusters.append([self.energy.polygon_object.nodes_object.order[i] for i in sorted(set(b))])
+        return clusters
+    
+    @staticmethod
+    def unique_clusters(clusters):
+        """
+        merge clusters as far as possible
+        """
+        merged = []
+        for idx, group in enumerate(MC_core.wrapper(clusters)):
+            # if len is one, nothing can be merged
+            if len(group)>1:
+                # remove clusters in group which are already subset of other cluster in this group
+                for x in group:
+                    if (sum([all(i in g for i in x) for g in group]) > 1):
+                        group.remove(x)
+                j = 0
+                # merge clusters in group till group is one large cluster
+                while len(group) > 1:
+                    """
+                    take first element (a) of group of clusters, 
+                    check if last element of a is in the next element (b)
+                    if so merge them, if not check switch role of a and b,
+                    otherwise keep a and take next element b,
+                    if successful, remove a and b and append merged list ~ a+b
+                    start search from first element again (which is now another
+                    since a has been removed)
+                    """
+                    a, b = group[0], group[(j+1)%len(group)]
+                    if a[-1] in b:
+                        merged_ab = a+b[b.index(a[-1])+1:]
+                    elif b[-1] in a:
+                        merged_ab = b+a[a.index(b[-1])+1:]
+                    else:
+                        j += 1
+                        continue
+                    group.append(merged_ab)
+                    group.pop(0)
+                    group.pop((j)%len(group))
+                    j=0
+            merged.append(group[0])
+        return merged
+    
+    def update_nodes_order(self, new_order):
+        for idx, node in enumerate(new_order):
+            self.energy.polygon_object.nodes_object.nodes[node].coord = idx
+        self.energy.polygon_object.nodes_object.place_qbits_in_lines()
+        
+    def shuffle_clusters(self, merged_clusters):
+            nodes_in_clusters = [i for x in merged_clusters for i in x]
+            all_clusters = merged_clusters + [[i]
+                                              for i in 
+                                              list(set(self.energy.polygon_object.nodes_object.logical_nodes)
+                                                   -set(nodes_in_clusters))]
+            np.random.shuffle(all_clusters)
+            new_order = [i for x in all_clusters for i in x]
+            return new_order
+        
+    def greedy_clusters_swap(self, number_of_cluster_swaps: int=10):
+        """
+        swap clusters (swap them in a random way (np.random.shuffle) 
+        for number_of_cluster_swaps times, take the orientation with the
+        lowest energy. Since it is expensive to determine the clusters,
+        we determine them once and then shuffle them several times 
+        and update the nodes_order at the end by the minimum 
+        order
+        """
+        order_and_energy = [(self.total_energy, self.energy.polygon_object.nodes_object.order)]    
+        clusters = self.get_clusters()
+        merged = MC_core.unique_clusters(clusters)
+        for _ in range(number_of_cluster_swaps):
+            new_order = self.shuffle_clusters(merged[:])
+            self.update_nodes_order(new_order)
+            new_energy = self.energy(self.energy.polygon_object.nodes_object.qbits)[0]
+            order_and_energy.append((new_energy, new_order))
+
+        self.update_nodes_order(min(order_and_energy)[1])
+        
+    def clusters_swap(self, number_of_cluster_swaps: int=10):
+        """
+        swap clusters and always accept this move"""
+        clusters = self.get_clusters()
+        merged = MC_core.unique_clusters(clusters)
+        new_order = self.shuffle_clusters(merged[:])
+        self.update_nodes_order(new_order)
+
