@@ -1,7 +1,7 @@
 import numpy as np
 import networkx as nx
 
-
+# TODO: graph.nodes is the same as logical_nodes in nodes.py, replace logical nodes!
 class Graph:
     def __init__(self, adj_matrix):
         """
@@ -135,6 +135,19 @@ class Graph:
         for (i, j) in ancillas:
             self.adj_matrix[i][j] = self.adj_matrix[j][i] = 1
     
+    def remove_ancillas_from_adj_matrix(self, ancillas):
+        for (i, j) in ancillas:
+            self.adj_matrix[i][j] = self.adj_matrix[j][i] = 0
+
+    def remove_ancillas(self, ancillas):
+        self.remove_ancillas_from_adj_matrix(ancillas)
+        self.K = self.num_edges()
+        for ancilla in ancillas:
+            self.qbits.remove(ancilla)
+        assert self.K == len(self.qbits), "number of qbits is not equal to K"
+        self.nodes = self.nodes_from_graph()
+        self.C = self.num_constrains()   
+        
     def update_ancillas(self, ancillas):
         self.add_ancillas_to_adj_matrix(ancillas)
         self.K = self.num_edges()
