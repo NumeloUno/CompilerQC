@@ -537,6 +537,7 @@ class MC_core(MC):
         self.temperature_linearC = False
         
         # cluster swap
+
         self.shape_x = self.shape_y = self.energy.polygon_object.qbits.graph.N
         self.indices = np.indices((self.shape_x + 2, self.shape_y + 2)).T[:,:,]
         self.cluster_shuffling_probability = cluster_shuffling_probability
@@ -767,9 +768,31 @@ class MC_core(MC):
         
     def clusters_swap(self, number_of_cluster_swaps: int=10):
         """
-        swap clusters and always accept this move"""
+        swap clusters and always accept this move
+        """
         clusters = self.get_clusters()
         merged = MC_core.unique_clusters(clusters)
         new_order = self.shuffle_clusters(merged[:])
         self.update_nodes_order(new_order)
+        
+        
+    def add_ancillas(self, ancillas):
+        self.energy.polygon_object.nodes_object.qbits.graph.update_ancillas(ancillas)
+        new_polygons = self.energy.polygon_object.add_ancillas_to_polygons(ancillas)
+        ancilla_qbits = self.energy.polygon_object.nodes_object.qbits.add_ancillas_to_qbits(ancillas, new_polygons)
+        self.energy.polygon_object.nodes_object.add_ancillas_to_nodes(ancillas)
 
+        delta_energy, delta_number_of_plaquettes = self.energy(ancilla_qbits)
+        self.total_energy += delta_energy
+        self.number_of_plaquettes += delta_number_of_plaquettes
+        
+    def remove_ancillas(self, ancillas):
+        delta_energy, delta_number_of_plaquettes = self.energy(ancilla_qbits)
+        self.total_energy -= delta_energy
+        self.number_of_plaquettes -= delta_number_of_plaquettes
+        
+        self.energy.polygon_object.remove_ancillas_from_polygons(ancillas)
+        self.energy.polygon_object.nodes_object.remove_ancillas_from_nodes(ancillas)
+        self.energy.polygon_object.nodes_object.qbits.remove_ancillas_from_qbits(ancillas)
+        # remove ancillas from graph, cycles are not updatet!
+        self.energy.polygon_object.nodes_object.qbits.graph.remove_ancillas(ancillas)
