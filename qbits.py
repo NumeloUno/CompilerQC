@@ -246,6 +246,35 @@ class Qbits():
         swap two qubits with each other
         """
         self.qubits[qbit1.qubit].coord, self.qubits[qbit2.qubit].coord = self.qubits[qbit2.qubit].coord ,self.qubits[qbit1.qubit].coord
+        
+    def add_ancillas_to_qbits(self, ancillas, new_polygons):
+        ancilla_qbits = []
+        for ancilla, coord in ancillas.items():
+            qbit = Qbit(ancilla, coord)
+            qbit.ancilla = True
+            qbit.core = True
+            ancilla_qbits.append(qbit)
+        self.qubits.update({ancilla_qbit.qubit: ancilla_qbit for ancilla_qbit in ancilla_qbits})
+        self.update_core_shell()
+        self.append_polygons(new_polygons)
+        return ancilla_qbits
+    
+    def remove_ancillas_from_qbits(self, ancillas):
+        
+        for qbit in self.qubits.values():
+            if qbit.qubit in ancillas:
+                continue
+            # remove ancillas from qbit.polygons, creating new list is faster
+            remaining_polygons = []
+            for polygon in qbit.polygons:
+                if set(ancillas).isdisjoint(polygon):
+                     remaining_polygons.append(polygon)
+            qbit.polygons = remaining_polygons
+
+        # remove ancilla from qbits
+        for ancilla in ancillas:
+            self.qubits.pop(ancilla,None)
+        self.update_core_shell() 
 
 
 class Qbit():

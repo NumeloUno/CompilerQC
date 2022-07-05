@@ -302,14 +302,22 @@ class Polygons:
     def qbits_of_node(self, i):
         """returns the qbits to node i"""
         return [qbit for qbit in self.qbits if i in qbit.qubit]
-
-# TODO: create function to analyse search
-# for i in range(100):
-# #     delta_energy = 0#(mc.apply('',1))
-# #     print("delta energy {} temperature {}".format(delta_energy, mc.temperature))
-# #     if type(mc.qbits_to_move[1]) == tuple:
-# #         print(f'move {mc.qbits_to_move[0].qubit} to {mc.qbits_to_move[1]} with probability %2.f'% min(1, np.exp(- delta_energy / mc.temperature)))
-# #     else:
-# #         print(f'switch {mc.qbits_to_move[0].qubit} with {mc.qbits_to_move[1].qubit} with probability %2.f'% min(1, np.exp(- delta_energy / mc.temperature)))
-#     polygon_object.visualize()
-#     plt.show()
+    
+    
+    def add_ancillas_to_polygons(self, ancillas, only_four_cycles: bool=False):
+        """find all cycles, or only four cycles if True,
+        create polygons and extend them"""
+        cycles = self.qbits.graph.get_cycles_of_ancillas(ancillas, 4)
+        if not only_four_cycles:
+            cycles += self.qbits.graph.get_cycles_of_ancillas(ancillas, 3)            
+        polygons = Polygons.create_polygons(cycles)
+        self.polygons += polygons
+        return polygons
+    
+    def remove_ancillas_from_polygons(self, ancillas):
+        """remove ancillas from all polygons"""
+        remaining_polygons = []
+        for polygon in self.polygons:
+            if set(ancillas).isdisjoint(polygon):
+                remaining_polygons.append(polygon)
+        self.polygons = remaining_polygons
