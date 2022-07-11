@@ -42,12 +42,16 @@ class MC:
         self.isolation_weight = False
         self.sparse_plaquette_density_weight = False
         self.random_qbit = False
+        self.qbit_with_same_node = False
         
         # choose coords
-        self.neighbour_coords = False
+        self.same_node_coords = False
         self.finite_grid_size = False
         self.padding_finite_grid = 0
         self.infinite_grid_size = False
+        self.shell_search = False
+        self.min_plaquette_density_in_softcore = 0.75
+        self.corner = None
         # TODO: only coords which have node as neighbozr -> form a line
         
         # initial temperature
@@ -67,6 +71,9 @@ class MC:
         self.linear_in_moves = False
         self.temperature_C = False
         self.temperature_linearC = False
+        
+        # search schedule
+        self.swap_probability = 0
         
         # compute total energy once at the beginning
         self.total_energy, self.number_of_plaquettes = self.energy(
@@ -115,10 +122,16 @@ class MC:
         if self.random_qbit:
             qbit = self.energy.polygon_object.qbits.random_shell_qbit()
         # select coord
-        if self.neighbour_coords:
-            target_coord = self.coord_from_neighbour_coords()
+        if self.qbit_with_same_node:
+            target_coord = self.coord_from_softcore()
+            qbit = self.qbit_with_same_node_as_neighbour(target_coord)
+        if self.same_node_coords:
+            qbit, possible_coords = self.coord_from_same_node(qbit)
+            target_coord = random.choice(possible_coords)
         if self.finite_grid_size:
             target_coord = self.coord_from_finite_grid()
+        if self.shell_search:
+            target_coord = self.coord_from_softcore()
         if self.infinite_grid_size:
             target_coord = self.coord_from_infinite_grid()
         assert qbit is not None and target_coord is not None, "oh! there is no qbit or targetcoord"
@@ -157,19 +170,47 @@ class MC:
         # reset number of plaquettes
         self.number_of_plaquettes = self.current_number_of_plaquettes
 
-    
-    def coord_from_neighbour_coords(self):
+    def qbit_with_same_node_as_neighbour(self, target_coord):
+        neighbour_qbits_in_envelop = list(map(self.energy.polygon_object.qbits.coord_to_qbit_dict.get, set(self.coords_in_softcore()[0]).intersection(self.energy.polygon_object.qbits.neighbour_coords_without_origin(target_coord))))
+        neighbour_nodes_in_envelop = [node for qbit in neighbour_qbits_in_envelop for node in qbit.qubit if qbit is not None]
+        potential_nodes = [node for node in neighbour_nodes_in_envelop if neighbour_nodes_in_envelop.count(node) < 4 ]
+        qbits_to_propose = ([qbit.qubit for qbit in self.energy.polygon_object.qbits.shell_qbits if set(qbit.qubit).intersection(potential_nodes)])
+        if qbits_to_propose == []:
+            return self.energy.polygon_object.qbits.random_shell_qbit()
+        else:
+            return random.choice(qbits_to_propose)
+        
+    def coord_from_same_node(self, qbit_to_move):
         """
-        return random coord from neighbour coords
+        return random coord from neighbour coords of qbits which 
+        are from the same node as qbit_to_move
         """
-        neighbour_coords = [coord for qbit in self.energy.polygon_object.qbits
-                for coord in Qbits.neighbour_coords(qbit.coord)]
-        self.possible_coords = list(
-                set(neighbour_coords)
+        """
+        softcore = core + plaquettes around it from shell qbits
+        """
+        if self.corner is None:
+            self.corner = self.energy.polygon_object.core_corner
+        # check every few hundert steps if shell should be expanded
+        if self.n_total_steps % (self.energy.polygon_object.graph.K * 10) == 0:
+            if self.plaquette_density_in_softcore() > self.min_plaquette_density_in_softcore:
+                 # if enough plaquettes in this area, expand area
+                (min_x, max_x), (min_y, max_y) = self.corner
+                self.corner = (min_x - 1, max_x + 1), (min_y - 1, max_y + 1)
+            possible_coords = self.coords_in_softcore()[0]
+            self.possible_coords = (
+                set(possible_coords)
                 - set(self.energy.polygon_object.qbits.core_qbit_coords)
-            )
-        return random.choice(self.possible_coords)
-    
+            )                
+
+        neighbour_coords = [coord for qbit in self.energy.polygon_object.qbits for coord in Qbits.neighbour_coords_without_origin(qbit.coord) if qbit.qubit[0] in qbit_to_move.qubit
+                        or qbit.qubit[1] in qbit_to_move.qubit]
+        possible_coords = list(self.possible_coords.intersection(neighbour_coords))
+        if possible_coords == []:
+            qbit_to_move = self.energy.polygon_object.qbits.random_shell_qbit()
+            qbit_to_move, possible_coords = self.coord_from_same_node(qbit_to_move)
+
+        return qbit_to_move, possible_coords
+
     @property
     def repetition_rate(self):
         """lenght of markov chain"""
@@ -182,7 +223,7 @@ class MC:
         for running time reasons: only every repetition_rate times
         """
         if self.n_total_steps % self.repetition_rate == 0:
-            possible_coords = self.energy.polygon_object.envelop_rect()
+            possible_coords = self.energy.polygon_object.qbits.envelop_rect()
             self.possible_coords = list(
                 set(possible_coords)
                 - set(self.energy.polygon_object.qbits.core_qbit_coords)
@@ -191,13 +232,67 @@ class MC:
     
     def coord_from_finite_grid(self):
         if self.n_total_steps == 0:
-            possible_coords = self.energy.polygon_object.envelop_rect(self.padding_finite_grid)
+            possible_coords = self.energy.polygon_object.qbits.envelop_rect(self.padding_finite_grid)
             self.possible_coords = list(
                 set(possible_coords)
                 - set(self.energy.polygon_object.qbits.core_qbit_coords)
             )
         return random.choice(self.possible_coords)        
 
+
+    def coords_in_softcore(self):
+        (min_x, max_x), (min_y, max_y) = self.corner
+        coords_in_softcore = [(i, j) for i in range(min_x, max_x + 1) for j in range(min_y, max_y + 1)]
+        number_of_cells_in_softcore = (max_x - min_x) * (max_y - min_y)
+        
+        max_x_and_y_coords = ([(max_x, y) for y in range(min_y, max_y + 1)] + [(max_y, x) for x in range(min_x, max_x)])
+        return coords_in_softcore, number_of_cells_in_softcore, max_x_and_y_coords
+    
+    def plaquette_density_in_softcore(self):
+        coords_in_softcore, number_of_cells_in_softcore, max_x_and_y_coords = self.coords_in_softcore()
+        number_of_plaquettes_in_softcore = len(self.energy.polygon_object.qbits.found_plaquettes_around_coords(
+            list(set(coords_in_softcore) - set(max_x_and_y_coords))))
+        plaquette_density = number_of_plaquettes_in_softcore / number_of_cells_in_softcore       
+        return plaquette_density
+    
+    def edge_coords_of_envelop(self):
+        """ returns the coords of the edge of corner
+        this function is currently not used"""
+        (min_x, max_x), (min_y, max_y) = self.corner
+        return ([(X, y) for y in range(min_y, max_y + 1) for X in [min_x, max_x]]
++ [(Y, x) for x in range(min_x + 1, max_x) for Y in [min_y, max_y]])
+            
+    def coord_from_softcore(self):
+        """
+        softcore = core + plaquettes around it from shell qbits
+        """
+        if self.corner is None:
+            self.corner = self.energy.polygon_object.core_corner
+            # if no core has been set, use square around the center as start for shell search
+            if self.corner is None:
+                x, y = self.energy.polygon_object.center_of_coords(self.energy.polygon_object.qbits.coords)
+                self.corner = (int(x - 0.5), int(x + 0.5)), (int(y - 0.5), int(y + 0.5))
+            possible_coords = self.coords_in_softcore()[0]
+            self.possible_coords = list(
+                set(possible_coords)
+                - set(self.energy.polygon_object.qbits.core_qbit_coords)
+            )        
+            
+        # check every few hundert steps if shell should be expanded
+        if self.n_total_steps % (self.energy.polygon_object.graph.K * 10) == 0:
+            if self.plaquette_density_in_softcore() > self.min_plaquette_density_in_softcore:
+                 # if enough plaquettes in this area, expand area
+                (min_x, max_x), (min_y, max_y) = self.corner
+                self.corner = (min_x - 1, max_x + 1), (min_y - 1, max_y + 1)
+                possible_coords = self.coords_in_softcore()[0]
+                self.possible_coords = list(
+                    set(possible_coords)
+                    - set(self.energy.polygon_object.qbits.core_qbit_coords)
+                )            
+        return random.choice(self.possible_coords)  
+    
+
+        
     def qbits_of_coord(self, coord, xy):
         """
         the core is defined by the core qbits, 
@@ -224,7 +319,16 @@ class MC:
         """
         corner = self.energy.polygon_object.core_corner
         xy = random.randint(0,1)
-        i, j = random.sample(range(corner[xy][0], corner[xy][1] + 1), 2)
+        
+        # choose line, and upper or lower / lefter or righter neighbour line
+        i = random.choice(range(corner[xy][0], corner[xy][1] + 1))
+        if i == corner[xy][0]:
+            j = i + 1
+        elif i == corner[xy][1]:
+            j = i - 1
+        else:
+            j = i + (-1) ** random.randint(0, 1)
+        
         qbits_i = self.qbits_of_coord(i, xy)
         qbits_j = self.qbits_of_coord(j, xy)  
         return qbits_i, qbits_j, i, j, xy
@@ -248,19 +352,15 @@ class MC:
     def reverse_swap_lines_in_core(self, i, j, xy):
         self.swap_lines_in_core(j, i, xy)
 
-    def step(self, operation: str = None):
+    def step(self):
         """
         move qbit or swap qbits and return energy of old and new configuration
         to expand this function for g(x) > 1, select_move() shouls use random.choices(k>1)
         """
         
-        if operation == 'move':
-            self.qbits_to_move = self.select_move()
-            current_energy, current_n_plaqs = self.energy(self.qbits_to_move)
-            self.apply_move(*self.qbits_to_move)
-            new_energy, new_n_plaqs = self.energy(self.qbits_to_move)
-
-        if operation == 'swap':
+        # swap adjacent lines with swap_probability
+        if random.random() < self.swap_probability:
+            operation = 'swap'
             self.qbits_i, self.qbits_j, i, j, xy = self.select_lines_in_core()
             qbits_to_move = self.qbits_i + self.qbits_j
             current_energy, current_n_plaqs = self.energy(qbits_to_move)
@@ -268,10 +368,18 @@ class MC:
             self.swap_lines_in_core(*self.lines_in_core_to_swap)
             new_energy, new_n_plaqs = self.energy(qbits_to_move)
             
+        # if not swapping, move a qbit
+        else:
+            operation = 'move'
+            self.qbits_to_move = self.select_move()
+            current_energy, current_n_plaqs = self.energy(self.qbits_to_move)
+            self.apply_move(*self.qbits_to_move)
+            new_energy, new_n_plaqs = self.energy(self.qbits_to_move)
+          
         self.current_number_of_plaquettes = self.number_of_plaquettes
         self.number_of_plaquettes += new_n_plaqs - current_n_plaqs
         self.n_total_steps += 1
-        return current_energy, new_energy
+        return current_energy, new_energy, operation
 
 
     def metropolis(self, current_energy, new_energy, operation):
@@ -303,27 +411,19 @@ class MC:
                 self.record_rejected_moves.append(self.n_total_steps)
 
     def apply(
-        self, operation, n_steps,
+        self, n_steps,
     ):
         # self.prof.enable()
         C = self.energy.polygon_object.graph.C
-        for i in range(n_steps):
+        for _ in range(n_steps):
             if self.number_of_plaquettes == C:
                 return 0  # ? what is the best value np.nan, None, ?
             self.update_mean_and_variance()
-            current_energy, new_energy = self.step(operation)
+            current_energy, new_energy, operation = self.step()
             self.metropolis(current_energy, new_energy, operation)
 
         # self.prof.disable()
         return new_energy - current_energy
-
-    def optimization_schedule(self,):
-        """
-        schedule is a dict = {operation:n_steps}
-        set schedule for the optimization
-        """
-        for operation, n_steps in self.operation_schedule.items():
-            self.apply(operation, n_steps)
 
     def initial_temperature(self, chi_0: float=None, size_of_S=50):
         """
@@ -439,6 +539,13 @@ class MC:
         µ_n = µ_m + (x_n - µ_m) / (n + 1)
         s_n2 = s_m2 + (x_n - µ_m) ** 2 / (n + 1) - s_m2 / n
         return µ_n, s_n2
+    
+    
+    def update_qbits_from_dict(self, core_qbit_to_core_dict, assign_to_core: bool=True):
+        self.energy.polygon_object.qbits.update_qbits_from_dict(core_qbit_to_core_dict, assign_to_core=True)
+        self.total_energy, self.number_of_plaquettes = self.energy(
+            self.energy.polygon_object.qbits
+        )
 
 
 from copy import deepcopy
@@ -575,7 +682,7 @@ class MC_core(MC):
     def reverse_swap(self, node_i, node_j):
         self.energy.polygon_object.nodes_object.swap_nodes(node_j, node_i)
 
-    def step(self, operation: str = None):
+    def step(self):
         """
         move qbit or swap qbits and return energy of old and new configuration
         to expand this function for g(x) > 1, select_move() shouls use random.choices(k>1)
@@ -593,9 +700,9 @@ class MC_core(MC):
         self.current_number_of_plaquettes = self.number_of_plaquettes
         self.number_of_plaquettes += new_n_plaqs - current_n_plaqs
         self.n_total_steps += 1
-        return current_energy, new_energy
+        return current_energy, new_energy, 'placeholder'
     
-    def metropolis(self, current_energy, new_energy, operation):
+    def metropolis(self, current_energy, new_energy, placeholder):
         temperature = self.temperature
         delta_energy = new_energy - current_energy
         if self.recording:
@@ -777,8 +884,12 @@ class MC_core(MC):
         
         
     def add_ancillas(self, ancillas):
+        """
+        ancillas are also conncected via 3cycles, 
+        this can be changed with only_four_cycles=True
+        """
         self.energy.polygon_object.nodes_object.qbits.graph.update_ancillas(ancillas)
-        new_polygons = self.energy.polygon_object.add_ancillas_to_polygons(ancillas)
+        new_polygons = self.energy.polygon_object.add_ancillas_to_polygons(ancillas, only_four_cycles=False)
         ancilla_qbits = self.energy.polygon_object.nodes_object.qbits.add_ancillas_to_qbits(ancillas, new_polygons)
         self.energy.polygon_object.nodes_object.add_ancillas_to_nodes(ancillas)
 
@@ -787,7 +898,8 @@ class MC_core(MC):
         self.number_of_plaquettes += delta_number_of_plaquettes
         
     def remove_ancillas(self, ancillas):
-        delta_energy, delta_number_of_plaquettes = self.energy(ancilla_qbits)
+        delta_energy, delta_number_of_plaquettes = self.energy(
+            [self.energy.polygon_object.nodes_object.qbits[ancilla] for ancilla in ancillas])
         self.total_energy -= delta_energy
         self.number_of_plaquettes -= delta_number_of_plaquettes
         
@@ -796,3 +908,25 @@ class MC_core(MC):
         self.energy.polygon_object.nodes_object.qbits.remove_ancillas_from_qbits(ancillas)
         # remove ancillas from graph, cycles are not updatet!
         self.energy.polygon_object.nodes_object.qbits.graph.remove_ancillas(ancillas)
+        
+    def ignore_qbits(self, qbits_to_ignore):
+        """
+        qbits_to_ignore will be ignored in further search
+        """
+        delta_energy, delta_number_of_plaquettes = self.energy(
+            [self.energy.polygon_object.nodes_object.qbits[qbit] for qbit in qbits_to_ignore])
+        self.total_energy -= delta_energy
+        self.number_of_plaquettes -= delta_number_of_plaquettes
+        
+        self.energy.polygon_object.remove_ancillas_from_polygons(qbits_to_ignore)
+        self.energy.polygon_object.nodes_object.remove_ancillas_from_nodes(qbits_to_ignore)
+        self.energy.polygon_object.nodes_object.qbits.remove_ancillas_from_qbits(qbits_to_ignore)
+  
+    def remove_short_lines_in_core_search(self):
+        """
+        ignore qbit in search if it is part of a node which is very short (length 2 or 3)
+        length 1 would mean that only this qbit exists which cannot form any constraints
+        """
+        qbits_to_ignore = [qbit.qubit for qbit in self.energy.polygon_object.nodes_object.qbits if 2 in qbit.length_of_its_nodes or 3 in qbit.length_of_its_nodes]
+        self.ignore_qbits(qbits_to_ignore)
+        return qbits_to_ignore

@@ -78,17 +78,6 @@ class Polygons:
             5,
         )
 
-    def envelop_rect(self, padding: int = 1):
-        """
-        generate grid coords of envelop rectengular (of all qbits) with padding
-        """
-        x, y = np.array(self.qbits.coords).T
-        x, y = np.meshgrid(
-            np.arange(min(x) - padding, max(x) + (padding + 1)),
-            np.arange(min(y) - padding, max(y) + (padding + 1)),
-        )
-        return list(zip(x.flatten(), y.flatten()))
- 
     @staticmethod
     def corner_of_coords(coords):
         """
@@ -112,51 +101,12 @@ class Polygons:
         c_x = (min_x + max_x) / 2
         c_y = (min_y + max_y) / 2
         return c_x, c_y
-    
-    def found_plaqs(self):
-        """
-        listing all plaquettes in current compilation,
-        without looping over all polygons
-        """
-        coords = self.envelop_rect(padding=0)
-        coord_to_qbit_dict = self.qbits.coord_to_qbit_dict
-        # get upper right square of coords for each coord
-        square = lambda coord: [
-            coord_to_qbit_dict.get((coord[0] + i, coord[1] + j), np.nan)
-            for i in range(2)
-            for j in range(2)
-        ]
-        # remove nan in each square
-        qbits_in_each_square = [
-            list(filter(lambda v: v == v, square))
-            for square in list(map(square, coords))
-        ]
-        # consider only squares with more than 2 qbits
-        relevant_squares = [
-            [qbit.qubit for qbit in square]
-            for square in qbits_in_each_square
-            if len(square) > 2
-        ]
-        # list of 3 combinations and 4 combis, 4 combis are appended by all possible 3 combis
-        possible_plaqs = [
-            [i] if len(i) == 3 else list(combinations(i, 3)) + [i]
-            for i in relevant_squares
-        ]
-        # count number of nodes in each 3er or 4er combination, divide it by length of combination
-        a = [[len(set(sum(x, ()))) / len(x) for x in i] for i in possible_plaqs]
-        # if there is a one in a 3er combi, there is a plaquette
-        # if there is a one in a 4er combi and its 3 combinations (for 3plaqs), its a 4 plaq
-        # if there are two ones in a a 4er combi and its 3 combinations (for 3plaqs), the first one is a 3er plaq
-        return [
-            list(possible_plaqs[i][j])
-            for i, j in [[i, l.index(1)] for i, l in enumerate(a) if 1 in l]
-        ]
-
+        
     def set_plaquettes_of_qbits(self):
         """
         set the plaquettes of each qbit
         """
-        found_plaquettes = self.found_plaqs()
+        found_plaquettes = self.qbits.found_plaqs()
         for qbit in self.qbits:
             qbit.plaquettes = [plaq for plaq in found_plaquettes if qbit.qubit in plaq]
         
@@ -167,12 +117,12 @@ class Polygons:
            
     @property
     def number_of_plaqs(self):
-        return len(self.found_plaqs())
+        return len(self.qbits.found_plaqs())
 
     def visualize(self, ax=None, zoom=1, figsize=(15,15), core_corner=None, check_ancilla_in_core: bool=True):
         if ax is None:
             _, ax = plt.subplots(figsize=figsize)
-        x, y = list(zip(*self.envelop_rect()))
+        x, y = list(zip(*self.qbits.envelop_rect()))
         ax.scatter(x, y, color="grey", s=0.6)
         ax.set_yticklabels([])
         ax.set_xticklabels([])
