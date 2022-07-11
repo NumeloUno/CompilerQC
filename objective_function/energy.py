@@ -147,7 +147,7 @@ class Energy(Polygons):
         note: checked
         """
 
-        found_plaqs = self.polygon_object.found_plaqs()
+        found_plaqs = self.polygon_object.qbits.found_plaqs()
         forbidden_edges = [
             ((p[0], p[3]), (p[1], p[2])) for p in found_plaqs if len(p) == 4
         ]
@@ -349,7 +349,7 @@ class Energy_core(Energy):
         triangulars are not considered 
         by choosing the largest core"""
         G = nx.Graph()
-        plaquettes = self.polygon_object.found_plaqs()
+        plaquettes = self.polygon_object.qbits.found_plaqs()
         if self.only_squares_in_core:
             plaquettes = [plaq for plaq in plaquettes if len(plaq)==4]
         for l in plaquettes:
@@ -364,9 +364,9 @@ class Energy_core(Energy):
             :self.polygon_object.qbits[qbit].coord
             for qbit in max_core_qbits}
         
-        # move core to center of later initialization
+        # move core to center of later initialization 
         core_center_x, core_center_y = Polygons.center_of_coords(qubit_coord_dict.values())
-        center_envelop_of_all_coord = np.sqrt(self.polygon_object.qbits.graph.K) / 2
+        center_envelop_of_all_coord = (np.sqrt(self.polygon_object.qbits.graph.K)) / 2
         delta_cx, delta_cy = int(center_envelop_of_all_coord-core_center_x), int(center_envelop_of_all_coord-core_center_y)
         
         for qubit, coord in qubit_coord_dict.items():
