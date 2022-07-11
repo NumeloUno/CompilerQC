@@ -1,7 +1,6 @@
 from CompilerQC import *
 import numpy as np
 import random 
-from itertools import combinations
 
 class Node():
     """
@@ -52,10 +51,17 @@ class Nodes():
             
     def set_qbits_of_nodes(self):
         """
-        each node is involved in several qbits
+        each node is involved in several qbits,
+        added: each qbit gets attribute length_of_its_nodes,
+        which is a tuple (number of qbits involved in the first node,
+        number of qbits involved in the second node)
         """
         for node_name, node in self.nodes.items():
             node.qbits = [qbit for qbit in self.qbits if node_name in qbit.qubit]
+            
+        self.length_of_nodes = {i: len(self.qbits_of_nodes([i])) for i in self.nodes}
+        for qbit in self.qbits:
+            qbit.length_of_its_nodes = tuple([self.length_of_nodes.get(node) for node in qbit.qubit])
             
             
     def add_ancillas_to_nodes(self, ancillas):
@@ -201,60 +207,20 @@ class Nodes():
         remove ancillas which are:
         * only in plaquettes where already other ancillas are involved or 
         ** only involved in one plaquette
-        *** not involved in plaquettes or
+        *** or not involved in plaquettes
         """
         all_ancillas = [qbit.qubit for qbit in self.qbits if qbit.ancilla==True]
         coords_around_ancillas = set([coord for qbit in self.qbits if qbit.ancilla==True for coord in Qbits.neighbour_coords(qbit.coord)])
-        found_plaquettes = self.found_plaquettes_around_coords(coords_around_ancillas)
+        found_plaquettes = self.qbits.found_plaquettes_around_coords(coords_around_ancillas)
         # search for all ancillas, which are involved in plaquettes where only this ancillas takes part (intersection == 1) *
         ancillas_in_plaquettes = []
         for plaquette in found_plaquettes:
             intersection = list(set(all_ancillas).intersection(plaquette))
             if len(intersection) == 1:
-                ancillas_in_plaquettes.append(intersection)
+                ancillas_in_plaquettes.append(intersection[0])
         # keep ancillas, which are part in >= 2 plaquettes  ** 
         ancillas_to_keep = [ancilla for ancilla in ancillas_in_plaquettes
                             if ancillas_in_plaquettes.count(ancilla) >= 2]  
         # additionally, remove ancillas which are not involved in plaquettes (***) 
         ancillas_to_remove = list(set(all_ancillas) - set(ancillas_to_keep))
         return ancillas_to_remove
-    
-    
-    def found_plaquettes_around_coords(self, coords):
-        """
-        listing all plaquettes around given coords
-        this function can me much faster (if fewer coords
-        are considered than in envelop_rect())
-        """
-        coord_to_qbit_dict = self.qbits.coord_to_qbit_dict
-        # get upper right square of coords for each coord
-        square = lambda coord: [
-            coord_to_qbit_dict.get((coord[0] + i, coord[1] + j), np.nan)
-            for i in range(2)
-            for j in range(2)
-        ]
-        # remove nan in each square
-        qbits_in_each_square = [
-            list(filter(lambda v: v == v, square))
-            for square in list(map(square, coords))
-        ]
-        # consider only squares with more than 2 qbits
-        relevant_squares = [
-            [qbit.qubit for qbit in square]
-            for square in qbits_in_each_square
-            if len(square) > 2
-        ]
-        # list of 3 combinations and 4 combis, 4 combis are appended by all possible 3 combis
-        possible_plaqs = [
-            [i] if len(i) == 3 else list(combinations(i, 3)) + [i]
-            for i in relevant_squares
-        ]
-        # count number of nodes in each 3er or 4er combination, divide it by length of combination
-        a = [[len(set(sum(x, ()))) / len(x) for x in i] for i in possible_plaqs]
-        # if there is a one in a 3er combi, there is a plaquette
-        # if there is a one in a 4er combi and its 3 combinations (for 3plaqs), its a 4 plaq
-        # if there are two ones in a a 4er combi and its 3 combinations (for 3plaqs), the first one is a 3er plaq
-        return [
-            list(possible_plaqs[i][j])
-            for i, j in [[i, l.index(1)] for i, l in enumerate(a) if 1 in l]
-        ]
