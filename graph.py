@@ -19,7 +19,7 @@ class Graph:
             len(four_cycles),
         )
         self.cycles = three_cycles + four_cycles
-        self.qbits = self.qbits_from_graph()
+        self.qubits = self.qubits_from_graph()
         self.nodes = self.nodes_from_graph()
         self.C = self.num_constrains()
 
@@ -143,8 +143,8 @@ class Graph:
         self.remove_ancillas_from_adj_matrix(ancillas)
         self.K = self.num_edges()
         for ancilla in ancillas:
-            self.qbits.remove(ancilla)
-        assert self.K == len(self.qbits), "number of qbits is not equal to K"
+            self.qubits.remove(ancilla)
+        assert self.K == len(self.qubits), "number of qubits is not equal to K"
         self.nodes = self.nodes_from_graph()
         self.C = self.num_constrains()   
         
@@ -152,15 +152,15 @@ class Graph:
         self.add_ancillas_to_adj_matrix(ancillas)
         self.K = self.num_edges()
         for ancilla in ancillas:
-            self.qbits.append(ancilla)
-        assert self.K == len(self.qbits), "number of qbits is not equal to K"
+            self.qubits.append(ancilla)
+        assert self.K == len(self.qubits), "number of qubits is not equal to K"
         self.nodes = self.nodes_from_graph()
         self.C = self.num_constrains()     
         
-    def qbits_from_graph(self):
+    def qubits_from_graph(self):
         triup_adj_graph = np.triu(self.adj_matrix, k=1)
-        qbits = np.argwhere(triup_adj_graph == 1)
-        return list(map(tuple, qbits))
+        qubits = np.argwhere(triup_adj_graph == 1)
+        return list(map(tuple, qubits))
 
     # TODO: count degeneracies D in graph
     def num_constrains(self):
@@ -173,7 +173,7 @@ class Graph:
 
     def nodes_from_graph(self):
         """return nodes"""
-        return list({node for qubit in self.qbits for node in qubit})
+        return list({node for qubit in self.qubits for node in qubit})
 
     def num_edges(self):
         return int(self.adj_matrix.sum() // 2)

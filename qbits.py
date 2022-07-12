@@ -54,7 +54,7 @@ class Qbits():
             assert len(coords) > graph.K, "init qbits: more qbits than coords"
             remaining_coords = [coord for coord in coords if coord not in core_coords]
             np.random.shuffle(remaining_coords)
-            remaining_qubits = [qubit for qubit in graph.qbits if qubit not in core_qubits]
+            remaining_qubits = [qubit for qubit in graph.qubits if qubit not in core_qubits]
             remaining_qubit_coord_dict = dict(zip(remaining_qubits, remaining_coords))
             qubit_coord_dict.update(remaining_qubit_coord_dict)
             

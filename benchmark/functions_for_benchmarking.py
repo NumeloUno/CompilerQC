@@ -123,13 +123,13 @@ def evaluate_optimization(
             # reset mc core
             mc_core.reset(mc_core.T_0)
             # update core (reset is part of update)
-            mc.energy.polygon_object.qbits.update_qbits_from_dict(qubit_coord_dict)
+            mc.energy.polygon_object.nodes_object.qbits.update_qbits_from_dict(qubit_coord_dict)
             mc.reset(mc.T_0, keep_core=True)      
         
         # check if there are still some qbits left to place
         remaining_qbits = (
-            len(mc.energy.polygon_object.qbits.qubits)
-            - len(mc.energy.polygon_object.qbits.core_qbits)
+            len(mc.energy.polygon_object.nodes_object.qbits.qubits)
+            - len(mc.energy.polygon_object.nodes_object.qbits.core_qbits)
         )
         if remaining_qbits > 0:
             logger.info(f"place {remaining_qbits} remaining qubits")

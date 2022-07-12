@@ -20,23 +20,24 @@ class Node():
     
 class Nodes():
     
-    def __init__(self, qbits, coords=None):
+    def __init__(self, qbits, place_qbits_in_lines: bool=True, coords=None):
         """
         if not specified, assign the nodes random coords, 
         main part here is the self.nodes object, 
         its a dict with the nodes (integers) as keys and
         node object as values (as in the Qbits class)
         qbits are placed according to the coords of the nodes
+        set place_qbits_in_lines = False when qbits shouldnt be rearranged
         """
         self.qbits = qbits
-        self.logical_nodes = list(range(self.qbits.graph.N))
         if coords is None:
-            coords = self.logical_nodes[:]
+            coords = self.qbits.graph.nodes[:]
             np.random.shuffle(coords)
-        node_objects = [Node(n, coord) for n, coord in zip(self.logical_nodes, coords)]
-        self.nodes = dict(zip(self.logical_nodes, node_objects))
+        node_objects = [Node(n, coord) for n, coord in zip(self.qbits.graph.nodes, coords)]
+        self.nodes = dict(zip(self.qbits.graph.nodes, node_objects))
         self.set_qbits_of_nodes()
-        self.place_qbits_in_lines()
+        if place_qbits_in_lines:
+            self.place_qbits_in_lines()
         
         # for ancillas
         self.diagonal_coords = set([(i, i) for i in range(self.qbits.graph.N)])

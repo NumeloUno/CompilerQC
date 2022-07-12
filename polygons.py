@@ -18,19 +18,18 @@ class Polygons:
     unit_triangle_scope = round((np.sqrt(2) + 2) / 3, 5)
     unit_square_scope = round((2 * np.sqrt(2) + 4) / 4, 5)
 
-    def __init__(self, qbits: "Qbits", polygons: "list of polygons" = None, line_scaling:float=0):
+    def __init__(self, nodes_object: "Nodes", polygons: "list of polygons" = None, line_scaling:float=0):
         """
         qbits: qbits object, qbits represent connections in logical grpah
         polygons:
         line_scaling: if the distance between two qbits is 1.0 or sqrt(2), hence the qbits are
         adjacent, set their distance to line_scaling
         """
-        self.qbits = qbits
-        self.graph = self.qbits.graph
+        self.nodes_object = nodes_object
         if polygons is None:
-            polygons = Polygons.create_polygons(self.graph.cycles)
+            polygons = Polygons.create_polygons(self.nodes_object.qbits.graph.cycles)
         self.polygons = polygons
-        self.qbits.set_all_polygons(self.polygons)
+        self.nodes_object.qbits.set_all_polygons(self.polygons)
         
         self.line_scaling = line_scaling
         self.core_corner = None
@@ -106,29 +105,29 @@ class Polygons:
         """
         set the plaquettes of each qbit
         """
-        found_plaquettes = self.qbits.found_plaqs()
-        for qbit in self.qbits:
+        found_plaquettes = self.nodes_object.qbits.found_plaqs()
+        for qbit in self.nodes_object.qbits:
             qbit.plaquettes = [plaq for plaq in found_plaquettes if qbit.qubit in plaq]
         
     def set_numbers_of_qbits_neighbours(self):
         """"set number of neighbours each qbit has"""
-        for qbit in self.qbits:
-            self.qbits.set_number_of_qbit_neighbours(qbit) 
+        for qbit in self.nodes_object.qbits:
+            self.nodes_object.qbits.set_number_of_qbit_neighbours(qbit) 
            
     @property
     def number_of_plaqs(self):
-        return len(self.qbits.found_plaqs())
+        return len(self.nodes_object.qbits.found_plaqs())
 
     def visualize(self, ax=None, zoom=1, figsize=(15,15), core_corner=None, check_ancilla_in_core: bool=True):
         if ax is None:
             _, ax = plt.subplots(figsize=figsize)
-        x, y = list(zip(*self.qbits.envelop_rect()))
+        x, y = list(zip(*self.nodes_object.qbits.envelop_rect()))
         ax.scatter(x, y, color="grey", s=0.6)
         ax.set_yticklabels([])
         ax.set_xticklabels([])
         # color plaquettes
         for polygon in self.polygons_coords(
-            self.qbits.qubit_to_coord_dict, self.polygons
+            self.nodes_object.qbits.qubit_to_coord_dict, self.polygons
         ):
             fill, facecolor, lw = False, None, 0
             if self.scope_of_polygon(polygon) == self.unit_square_scope:
@@ -138,7 +137,7 @@ class Polygons:
             patch = plt.Polygon(polygon, zorder=0, fill=fill, lw=lw, edgecolor='white', facecolor=facecolor)
             ax.add_patch(patch)
         # color qbits
-        for qbit in self.qbits:
+        for qbit in self.nodes_object.qbits:
             label = ax.annotate(
                     r"{},{}".format(*qbit.qubit),
                     xy=qbit.coord, ha="center", va="center",
@@ -172,7 +171,7 @@ class Polygons:
      
     def draw_lines(self, ax):
         """draw lines of nodes in plot"""
-        for node in self.qbits.graph.nodes:
+        for node in self.nodes_object.qbits.graph.nodes:
             qbits_path, _ = self.line_to_node(node)
             ax.plot([qbit.coord[0] for qbit in qbits_path],
                    [qbit.coord[1] for qbit in qbits_path])
@@ -224,9 +223,9 @@ class Polygons:
         if qbits adjacent, the length is set to line_scaling
         this function can be seen as an approximation to TSP
         """
-        if i not in self.qbits.graph.nodes:
+        if i not in self.nodes_object.qbits.graph.nodes:
             return 0
-        node_qbits = self.qbits_of_node(i)
+        node_qbits = self.nodes_object.qbits_of_node(i)
         temporar_qbits = node_qbits[:]
         # cycle is starting with start_qbit (qbit with the most free neighbours, top and leftmost )
         start_qbit = min([((qbit.number_of_qbit_neighbours-8), -qbit.coord[1], -qbit.coord[0], qbit) for qbit in node_qbits])[-1]
@@ -251,15 +250,15 @@ class Polygons:
     
     def qbits_of_node(self, i):
         """returns the qbits to node i"""
-        return [qbit for qbit in self.qbits if i in qbit.qubit]
+        return [qbit for qbit in self.nodes_object.qbits if i in qbit.qubit]
     
     
     def add_ancillas_to_polygons(self, ancillas, only_four_cycles: bool=False):
         """find all cycles, or only four cycles if True,
         create polygons and extend them"""
-        cycles = self.qbits.graph.get_cycles_of_ancillas(ancillas, 4)
+        cycles = self.nodes_object.qbits.graph.get_cycles_of_ancillas(ancillas, 4)
         if not only_four_cycles:
-            cycles += self.qbits.graph.get_cycles_of_ancillas(ancillas, 3)            
+            cycles += self.nodes_object.qbits.graph.get_cycles_of_ancillas(ancillas, 3)            
         polygons = Polygons.create_polygons(cycles)
         self.polygons += polygons
         return polygons
