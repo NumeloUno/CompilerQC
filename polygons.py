@@ -225,7 +225,7 @@ class Polygons:
         """
         if i not in self.nodes_object.qbits.graph.nodes:
             return 0
-        node_qbits = self.nodes_object.qbits_of_node(i)
+        node_qbits = self.nodes_object.qbits_of_nodes([i])
         temporar_qbits = node_qbits[:]
         # cycle is starting with start_qbit (qbit with the most free neighbours, top and leftmost )
         start_qbit = min([((qbit.number_of_qbit_neighbours-8), -qbit.coord[1], -qbit.coord[0], qbit) for qbit in node_qbits])[-1]

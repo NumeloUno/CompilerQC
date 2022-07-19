@@ -153,8 +153,12 @@ class Qbits():
 
     def set_core_qbit_coords(self):
         """see core_qbits_()"""
-        self.core_qbit_coords = [qbit.coord for qbit in self.core_qbits]
+        pass #self.core_qbit_coords = [qbit.coord for qbit in self.core_qbits]
         
+    @property
+    def core_qbit_coords(self):
+        return [qbit.coord for qbit in self.core_qbits]
+    
     def set_shell_qbits(self):
         """see core_qbits_()"""
         self.shell_qbits = [qbit for qubit, qbit in self.qubits.items() if qbit.core == False]
@@ -218,11 +222,13 @@ class Qbits():
         for i in range(-1, 2) for j in range(-1, 2)]
     
     @staticmethod
-    def neighbour_coords_without_origin(coord):
+    def neighbour_coords_without_origin(coord, radius=0):
         """ return 8 neighbour coords and the coord itself as a list"""
         return [(coord[0] + i, coord[1] + j)
-        for i in range(-1, 2) for j in range(-1, 2) if (i, j) != (0, 0)]
-    
+         for i in range(-(1 + radius), 2 + radius)
+         for j in range(-(1 + radius), 2 + radius)
+         if (i, j) != (0, 0)]
+        
     def set_number_of_qbit_neighbours(self, qbit):
         """
         set the number of occupied neighbours a qbit has,

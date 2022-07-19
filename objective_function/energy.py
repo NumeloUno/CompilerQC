@@ -342,12 +342,14 @@ class Energy_core(Energy):
             if Energy_core.is_rectengular(polygon)
         ]
 
-    def qbits_in_max_core(self):
+    def qbits_in_max_core(self, K):
         """return the number of qbits
         in the maximum connected core
         if only_squares_in_core is True,
         triangulars are not considered 
-        by choosing the largest core"""
+        by choosing the largest core
+        if renaming is given in the graph, qbits are renamed according to graph.renaming: {old_node:new_node}
+        since graph.K in the core search may be different from the graph.K in the unmodified graph, we hand over the original K """
         G = nx.Graph()
         plaquettes = self.polygon_object.nodes_object.qbits.found_plaqs()
         if self.only_squares_in_core:
@@ -366,7 +368,7 @@ class Energy_core(Energy):
         
         # move core to center of later initialization 
         core_center_x, core_center_y = Polygons.center_of_coords(qubit_coord_dict.values())
-        center_envelop_of_all_coord = (np.sqrt(self.polygon_object.nodes_object.qbits.graph.K)) / 2
+        center_envelop_of_all_coord = np.sqrt(K) / 2
         delta_cx, delta_cy = int(center_envelop_of_all_coord-core_center_x), int(center_envelop_of_all_coord-core_center_y)
         
         for qubit, coord in qubit_coord_dict.items():
@@ -376,8 +378,15 @@ class Energy_core(Energy):
         corner = Polygons.corner_of_coords(core_coords)  
         
         # ancillas in core
-        ancillas_in_core = {qbit.qubit: qbit.coord for qbit in self.polygon_object.nodes_object.qbits 
+        ancillas_in_core = {qbit.qubit: qubit_coord_dict[qbit.qubit] for qbit in self.polygon_object.nodes_object.qbits 
                             if qbit.ancilla==True and qbit.qubit in qubit_coord_dict}
+        # rename qubits
+        renaming = self.polygon_object.nodes_object.qbits.graph.renaming
+        if renaming is not None:
+            qubit_coord_dict = {(renaming[qubit[0]], renaming[qubit[1]]): coord
+                    for qubit, coord in qubit_coord_dict.items()}
+            ancillas_in_core = {(renaming[qubit[0]], renaming[qubit[1]]): coord
+                    for qubit, coord in ancillas_in_core.items()}
 
         return qubit_coord_dict, corner, ancillas_in_core
 
