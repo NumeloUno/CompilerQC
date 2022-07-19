@@ -1,17 +1,19 @@
 import numpy as np
 import networkx as nx
+import warnings
 
 # TODO: graph.nodes is the same as logical_nodes in nodes.py, replace logical nodes!
 class Graph:
-    def __init__(self, adj_matrix):
+    def __init__(self, adj_matrix, renaming: dict=None):
         """
         adj_matrix: adjacency matrix is a square matrix used to represent a finite graph
         N, K: N(odes), K(anten) of logical graph
         C: C(onstraints) = number of plaquettes in phys. graph
+        renaming: dictionary which is used to rename nodes, used in Energy_core, to rename core
         """
         self.adj_matrix = adj_matrix
-        self.N = self.num_nodes()
-        self.K = self.num_edges()
+        self.renaming = renaming
+        self.adj_matrix_size = int(self.adj_matrix.shape[0])
         self.clear()
         three_cycles, four_cycles = self.get_cycles(3), self.get_cycles(4)
         self.number_of_3_cycles, self.number_of_4_cycles = (
@@ -21,6 +23,8 @@ class Graph:
         self.cycles = three_cycles + four_cycles
         self.qubits = self.qubits_from_graph()
         self.nodes = self.nodes_from_graph()
+        self.N = self.num_nodes()
+        self.K = self.num_edges()
         self.C = self.num_constrains()
 
     def to_nx_graph(self):
@@ -28,7 +32,7 @@ class Graph:
         return nx.from_numpy_array(self.adj_matrix)
 
     def clear(self):
-        self.visited = [False] * self.N
+        self.visited = [False] * self.adj_matrix_size
         self.count = 0
         self.paths = []
 
@@ -44,7 +48,7 @@ class Graph:
                 self.paths.append(path)
             self.visited[node] = False
             return
-        for new_node in range(self.N):
+        for new_node in range(self.adj_matrix_size):
             if not self.visited[new_node] and self.adj_matrix[node][new_node]:
                 next_path = path[:]
                 next_path.append(new_node)
@@ -69,7 +73,7 @@ class Graph:
                 self.paths.append(Graph.sort_up_to_permutation(path))
             self.visited[node] = False
             return
-        for new_node in range(self.N):
+        for new_node in range(self.adj_matrix_size):
             if not self.visited[new_node] and self.adj_matrix[node][new_node]:
                 next_path = path[:]
                 next_path.append(new_node)
@@ -110,7 +114,7 @@ class Graph:
         over N - (n+1) nodes if path lenght is n
         """
         self.clear()
-        for start_node in range(self.N - (length - 1)):
+        for start_node in range(self.adj_matrix_size - (length - 1)):
             self.DFS(length - 1, start_node, start_node, path=[start_node])
             self.visited[start_node] = True
 
@@ -169,7 +173,9 @@ class Graph:
 
     # TODO: replace by len(self.nodes)
     def num_nodes(self):
-        return int(self.adj_matrix.shape[0])
+        if self.adj_matrix_size != len(self.nodes):
+            warnings.warn("adjacency matrix contains null columns")
+        return len(self.nodes)
 
     def nodes_from_graph(self):
         """return nodes"""
@@ -198,3 +204,26 @@ class Graph:
         matrix = np.triu(np.random.randint(2, size=(n, n)), k=1)
         matrix += matrix.transpose()
         return cls(matrix)
+
+    @classmethod
+    def init_without_short_nodes(cls, adj_matrix, shorter_than=4):
+        """
+        remove nodes which are very short
+        (are involved only in less than default=4 qbits)
+        graph gets attribute renaming, with this dictionary, 
+        the qubits can be renamed e.g. in the qbits_max_core in Energy_core
+        """
+        nodes_to_keep = []
+        modified_adj_matrix = np.copy(adj_matrix)
+        for idx, i in enumerate(adj_matrix):
+            if sum(i)< shorter_than:
+                modified_adj_matrix[idx, :] = np.zeros(modified_adj_matrix.shape[1])
+                modified_adj_matrix[:, idx] = np.zeros(modified_adj_matrix.shape[1])
+            else:
+                nodes_to_keep.append(idx)
+        modified_adj_matrix = modified_adj_matrix[:,~np.all(modified_adj_matrix==0, axis=0)]
+        modified_adj_matrix = modified_adj_matrix[~np.all(modified_adj_matrix==0, axis=1)]
+
+        renaming = {new_name: old_name for new_name, old_name in enumerate(nodes_to_keep)}
+        return cls(modified_adj_matrix, renaming)
+

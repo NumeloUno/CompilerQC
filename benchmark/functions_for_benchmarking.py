@@ -46,17 +46,19 @@ def update_mc(mc, mc_schedule, core: bool=False) -> MC:
         return mc
 
 def init_energy_core(graph: Graph):
-    qbits = Qbits.init_qbits_from_dict(graph, dict())
-    nodes_object = Nodes(qbits)
-    polygons_4 = Polygons.create_polygons(graph.get_cycles(4))
-    polygon_object = Polygons(nodes_object.qbits, polygons=polygons_4)
-    polygon_object.nodes_object = nodes_object
-    energy_core = Energy_core(polygon_object)
-    return energy_core
+    graph_for_core = Graph.init_without_short_nodes(np.copy(graph.adj_matrix))
+    qbits_for_core = Qbits.init_qbits_from_dict(graph_for_core, dict())
+    nodes_object_for_core = Nodes(qbits_for_core)
+    polygon_object_for_core = Polygons(nodes_object_for_core,
+                                       polygons=Polygons.create_polygons(graph_for_core.get_cycles(4))
+                                      )
+    energy_for_core = Energy_core(polygon_object_for_core)
+    return energy_for_core
 
 def init_energy(graph: Graph):
     qbits = Qbits.init_qbits_from_dict(graph, dict())
-    polygon_object = Polygons(qbits)
+    nodes_object = Nodes(qbits, place_qbits_in_lines=False)
+    polygon_object = Polygons(nodes_object)
     energy = Energy(polygon_object)
     return energy
 
@@ -102,30 +104,32 @@ def evaluate_optimization(
     if mc_schedule['with_core']:
         mc_core = initialize_MC_object(graph, mc_schedule, core=True)
     else:
-        mc.operation_schedule.pop('swap', None)
+        mc.swap_probability = 0
     # benchmark    
     success_rate = np.zeros(batch_size)
     record_n_total_steps = np.zeros(batch_size)
     record_n_missing_C = np.zeros(batch_size)
     record_core_size = np.zeros(batch_size)
     record_n_core_qbits = np.zeros(batch_size)
+    number_of_ancillas = np.zeros(batch_size)
     for iteration in range(batch_size):
         # search for core
         if mc_schedule['with_core']:
             logger.info(f"search core in iteration {iteration}")
-            qubit_coord_dict, mc.energy.polygon_object.core_corner = search_max_core(mc_core)
+            qubit_coord_dict, mc.energy.polygon_object.core_corner, ancillas_in_core = search_max_core(mc_core, graph.K)
             logger.info(f"found core with {mc_core.number_of_plaquettes} / {graph.C} plaquettes")
             record_n_core_qbits[iteration] = len(qubit_coord_dict)
             record_core_size[iteration] = mc_core.number_of_plaquettes
             # if core is empty, dont allow swaps
             if len(qubit_coord_dict) == 0:
-                mc.operation_schedule.pop('swap', None)
+                mc.swap_probability = 0
             # reset mc core
             mc_core.reset(mc_core.T_0)
             # update core (reset is part of update)
-            mc.energy.polygon_object.nodes_object.qbits.update_qbits_from_dict(qubit_coord_dict)
-            mc.reset(mc.T_0, keep_core=True)      
-        
+            mc.update_qbits_from_dict(qubit_coord_dict, assign_to_core=True) 
+            mc.add_ancillas(ancillas_in_core)
+
+
         # check if there are still some qbits left to place
         remaining_qbits = (
             len(mc.energy.polygon_object.nodes_object.qbits.qubits)
@@ -133,14 +137,16 @@ def evaluate_optimization(
         )
         if remaining_qbits > 0:
             logger.info(f"place {remaining_qbits} remaining qubits")
-            # apply search
-            for repetition in range(mc.n_moves):
-                mc.optimization_schedule()
+            mc.apply(mc.n_moves)
+        # remove ancillas which dont reduce d.o.f
+        mc.remove_ancillas(mc.energy.polygon_object.nodes_object.propose_ancillas_to_remove())
         # save results in arrays
         n_missing_C = (graph.C - mc.number_of_plaquettes)
         record_n_total_steps[iteration] = mc.n_total_steps
         record_n_missing_C[iteration] = n_missing_C
         success_rate[iteration] = (n_missing_C == 0)
+        number_of_ancillas[iteration] = len([qbit for qbit in mc.energy.polygon_object.nodes_object.qbits if qbit.ancilla==True])
+
         #reset mc object
         mc.reset(current_temperature=mc.T_0, keep_core=False)
     # save resutls in dataframe 
@@ -161,6 +167,7 @@ def evaluate_optimization(
          'energy.scaling_for_plaq4': mc.energy.scaling_for_plaq4,
          'init_temperature': mc.T_0,
          'name': name,
+         'number_of_ancillas':number_of_ancillas,
         })
     dataframe = dataframe.append(mc_schedule, ignore_index=True)
     return dataframe
@@ -188,8 +195,7 @@ def run_benchmark(
         benchmark_df = evaluate_optimization(graph, name, mc_schedule, benchmark_df, args.batch_size, logger)
     return benchmark_df
 
-def search_max_core(mc_core): 
-    for repetition in range(mc_core.n_moves):
-        mc_core.optimization_schedule()
-    core_qubit_coord_dict, core_corner = mc_core.energy.qbits_in_max_core()
-    return core_qubit_coord_dict, core_corner
+def search_max_core(mc_core, K): 
+    mc_core.apply(mc_core.n_moves)
+    core_qbit_to_core_dict, core_corner, ancillas_in_core = mc_core.energy.qbits_in_max_core(K)
+    return core_qbit_to_core_dict, core_corner, ancillas_in_core
