@@ -124,9 +124,10 @@ def evaluate_optimization(
             if len(qubit_coord_dict) == 0:
                 mc.swap_probability = 0
             # reset mc core
-            mc_core.reset(mc_core.T_0)
+            mc_core.reset(mc_core.T_0, remove_ancillas=True)
             # update core (reset is part of update)
             mc.update_qbits_from_dict(qubit_coord_dict, assign_to_core=True) 
+            print(ancillas_in_core)
             mc.add_ancillas(ancillas_in_core)
 
 
@@ -140,6 +141,7 @@ def evaluate_optimization(
             mc.apply(mc.n_moves)
         # remove ancillas which dont reduce d.o.f
         mc.remove_ancillas(mc.energy.polygon_object.nodes_object.propose_ancillas_to_remove())
+        mc.energy.polygon_object.visualize()
         # save results in arrays
         n_missing_C = (graph.C - mc.number_of_plaquettes)
         record_n_total_steps[iteration] = mc.n_total_steps
@@ -148,7 +150,7 @@ def evaluate_optimization(
         number_of_ancillas[iteration] = len([qbit for qbit in mc.energy.polygon_object.nodes_object.qbits if qbit.ancilla==True])
 
         #reset mc object
-        mc.reset(current_temperature=mc.T_0, keep_core=False)
+        mc.reset(current_temperature=mc.T_0, remove_ancillas=True, keep_core=False)
     # save resutls in dataframe 
     print(record_n_missing_C)
     mc_schedule.update(
@@ -167,7 +169,7 @@ def evaluate_optimization(
          'energy.scaling_for_plaq4': mc.energy.scaling_for_plaq4,
          'init_temperature': mc.T_0,
          'name': name,
-         'number_of_ancillas':number_of_ancillas,
+         'number_of_ancillas':np.mean(number_of_ancillas),
         })
     dataframe = dataframe.append(mc_schedule, ignore_index=True)
     return dataframe

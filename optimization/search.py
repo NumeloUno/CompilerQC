@@ -7,7 +7,7 @@ from scipy import signal, misc
 from scipy.ndimage.measurements import label
 """
 number of repetition rate from Eq. (4.17)
-Simulated Annealing and Boltzmann Machines,
+Simulated Annealing and Boltzmann Machines
 size of neighbourhood approx bei K
 """
 
@@ -104,8 +104,13 @@ class MC:
     def init_from_yaml(self):
         pass
 
-    def reset(self, current_temperature, keep_core: bool):
+    def reset(self, current_temperature, remove_ancillas: bool, keep_core: bool):
         """ reset complete MC search"""
+        if remove_ancillas:
+            self.remove_ancillas({qbit.qubit:None
+                                  for qbit in self.energy.polygon_object.nodes_object.qbits
+                                  if qbit.ancilla==True
+                                 })
         if not keep_core:
             Qbits.remove_core(self.energy.polygon_object.nodes_object.qbits)
         else:
@@ -177,7 +182,8 @@ class MC:
             # thus (envelop_)shell_search has to be true, in this case target coord will be overwritten
             qbit, possible_coords = self.coord_from_same_node(qbit)
             target_coord = random.choice(possible_coords)
-        assert qbit is not None and target_coord is not None, "oh! there is no qbit or targetcoord"
+        assert qbit is not None, "oh! there is no qbit selected"
+        assert target_coord is not None, "oh! there is no targetcoord selected"
         # return  
         if target_coord in self.energy.polygon_object.nodes_object.qbits.coords:
             target_qbit = self.energy.polygon_object.nodes_object.qbits.qbit_from_coord(target_coord)
@@ -849,10 +855,15 @@ class MC_core(MC):
             self.record_acc_probability = []
             self.record_delta_energy = []
  
-    def reset(self, current_temperature):
+    def reset(self, current_temperature, remove_ancillas: bool):
         """ reset complete MC search,
         first part sets qbit coords new, but keeps other qbits 
         attributes"""
+        if remove_ancillas:
+            self.remove_ancillas({qbit.qubit:None
+                                  for qbit in self.energy.polygon_object.nodes_object.qbits
+                                  if qbit.ancilla==True
+                                 })
         self.energy.polygon_object.nodes_object = (
             Nodes(self.energy.polygon_object.nodes_object.qbits)
         )

@@ -358,7 +358,7 @@ class Energy_core(Energy):
             nx.add_path(G, l)
         list_of_cores = list(nx.connected_components(G))
         if list_of_cores == []:
-            return dict(), ((0, 0), (0, 0))
+            return dict(), ((0, 0), (0, 0)), []
         max_core_qbits = max(list_of_cores, key=lambda x:len(x))
 
         qubit_coord_dict = {
