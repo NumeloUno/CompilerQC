@@ -1,0 +1,86 @@
+# control SA parameter
+# choose qbits
+random_qbit: False
+isolation_weight: False
+sparse_plaquette_density_weight: False
+length_of_node_weight: False
+qbit_with_same_node: False
+qbit_with_same_node_around_core: False
+shell_search_around_core: False
+# choose coords
+neighbour_coords: False
+finite_grid_size: False
+padding_finite_grid: 0
+infinite_grid_size: False
+min_plaquette_density_in_softcore: 0.75
+possible_coords_changed: False
+envelop_shell_search: False
+shell_search: False
+qbit_with_same_node: False
+same_node_coords: False
+greedy: False
+# choose temperature
+chi_0: 0.8
+delta: 0.05
+alpha: 0.95
+repetition_rate_factor: 1
+temperature_adaptive: False
+temperature_kirkpatrick: False
+temperature_kirkpatrick_sigma: False
+linear_in_moves: False
+temperature_C: False
+temperature_linearC: False
+# if current_temperature is 0, then initial temperature is estimated
+current_temperature: 0
+init_T_by_std: False
+T_1: False
+T_0_estimation: False
+# search schedule
+swap_probability: 0
+swap_only_core_qbits_in_line_swaps: False
+shell_time: 10
+with_core: True
+n_moves: 1000
+# polygon weights
+energy.decay_weight: False
+energy.decay_rate: 1
+energy.subset_weight: False
+energy.square_scope: False
+energy.sparse_density_penalty: False
+energy.sparse_density_factor: 1
+energy.line: False
+energy.line_exponent: 1
+energy.bad_line_penalty: 100
+# energy scaling
+# energy.scaling_for_plaq3 = 0
+# energy.scaling_for_plaq4 = 0
+energy.model_name: 'MLP'
+############################
+########## core ############
+############################
+# core_energy.scaling_for_plaq3 = 0
+# core_energy.scaling_for_plaq4 = 0
+core_energy.model_name: 'MLP'
+core_energy.only_largest_core: False
+core_energy.spring_energy: False
+core_energy.only_rectangulars: False
+core_energy.only_number_of_plaquettes: False
+core_energy.size_of_max_core: False
+core_energy.only_squares_in_core: False
+# choose temperature
+core_chi_0: 0.8
+core_delta: 0.05
+core_alpha: 0.95
+core_repetition_rate_factor: 1
+core_temperature_adaptive: False
+core_temperature_kirkpatrick: False
+core_temperature_kirkpatrick_sigma: False
+core_linear_in_moves: False
+core_temperature_C: False
+core_temperature_linearC: False
+# cluster swap
+core_cluster_shuffling_probability: 0.0
+#ancillas
+core_ancilla_insertion_probability: 0.0
+core_ancilla_deletion_probability: 0.0
+core_only_four_cycles_for_ancillas: False
