@@ -7,7 +7,7 @@ from .nodes import Node, Nodes
 from . import core
 from .objective_function import Energy, Energy_core
 from . import optimization
-from .optimization import MC, MC_core
+from .optimization import MC, MC_core, search
 
 from .reversed_engineering import functions_for_database
 

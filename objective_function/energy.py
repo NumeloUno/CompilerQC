@@ -9,7 +9,7 @@ class Energy(Polygons):
         polygon_object,
         scaling_for_plaq3: float = 0,
         scaling_for_plaq4: float = 0,
-        scaling_model: str=None,
+        model_name: str=None,
     ):
         """
         if a plaquette has been found, assign the scaling_for_plaq to it.
@@ -19,8 +19,8 @@ class Energy(Polygons):
         self.polygon_object = polygon_object
 
         # scaling for plaquettes
-        if scaling_model is not None:
-            self.set_scaling_from_model(scaling_model)
+        if model_name is not None:
+            self.set_scaling_from_model(model_name)
         self.scaling_for_plaq3 = scaling_for_plaq3
         self.scaling_for_plaq4 = scaling_for_plaq4
         # polygon weights
@@ -358,7 +358,7 @@ class Energy_core(Energy):
             nx.add_path(G, l)
         list_of_cores = list(nx.connected_components(G))
         if list_of_cores == []:
-            return dict(), ((0, 0), (0, 0)), []
+            return dict(), ((0, 0), (0, 0)), {}
         max_core_qbits = max(list_of_cores, key=lambda x:len(x))
 
         qubit_coord_dict = {

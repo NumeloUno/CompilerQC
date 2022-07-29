@@ -85,9 +85,11 @@ def initialize_MC_object(graph: Graph, mc_schedule: dict, core: bool=False):
     mc.T_0 = initial_temperature
     mc.current_temperature = initial_temperature
     if core:
-        mc.reset(current_temperature=initial_temperature)
+        # remove_ancillas False since there shouldnt be any ancillas, so we dont have to remove them
+        mc.reset(current_temperature=initial_temperature, remove_ancillas=False)
     else:
-        mc.reset(current_temperature=initial_temperature, keep_core=False)
+        # remove_ancillas False since there shouldnt be any ancillas, so we dont have to remove them
+        mc.reset(current_temperature=initial_temperature, remove_ancillas=False, keep_core=False)
         
     return mc
 
@@ -123,6 +125,8 @@ def evaluate_optimization(
             # if core is empty, dont allow swaps
             if len(qubit_coord_dict) == 0:
                 mc.swap_probability = 0
+                mc.finite_grid_size = True
+                mc.random_qbit = True
             # reset mc core
             mc_core.reset(mc_core.T_0, remove_ancillas=True)
             # update core (reset is part of update)
@@ -141,7 +145,6 @@ def evaluate_optimization(
             mc.apply(mc.n_moves)
         # remove ancillas which dont reduce d.o.f
         mc.remove_ancillas(mc.energy.polygon_object.nodes_object.propose_ancillas_to_remove())
-        mc.energy.polygon_object.visualize()
         # save results in arrays
         n_missing_C = (graph.C - mc.number_of_plaquettes)
         record_n_total_steps[iteration] = mc.n_total_steps
@@ -196,6 +199,43 @@ def run_benchmark(
         logger.info(f"start benchmarking {args.id_of_benchmark, name} with problem size {graph.N}")
         benchmark_df = evaluate_optimization(graph, name, mc_schedule, benchmark_df, args.batch_size, logger)
     return benchmark_df
+
+def visualize_search(
+    graph: Graph, name: str, mc_schedule: dict,
+):
+    """
+    create gif of search according to settings in mc_schedule
+    """
+    mc = initialize_MC_object(graph, mc_schedule)
+    if mc_schedule['with_core']:
+        mc_core = initialize_MC_object(graph, mc_schedule, core=True)
+    else:
+        mc.swap_probability = 0
+    if mc_schedule['with_core']:
+        qubit_coord_dict, mc.energy.polygon_object.core_corner, ancillas_in_core = search_max_core(mc_core, graph.K)
+        if len(qubit_coord_dict) == 0:
+            mc.swap_probability = 0
+            mc.finite_grid_size = True
+            mc.random_qbit = True
+        mc_core.reset(mc_core.T_0, remove_ancillas=True)
+        mc.update_qbits_from_dict(qubit_coord_dict, assign_to_core=True) 
+        mc.add_ancillas(ancillas_in_core)
+    remaining_qbits = (
+        len(mc.energy.polygon_object.nodes_object.qbits.qubits)
+        - len(mc.energy.polygon_object.nodes_object.qbits.core_qbits)
+    )
+    search.visualize_search_process(mc, name, 1000)
+    mc.reset(current_temperature=mc.T_0, remove_ancillas=True, keep_core=False)
+
+def visualize_settings(
+    graph: Graph,
+    args,
+):
+    path_to_config = paths.parameters_path / args.id_of_benchmark / args.yaml_path
+    with open(path_to_config) as f:
+        config = yaml.load(f, Loader=yaml.FullLoader)
+    for name, mc_schedule in config.items():
+        visualize_search(graph, f'{args.yaml_path}_{name}', mc_schedule)
 
 def search_max_core(mc_core, K): 
     mc_core.apply(mc_core.n_moves)
