@@ -37,7 +37,10 @@ def create_problem(num_constraints: int, square_plaquette_probability: int):
 
     return output
 
-def translate_and_save_problem(output, save_in_folder: str='training_set', save: bool=True):
+
+def translate_and_save_problem(
+    output, save_in_folder: str = "training_set", save: bool = True
+):
     """
     brings output from create_problem() in form
     for Graph class (adj_matrix) and Polygon class
@@ -63,7 +66,7 @@ def translate_and_save_problem(output, save_in_folder: str='training_set', save:
     C = len(output.compiled_problem.constraints)
     K = len(qbits)
     N = np.abs(C - K - 1)
-    
+
     if save:
 
         eventid = datetime.now().strftime("%Y%m-%d%H-%M%S-") + str(uuid4())
@@ -72,7 +75,10 @@ def translate_and_save_problem(output, save_in_folder: str='training_set', save:
             paths.database_path / save_in_folder / f"problem_N_{N}_K_{K}_C_{C}",
             exist_ok=True,
         )
-        dictionary = {"qbit_coord_dict": qbit_coord_dict, "graph_adj_matrix": adj_matrix}
+        dictionary = {
+            "qbit_coord_dict": qbit_coord_dict,
+            "graph_adj_matrix": adj_matrix,
+        }
         np.save(
             paths.database_path
             / save_in_folder
@@ -80,7 +86,7 @@ def translate_and_save_problem(output, save_in_folder: str='training_set', save:
             / f"{eventid}.npy",
             dictionary,
         )
-    
+
     return adj_matrix, qbit_coord_dict
 
 

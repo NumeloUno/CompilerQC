@@ -3,28 +3,29 @@ import networkx as nx
 from CompilerQC import Polygons, paths
 import pickle
 
+
 class Energy(Polygons):
     def __init__(
         self,
         polygon_object,
         scaling_for_plaq3: float = 0,
         scaling_for_plaq4: float = 0,
-        model_name: str=None,
+        scaling_model: str = None,
     ):
         """
         if a plaquette has been found, assign the scaling_for_plaq to it.
-        If a model ['LHZ', 'MLP' or 'maxC'] is assigned, scale them according to 
+        If a model ['LHZ', 'MLP' or 'maxC'] is assigned, scale them according to
         this model
         """
         self.polygon_object = polygon_object
 
         # scaling for plaquettes
-        if model_name is not None:
-            self.set_scaling_from_model(model_name)
         self.scaling_for_plaq3 = scaling_for_plaq3
         self.scaling_for_plaq4 = scaling_for_plaq4
+        if scaling_model is not None:
+            self.set_scaling_from_model(scaling_model)
         # polygon weights
-        
+
         self.decay_weight = False
         self.decay_rate = 1
         self.subset_weight = False
@@ -33,28 +34,53 @@ class Energy(Polygons):
         self.sparse_density_factor = 0
         self.line = False
         self.line_exponent = 1
-        self.bad_line_penalty = 100  
-                
-    def set_scaling_from_model(self, scaling_model:str):
+        self.bad_line_penalty = 100
+
+    def set_scaling_from_model(self, scaling_model: str):
         """load and set plaquette scaling from given model"""
-        assert scaling_model in ['MLP', 'maxC', 'LHZ'], "selected model does not exist, choose from ['MLP', 'maxC', 'LHZ']"
-        
-        if scaling_model == 'MLP':
-            loaded_model = pickle.load(open(paths.energy_scalings / 'MLPregr_model.sav', 'rb'))
-            predicted_energy = loaded_model.predict([[self.polygon_object.nodes_object.qbits.graph.N, self.polygon_object.nodes_object.qbits.graph.K, self.polygon_object.nodes_object.qbits.graph.C, self.polygon_object.nodes_object.qbits.graph.number_of_3_cycles, self.polygon_object.nodes_object.qbits.graph.number_of_4_cycles]])[0]
+        assert scaling_model in [
+            "MLP",
+            "maxC",
+            "LHZ",
+        ], "selected model does not exist, choose from 'MLP', 'maxC' or 'LHZ'"
 
-        if scaling_model == 'maxC':
-            poly_coeffs = np.load(paths.energy_scalings / 'energy_max_C_fit.npy')
+        if scaling_model == "MLP":
+            loaded_model = pickle.load(
+                open(paths.energy_scalings / "MLPregr_model.sav", "rb")
+            )
+            predicted_energy = loaded_model.predict(
+                [
+                    [
+                        self.polygon_object.nodes_object.qbits.graph.N,
+                        self.polygon_object.nodes_object.qbits.graph.K,
+                        self.polygon_object.nodes_object.qbits.graph.C,
+                        self.polygon_object.nodes_object.qbits.graph.number_of_3_cycles,
+                        self.polygon_object.nodes_object.qbits.graph.number_of_4_cycles,
+                    ]
+                ]
+            )[0]
+
+        if scaling_model == "maxC":
+            poly_coeffs = np.load(paths.energy_scalings / "energy_max_C_fit.npy")
             poly_function = np.poly1d(poly_coeffs)
-            predicted_energy = poly_function(self.polygon_object.nodes_object.qbits.graph.C)
+            predicted_energy = poly_function(
+                self.polygon_object.nodes_object.qbits.graph.C
+            )
 
-        if scaling_model == 'LHZ':
-            poly_coeffs = np.load(paths.energy_scalings / 'LHZ_energy_C_fit.npy')
+        if scaling_model == "LHZ":
+            poly_coeffs = np.load(paths.energy_scalings / "LHZ_energy_C_fit.npy")
             poly_function = np.poly1d(poly_coeffs)
-            predicted_energy = poly_function(self.polygon_object.nodes_object.qbits.graph.C)
+            predicted_energy = poly_function(
+                self.polygon_object.nodes_object.qbits.graph.C
+            )
 
-        scaling_for_plaq3 = scaling_for_plaq4 = predicted_energy / self.polygon_object.nodes_object.qbits.graph.C  
-        self.scaling_for_plaq3, self.scaling_for_plaq4 = scaling_for_plaq3, scaling_for_plaq4
+        scaling_for_plaq3 = scaling_for_plaq4 = (
+            predicted_energy / self.polygon_object.nodes_object.qbits.graph.C
+        )
+        self.scaling_for_plaq3, self.scaling_for_plaq4 = (
+            scaling_for_plaq3,
+            scaling_for_plaq4,
+        )
 
     def scopes_of_polygons(self):
         """return array of the scopes of all changed polygons,"""
@@ -69,7 +95,8 @@ class Energy(Polygons):
         """
         # consider all polygons
         self.polygons_coords_of_interest = self.polygon_object.polygons_coords(
-            self.polygon_object.nodes_object.qbits.qubit_to_coord_dict, self.polygon_object.polygons
+            self.polygon_object.nodes_object.qbits.qubit_to_coord_dict,
+            self.polygon_object.polygons,
         )
 
         scopes = np.array(
@@ -163,6 +190,18 @@ class Energy(Polygons):
 
         return 1 - weights.astype(int)
 
+    def penalty_for_low_number_of_plaquettes(self):
+        """
+        there is a penalty
+        if qbit is not involved in many plaquettes
+        """
+        # update plaquettes of each qbit
+        self.polygon_object.set_plaquettes_of_qbits()
+        # 3.5 and not 4 since then a small weight for all qbits is left (also for those which are already in 4 plaquettes)
+        return [
+            3.5 - len(qbit.plaquettes)
+            for qbit in self.polygon_object.nodes_object.qbits.shell_qbits
+        ]
 
     def penalty_for_sparse_plaquette_density(self):
         """
@@ -180,7 +219,10 @@ class Energy(Polygons):
 
         # the number of neighbour qbits (8-count(nan)) minus the avg. number of qbits which are in plaquettes
         return [
-            qbit.number_of_qbit_neighbours - qbits_per_plaq[len(qbit.plaquettes)]
+            np.abs(
+                qbit.number_of_qbit_neighbours - qbits_per_plaq[len(qbit.plaquettes)]
+            )
+            / 8
             for qbit in self.polygon_object.nodes_object.qbits.shell_qbits
         ]
 
@@ -210,36 +252,53 @@ class Energy(Polygons):
                 self.scaled_distance_to_plaquette(np.array(qbit_scopes))
                 * np.exp(-self.decay_rate * np.arange(len(qbit_scopes)))
                 for qbit_scopes in qbits_scopes
-            ]
+            ],
+            dtype=object,
         )
-
         distances_to_plaquette = np.hstack(scopes.flatten()).sum()
-
         return distances_to_plaquette
 
     # TODO: maybe make a multiplicator penalty instead of addition
     def line_energy(self, qbits_of_interest):
-        """return the lengths to the lines corresponding to the nodes involved in 
+        """return the lengths to the lines corresponding to the nodes involved in
         qbits of interest. If a line ends without connection to the outerspace (so if it has only
         occupied neighbours), add a bad_line_penalty"""
         # update since it is needed to determine start node in polygon_object.line_to_node()
         self.polygon_object.set_numbers_of_qbits_neighbours()
         # update since it is needed to check if begin or end of line is bad
         self.polygon_object.set_plaquettes_of_qbits()
-        nodes_of_interest = set([node for qbit in qbits_of_interest if not isinstance(qbit, tuple) for node in qbit.qubit])
+        nodes_of_interest = set(
+            [
+                node
+                for qbit in qbits_of_interest
+                if not isinstance(qbit, tuple)
+                for node in qbit.qubit
+            ]
+        )
         line_energy_value = 0
         for node in nodes_of_interest:
             qbits_path, distances = self.polygon_object.line_to_node(node)
             distances = np.power(np.array(distances), self.line_exponent)
             line_energy_value += (distances).sum()
-            #check if line is ending or starting bad, if so add penalty
+            # check if line is ending or starting bad, if so add penalty
             start_qbit, end_qbit = qbits_path[0], qbits_path[-1]
-            number_of_free_neighbours_of_start = self.polygon_object.nodes_object.qbits.neighbours(start_qbit.coord).count(np.nan)
-            number_of_free_neighbours_of_end = self.polygon_object.nodes_object.qbits.neighbours(end_qbit.coord).count(np.nan)
-            if number_of_free_neighbours_of_start == 0 and len(start_qbit.plaquettes) < 2:
+            number_of_free_neighbours_of_start = (
+                self.polygon_object.nodes_object.qbits.neighbours(
+                    start_qbit.coord
+                ).count(np.nan)
+            )
+            number_of_free_neighbours_of_end = (
+                self.polygon_object.nodes_object.qbits.neighbours(end_qbit.coord).count(
+                    np.nan
+                )
+            )
+            if (
+                number_of_free_neighbours_of_start == 0
+                and len(start_qbit.plaquettes) < 2
+            ):
                 line_energy_value += self.bad_line_penalty
             if number_of_free_neighbours_of_end == 0 and len(end_qbit.plaquettes) < 2:
-                line_energy_value += self.bad_line_penalty                
+                line_energy_value += self.bad_line_penalty
         return line_energy_value
 
     def __call__(self, qbits_of_interest):
@@ -247,7 +306,6 @@ class Energy(Polygons):
         return the energy and number of plaquettes of the polygons belonging to
         qbits of interest
         """
-        
         polygons_of_interest = self.changed_polygons(qbits_of_interest)
         self.polygons_coords_of_interest = self.coords_of_changed_polygons(
             polygons_of_interest
@@ -262,36 +320,37 @@ class Energy(Polygons):
             ]
         )
 
-        distances_to_plaquette = self.scaled_distance_to_plaquette(scopes)   
-        
+        distances_to_plaquette = self.scaled_distance_to_plaquette(scopes)
+
         energy_to_return = 0
-        
+
         if self.decay_weight:
             distances_to_plaquette = self.decay_scopes_per_qbit(qbits_of_interest)
             # decay is not working with terms which use the distances_to_plaquette array
             self.square_scope = self.subset_weight = False
-        
+
         if self.square_scope:
-            distances_to_plaquette = (distances_to_plaquette ** 2)
-            
-        #remove polygons with edges which are already in the diagonal of a 4 plaquette
+            distances_to_plaquette = distances_to_plaquette ** 2
+
+        # remove polygons with edges which are already in the diagonal of a 4 plaquette
         if self.subset_weight:
             weights = self.subset_weights(polygons_of_interest)
             distances_to_plaquette = np.dot(distances_to_plaquette, weights)
-           
+
         if self.line:
             line_energy_value = self.line_energy(qbits_of_interest)
             energy_to_return += line_energy_value
-        
+
         # if a qbit is surrounded by qbits but has no/few plaquettes, penalize it
         if self.sparse_density_penalty:
             energy_to_return += self.sparse_density_factor * sum(
                 self.penalty_for_sparse_plaquette_density()
             )
-            
-        energy_to_return += round(distances_to_plaquette.sum(), 5) 
-        
+
+        energy_to_return += round(distances_to_plaquette.sum(), 5)
+
         return energy_to_return, number_of_plaquettes
+
 
 class Energy_core(Energy):
     def __init__(
@@ -299,22 +358,21 @@ class Energy_core(Energy):
         polygon_object,
         scaling_for_plaq3: float = 0,
         scaling_for_plaq4: float = 0,
-        model_name: str=None,
+        scaling_model: str = None,
     ):
         self.polygon_object = polygon_object
 
         # scaling for plaquettes
-        if model_name is not None:
-            self.set_scaling_from_model(model_name)
         self.scaling_for_plaq3 = scaling_for_plaq3
         self.scaling_for_plaq4 = scaling_for_plaq4
+        if scaling_model is not None:
+            self.set_scaling_from_model(scaling_model)
 
         # energy terms
         self.only_largest_core = False
         self.spring_energy = False
         self.only_rectangulars = False
         self.only_number_of_plaquettes = False
-        self.size_of_max_core = False
 
         # search for largest conncected core
         self.only_squares_in_core = False
@@ -329,7 +387,7 @@ class Energy_core(Energy):
     def rectengular_energy(self, qbits_of_interest):
         """
         consider only scopes of rectengular shape
-        note: to find a minimal energy configuration, 
+        note: to find a minimal energy configuration,
         it will simply find a config with as least rectengulars as possible
         """
         polygons_of_interest = self.changed_polygons(qbits_of_interest)
@@ -346,47 +404,60 @@ class Energy_core(Energy):
         """return the number of qbits
         in the maximum connected core
         if only_squares_in_core is True,
-        triangulars are not considered 
+        triangulars are not considered
         by choosing the largest core
         if renaming is given in the graph, qbits are renamed according to graph.renaming: {old_node:new_node}
-        since graph.K in the core search may be different from the graph.K in the unmodified graph, we hand over the original K """
+        since graph.K in the core search may be different from the graph.K in the unmodified graph, we hand over the original K"""
         G = nx.Graph()
         plaquettes = self.polygon_object.nodes_object.qbits.found_plaqs()
         if self.only_squares_in_core:
-            plaquettes = [plaq for plaq in plaquettes if len(plaq)==4]
+            plaquettes = [plaq for plaq in plaquettes if len(plaq) == 4]
         for l in plaquettes:
             nx.add_path(G, l)
         list_of_cores = list(nx.connected_components(G))
         if list_of_cores == []:
             return dict(), ((0, 0), (0, 0)), {}
-        max_core_qbits = max(list_of_cores, key=lambda x:len(x))
+        max_core_qbits = max(list_of_cores, key=lambda x: len(x))
 
         qubit_coord_dict = {
-            tuple(sorted(self.polygon_object.nodes_object.qbits[qbit].qubit))
-            :self.polygon_object.nodes_object.qbits[qbit].coord
-            for qbit in max_core_qbits}
-        
-        # move core to center of later initialization 
-        core_center_x, core_center_y = Polygons.center_of_coords(qubit_coord_dict.values())
+            tuple(
+                sorted(self.polygon_object.nodes_object.qbits[qbit].qubit)
+            ): self.polygon_object.nodes_object.qbits[qbit].coord
+            for qbit in max_core_qbits
+        }
+
+        # move core to center of later initialization
+        core_center_x, core_center_y = Polygons.center_of_coords(
+            qubit_coord_dict.values()
+        )
         center_envelop_of_all_coord = np.sqrt(K) / 2
-        delta_cx, delta_cy = int(center_envelop_of_all_coord-core_center_x), int(center_envelop_of_all_coord-core_center_y)
-        
+        delta_cx, delta_cy = int(center_envelop_of_all_coord - core_center_x), int(
+            center_envelop_of_all_coord - core_center_y
+        )
+
         for qubit, coord in qubit_coord_dict.items():
             qubit_coord_dict[qubit] = tuple(np.add(coord, (delta_cx, delta_cy)))
         # coords of envelop of core
         core_coords = list(qubit_coord_dict.values())
-        corner = Polygons.corner_of_coords(core_coords)  
-        
+        corner = Polygons.corner_of_coords(core_coords)
+
         # ancillas in core
-        ancillas_in_core = {qbit.qubit: qubit_coord_dict[qbit.qubit] for qbit in self.polygon_object.nodes_object.qbits 
-                            if qbit.ancilla==True and qbit.qubit in qubit_coord_dict}
+        ancillas_in_core = {
+            qbit.qubit: qubit_coord_dict[qbit.qubit]
+            for qbit in self.polygon_object.nodes_object.qbits
+            if qbit.ancilla == True and qbit.qubit in qubit_coord_dict
+        }
         # rename qubits
         renaming = self.polygon_object.nodes_object.qbits.graph.renaming
         if renaming is not None:
-            qubit_coord_dict = {(renaming[qubit[0]], renaming[qubit[1]]): coord
-                    for qubit, coord in qubit_coord_dict.items()}
-            ancillas_in_core = {(renaming[qubit[0]], renaming[qubit[1]]): coord
-                    for qubit, coord in ancillas_in_core.items()}
+            qubit_coord_dict = {
+                (renaming[qubit[0]], renaming[qubit[1]]): coord
+                for qubit, coord in qubit_coord_dict.items()
+            }
+            ancillas_in_core = {
+                (renaming[qubit[0]], renaming[qubit[1]]): coord
+                for qubit, coord in ancillas_in_core.items()
+            }
 
         return qubit_coord_dict, corner, ancillas_in_core
 

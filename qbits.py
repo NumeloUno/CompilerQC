@@ -3,48 +3,46 @@ import random
 import numpy as np
 from itertools import combinations
 
-class Qbits():
+
+class Qbits:
     """
     Qbits can be randomly initialized (random coords for qubits)
     or it can be initialized from dictionary {qubit: coord}.
     """
-    def __init__(self,
-                 graph: Graph,
-                 qbits:'list of Qbit objects'
-                ):
+
+    def __init__(self, graph: Graph, qbits: "list of Qbit objects"):
         self.graph = graph
-        self.qubits = {qbit.qubit:qbit for qbit in qbits} 
+        self.qubits = {qbit.qubit: qbit for qbit in qbits}
         self.update_core_shell()
 
-        
     @classmethod
     def init_qbits_from_dict(
         cls,
         graph,
-        qubit_coord_dict: dict=None,
-        assign_to_core: bool=True,
+        qubit_coord_dict: dict = None,
+        assign_to_core: bool = True,
     ):
         """
-        initialization of qbits according to qubit to coord dict, 
+        initialization of qbits according to qubit to coord dict,
         return Qbits object
         """
         qbits = Qbits.qbits_from_dict(graph, qubit_coord_dict, assign_to_core)
         return cls(graph, qbits)
-    
+
     @staticmethod
     def qbits_from_dict(
         graph,
-        qubit_coord_dict: dict=None,
-        assign_to_core: bool=True,
+        qubit_coord_dict: dict = None,
+        assign_to_core: bool = True,
     ):
         """
-        if dict is not complete, remaining qbits are initialized 
+        if dict is not complete, remaining qbits are initialized
         with random coordinates
         return: list ob qbit objects
         """
         # change what the dicts point to - otherwise some annoying behaviour
         qubit_coord_dict = qubit_coord_dict.copy()
-        
+
         core_coords = list(qubit_coord_dict.values())
         core_qubits = list(qubit_coord_dict.keys())
 
@@ -54,22 +52,24 @@ class Qbits():
             assert len(coords) > graph.K, "init qbits: more qbits than coords"
             remaining_coords = [coord for coord in coords if coord not in core_coords]
             np.random.shuffle(remaining_coords)
-            remaining_qubits = [qubit for qubit in graph.qubits if qubit not in core_qubits]
+            remaining_qubits = [
+                qubit for qubit in graph.qubits if qubit not in core_qubits
+            ]
             remaining_qubit_coord_dict = dict(zip(remaining_qubits, remaining_coords))
             qubit_coord_dict.update(remaining_qubit_coord_dict)
-            
-        qbits = [Qbit(qubit, coord) for qubit, coord in qubit_coord_dict.items()] 
-        
+
+        qbits = [Qbit(qubit, coord) for qubit, coord in qubit_coord_dict.items()]
+
         if assign_to_core:
             for qbit in qbits:
                 if qbit.qubit in core_qubits:
                     qbit.core = True
         return qbits
-        
+
     def update_qbits_from_dict(
         self,
-        qubit_coord_dict: dict=None,
-        assign_to_core: bool=True,
+        qubit_coord_dict: dict = None,
+        assign_to_core: bool = True,
     ):
         """
         if Qbits object is already initialized,
@@ -80,20 +80,20 @@ class Qbits():
         for qbit in qbits:
             # for adding ancilla
             if qbit.qubit not in self.qubits.keys():
-                self.qubits.update({qbit.qubit:qbit})
+                self.qubits.update({qbit.qubit: qbit})
             self.qubits[qbit.qubit].coord = qbit.coord
             self.qubits[qbit.qubit].core = qbit.core
         self.update_core_shell()
 
     def __getitem__(self, qbit):
         return self.qubits[qbit]
-    
+
     def __iter__(self):
         return iter(self.qubits.values())
-    
+
     @staticmethod
-    def remove_core(qbits: 'Qbits object'):
-        """ remove core assignment and 
+    def remove_core(qbits: "Qbits object"):
+        """remove core assignment and
         reinitialize coords"""
         # remove core
         for qbit in qbits:
@@ -102,77 +102,83 @@ class Qbits():
         Qbits.reinit_coords(qbits, with_core=False)
 
     @staticmethod
-    def reinit_coords(qbits: 'Qbits object', with_core: bool):
+    def reinit_coords(qbits: "Qbits object", with_core: bool):
         """reinitialize coords"""
         init_grid_size = int(np.sqrt(qbits.graph.K)) + 1
         coords = list(np.ndindex(init_grid_size, init_grid_size))
-        np.random.shuffle(coords) 
+        np.random.shuffle(coords)
         if with_core:
             coords = [coord for coord in coords if coord not in qbits.core_qbit_coords]
-            qbits = [qbit for qbit in qbits if qbit.core==False]
+            qbits = [qbit for qbit in qbits if qbit.core == False]
         for qbit, coord in zip(qbits, coords):
-            qbit.coord = coord     
-    
-    @property  
+            qbit.coord = coord
+
+    @property
     def coords(self):
         return [qbit.coord for qbit in self.qubits.values()]
-    
+
     @property
     def coord_to_qbit_dict(self):
-        """ coord to qbit object dict,
+        """coord to qbit object dict,
         whereas qubit_to_coord_dict is a qubit tuple to coord dict"""
-        return {qbit.coord:qbit for qubit, qbit in self.qubits.items()}
-        
+        return {qbit.coord: qbit for qubit, qbit in self.qubits.items()}
+
     def qbit_from_coord(self, coord):
-        """ if on coord sits a qbit, return qbit, else return NaN"""
+        """if on coord sits a qbit, return qbit, else return NaN"""
         return self.coord_to_qbit_dict.get(coord, np.nan)
-    
+
     def update(self, qubit, coord):
         self.qubits[qubit].coord = coord
-        
+
     def mark_ancillas(self, ancilla_names):
         """
         mark all ancillas in ancilla_names as such
         """
         for qubit in ancilla_names:
             self.qubits[qubit].ancilla = True
-        
-    @property     
+
+    @property
     def qubit_to_coord_dict(self):
-        qubit_to_coord_dict = {qubit:qbit.coord for qubit, qbit in self.qubits.items()}
-        assert len(set(list(qubit_to_coord_dict.keys()))) == len(set(list(qubit_to_coord_dict.values()))), 'non unique coords or qbits!'
+        qubit_to_coord_dict = {qubit: qbit.coord for qubit, qbit in self.qubits.items()}
+        assert len(set(list(qubit_to_coord_dict.keys()))) == len(
+            set(list(qubit_to_coord_dict.values()))
+        ), "non unique coords or qbits!"
         return qubit_to_coord_dict
-    
+
     def set_core_qbits(self):
         """
         the attribute core_qbits should not change over time
         thus it is not a property object anymore, it will change only
         when core_qbits_() is called
         """
-        self.core_qbits = [qbit for qubit, qbit in self.qubits.items() if qbit.core == True]
+        self.core_qbits = [
+            qbit for qubit, qbit in self.qubits.items() if qbit.core == True
+        ]
 
     def set_core_qbit_coords(self):
         """see core_qbits_()"""
-        pass #self.core_qbit_coords = [qbit.coord for qbit in self.core_qbits]
-        
+        pass  # self.core_qbit_coords = [qbit.coord for qbit in self.core_qbits]
+
     @property
     def core_qbit_coords(self):
         return [qbit.coord for qbit in self.core_qbits]
-    
+
     def set_shell_qbits(self):
         """see core_qbits_()"""
-        self.shell_qbits = [qbit for qubit, qbit in self.qubits.items() if qbit.core == False]
-    
+        self.shell_qbits = [
+            qbit for qubit, qbit in self.qubits.items() if qbit.core == False
+        ]
+
     def set_shell_qbit_coords(self):
         """see core_qbits_()"""
         self.shell_qbit_coords = [qbit.coord for qbit in self.shell_qbits]
-    
+
     def assign_core_qbits(self, core_qubits):
-        assert set(core_qubits).issubset(self.qubits.keys()), 'core qubit not in qubits' 
+        assert set(core_qubits).issubset(self.qubits.keys()), "core qubit not in qubits"
         for qubit in core_qubits:
             self.qubits[qubit].core = True
         self.update_core_shell()
-        
+
     def update_core_shell(self):
         """
         set attributes like core_qbits/shell_qbits
@@ -180,18 +186,17 @@ class Qbits():
         """
         self.set_core_qbits(), self.set_core_qbit_coords()
         self.set_shell_qbits(), self.set_shell_qbit_coords()
-        
-    
+
     def set_all_polygons(self, all_polygons: list):
         """
         calling this function sets for all qbits
-        the attribute polygons from None to a list of all 
-        polygons they are involved in. This function is called in the __init__ of 
+        the attribute polygons from None to a list of all
+        polygons they are involved in. This function is called in the __init__ of
         Polygons.
         """
         for qbit in self.qubits.values():
             qbit.set_polygons(all_polygons)
-            
+
     def append_polygons(self, new_polygons: list):
         """
         new polygons which are added due to e.g.
@@ -202,39 +207,42 @@ class Qbits():
             for qbit in self.qubits.values():
                 if qbit.qubit in polygon:
                     qbit.polygons.append(polygon)
-            
+
     def neighbours(self, coord):
         """
-        return the 8 neighbours of a coord, if the neighbour is (not) occupied by another 
+        return the 8 neighbours of a coord, if the neighbour is (not) occupied by another
         qbit, (np.nan) the qbit object will be returned in a list of length 8
         """
         neighbours_ = lambda coord: [
             self.coord_to_qbit_dict.get((coord[0] + i, coord[1] + j), np.nan)
-            for i in range(-1,2)
-            for j in range(-1,2)
+            for i in range(-1, 2)
+            for j in range(-1, 2)
         ]
         return neighbours_(coord)
-    
+
     @staticmethod
     def neighbour_coords(coord):
-        """ return 8 neighbour coords and the coord itself as a list"""
-        return [(coord[0] + i, coord[1] + j)
-        for i in range(-1, 2) for j in range(-1, 2)]
-    
+        """return 8 neighbour coords and the coord itself as a list"""
+        return [
+            (coord[0] + i, coord[1] + j) for i in range(-1, 2) for j in range(-1, 2)
+        ]
+
     @staticmethod
     def neighbour_coords_without_origin(coord, radius=0):
-        """ return 8 neighbour coords and the coord itself as a list"""
-        return [(coord[0] + i, coord[1] + j)
-         for i in range(-(1 + radius), 2 + radius)
-         for j in range(-(1 + radius), 2 + radius)
-         if (i, j) != (0, 0)]
-        
+        """return 8 neighbour coords and the coord itself as a list"""
+        return [
+            (coord[0] + i, coord[1] + j)
+            for i in range(-(1 + radius), 2 + radius)
+            for j in range(-(1 + radius), 2 + radius)
+            if (i, j) != (0, 0)
+        ]
+
     def set_number_of_qbit_neighbours(self, qbit):
         """
         set the number of occupied neighbours a qbit has,
         called via Polygons()
         """
-        qbit.number_of_qbit_neighbours = (8 - self.neighbours(qbit.coord).count(np.nan))
+        qbit.number_of_qbit_neighbours = 8 - self.neighbours(qbit.coord).count(np.nan)
 
     def random(self):
         """
@@ -258,8 +266,11 @@ class Qbits():
         """
         swap two qubits with each other
         """
-        self.qubits[qbit1.qubit].coord, self.qubits[qbit2.qubit].coord = self.qubits[qbit2.qubit].coord ,self.qubits[qbit1.qubit].coord
-        
+        self.qubits[qbit1.qubit].coord, self.qubits[qbit2.qubit].coord = (
+            self.qubits[qbit2.qubit].coord,
+            self.qubits[qbit1.qubit].coord,
+        )
+
     def add_ancillas_to_qbits(self, ancillas, new_polygons):
         ancilla_qbits = []
         for ancilla, coord in ancillas.items():
@@ -267,13 +278,15 @@ class Qbits():
             qbit.ancilla = True
             qbit.core = True
             ancilla_qbits.append(qbit)
-        self.qubits.update({ancilla_qbit.qubit: ancilla_qbit for ancilla_qbit in ancilla_qbits})
+        self.qubits.update(
+            {ancilla_qbit.qubit: ancilla_qbit for ancilla_qbit in ancilla_qbits}
+        )
         self.update_core_shell()
         self.append_polygons(new_polygons)
         return ancilla_qbits
-    
+
     def remove_ancillas_from_qbits(self, ancillas):
-        
+
         for qbit in self.qubits.values():
             if qbit.qubit in ancillas:
                 continue
@@ -281,14 +294,14 @@ class Qbits():
             remaining_polygons = []
             for polygon in qbit.polygons:
                 if set(ancillas).isdisjoint(polygon):
-                     remaining_polygons.append(polygon)
+                    remaining_polygons.append(polygon)
             qbit.polygons = remaining_polygons
 
         # remove ancilla from qbits
         for ancilla in ancillas:
-            self.qubits.pop(ancilla,None)
-        self.update_core_shell() 
-        
+            self.qubits.pop(ancilla, None)
+        self.update_core_shell()
+
     def envelop_rect(self, padding: int = 1):
         """
         generate grid coords of envelop rectengular (of all qbits) with padding
@@ -299,7 +312,7 @@ class Qbits():
             np.arange(min(y) - padding, max(y) + (padding + 1)),
         )
         return list(zip(x.flatten(), y.flatten()))
- 
+
     def found_plaqs(self):
         """
         listing all plaquettes in current compilation,
@@ -338,7 +351,7 @@ class Qbits():
             list(possible_plaqs[i][j])
             for i, j in [[i, l.index(1)] for i, l in enumerate(a) if 1 in l]
         ]
-    
+
     def found_plaquettes_around_coords(self, coords):
         """
         listing all plaquettes around given coords
@@ -379,18 +392,17 @@ class Qbits():
         ]
 
 
-
-class Qbit():
+class Qbit:
     """
     each qbit is an object with a name (qubit) and a coord.
-    """    
-    
+    """
+
     def __init__(
         self,
         qubit: tuple,
-        coord: tuple, 
-        core: bool=False,
-        ):
+        coord: tuple,
+        core: bool = False,
+    ):
         self._qubit = qubit
         self.coord = coord
         self.core = core
@@ -400,21 +412,20 @@ class Qbit():
         # self.plaquettes is set with set_plaquettes_of_qbits(), this function has to be called after Polygons is initialized
         self.plaquettes = None
         self.number_of_qbit_neighbours = None
-        
+
     @property
     def qubit(self):
-        """ qubit cant be overwritten like this"""
+        """qubit cant be overwritten like this"""
         return self._qubit
-    
+
     def set_polygons(self, all_polygons):
         """
         set polyons which belong to this qbit, this function is called
         in the init of Polygons()
         """
-        #if self.polygons is None: warum war dieses if statement überhaupt hier?
+        # if self.polygons is None: warum war dieses if statement überhaupt hier?
         self.polygons = [polygon for polygon in all_polygons if self.qubit in polygon]
-        
+
     def polygons_coords(self, qubit_to_coord_dict: dict):
-        """ return coords of polygons which belong to this qbit"""
+        """return coords of polygons which belong to this qbit"""
         return Polygons.polygons_coords(qubit_to_coord_dict, self.polygons)
-    

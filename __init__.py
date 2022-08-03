@@ -1,5 +1,6 @@
 from . import paths
 from .graph import Graph
+
 # init Polygons before Qbits, since in Qbits there are some staticmehtod functions from Polygons used
 from .polygons import Polygons
 from .qbits import Qbits, Qbit

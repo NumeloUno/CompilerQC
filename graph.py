@@ -4,7 +4,7 @@ import warnings
 
 # TODO: graph.nodes is the same as logical_nodes in nodes.py, replace logical nodes!
 class Graph:
-    def __init__(self, adj_matrix, renaming: dict=None):
+    def __init__(self, adj_matrix, renaming: dict = None):
         """
         adj_matrix: adjacency matrix is a square matrix used to represent a finite graph
         N, K: N(odes), K(anten) of logical graph
@@ -80,18 +80,20 @@ class Graph:
                 self.DFS_for_ancilla(end_node, n - 1, new_node, start_node, next_path)
         self.visited[node] = False
         return
-    
+
     def get_cycles_of_ancilla(self, ancilla, length):
         """
-        get cycles of a specific ancilla, 
-        the ancilla does not have to be added to the adj 
+        get cycles of a specific ancilla,
+        the ancilla does not have to be added to the adj
         matrix in advance
         """
         self.clear()
         start_node, end_node = ancilla
-        self.DFS_for_ancilla(end_node, length - 1, start_node, start_node, path=[start_node])
+        self.DFS_for_ancilla(
+            end_node, length - 1, start_node, start_node, path=[start_node]
+        )
         return self.paths
-    
+
     def get_cycles_of_ancillas(self, ancillas, length):
         """
         get all cycles of ancillas, and remove duplicates
@@ -102,9 +104,12 @@ class Graph:
         for ancilla in ancillas:
             self.get_cycles_of_ancilla(ancilla, length)
             paths.append(list(map(tuple, self.paths)))
-        self.paths = list(map(list, set(
-            [path for paths_of_ancilla in paths for path in paths_of_ancilla]
-        )))
+        self.paths = list(
+            map(
+                list,
+                set([path for paths_of_ancilla in paths for path in paths_of_ancilla]),
+            )
+        )
         self.drop_duplicates()
         return self.paths
 
@@ -138,7 +143,7 @@ class Graph:
     def add_ancillas_to_adj_matrix(self, ancillas):
         for (i, j) in ancillas:
             self.adj_matrix[i][j] = self.adj_matrix[j][i] = 1
-    
+
     def remove_ancillas_from_adj_matrix(self, ancillas):
         for (i, j) in ancillas:
             self.adj_matrix[i][j] = self.adj_matrix[j][i] = 0
@@ -150,8 +155,8 @@ class Graph:
             self.qubits.remove(ancilla)
         assert self.K == len(self.qubits), "number of qubits is not equal to K"
         self.nodes = self.nodes_from_graph()
-        self.C = self.num_constrains()   
-        
+        self.C = self.num_constrains()
+
     def update_ancillas(self, ancillas):
         self.add_ancillas_to_adj_matrix(ancillas)
         self.K = self.num_edges()
@@ -159,8 +164,8 @@ class Graph:
             self.qubits.append(ancilla)
         assert self.K == len(self.qubits), "number of qubits is not equal to K"
         self.nodes = self.nodes_from_graph()
-        self.C = self.num_constrains()     
-        
+        self.C = self.num_constrains()
+
     def qubits_from_graph(self):
         triup_adj_graph = np.triu(self.adj_matrix, k=1)
         qubits = np.argwhere(triup_adj_graph == 1)
@@ -210,20 +215,25 @@ class Graph:
         """
         remove nodes which are very short
         (are involved only in less than default=4 qbits)
-        graph gets attribute renaming, with this dictionary, 
+        graph gets attribute renaming, with this dictionary,
         the qubits can be renamed e.g. in the qbits_max_core in Energy_core
         """
         nodes_to_keep = []
         modified_adj_matrix = np.copy(adj_matrix)
         for idx, i in enumerate(adj_matrix):
-            if sum(i)< shorter_than:
+            if sum(i) < shorter_than:
                 modified_adj_matrix[idx, :] = np.zeros(modified_adj_matrix.shape[1])
                 modified_adj_matrix[:, idx] = np.zeros(modified_adj_matrix.shape[1])
             else:
                 nodes_to_keep.append(idx)
-        modified_adj_matrix = modified_adj_matrix[:,~np.all(modified_adj_matrix==0, axis=0)]
-        modified_adj_matrix = modified_adj_matrix[~np.all(modified_adj_matrix==0, axis=1)]
+        modified_adj_matrix = modified_adj_matrix[
+            :, ~np.all(modified_adj_matrix == 0, axis=0)
+        ]
+        modified_adj_matrix = modified_adj_matrix[
+            ~np.all(modified_adj_matrix == 0, axis=1)
+        ]
 
-        renaming = {new_name: old_name for new_name, old_name in enumerate(nodes_to_keep)}
+        renaming = {
+            new_name: old_name for new_name, old_name in enumerate(nodes_to_keep)
+        }
         return cls(modified_adj_matrix, renaming)
-

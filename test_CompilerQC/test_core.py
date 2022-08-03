@@ -1,5 +1,6 @@
 from CompilerQC import Graph, core
 
+
 def test_find_max_bipartite_core():
     """
     check if the bipartite cores in the even complete
@@ -7,7 +8,7 @@ def test_find_max_bipartite_core():
     """
     for N in [4, 6]:
         graph = Graph.complete(N)
-        assert (
-                core.largest_complete_bipartite_graph(graph)
-                ==((N - 4) / 2 + 2,  (N - 4) / 2 + 2)  
-                )
+        assert core.largest_complete_bipartite_graph(graph) == (
+            (N - 4) / 2 + 2,
+            (N - 4) / 2 + 2,
+        )
