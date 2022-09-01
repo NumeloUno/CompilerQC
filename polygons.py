@@ -130,10 +130,13 @@ class Polygons:
         figsize=(15, 15),
         core_corner=None,
         check_ancilla_in_core: bool = True,
+        envelop_rect=None,
     ):
         if ax is None:
             _, ax = plt.subplots(figsize=figsize)
-        x, y = list(zip(*self.nodes_object.qbits.envelop_rect()))
+        if envelop_rect is None:
+            envelop_rect = self.nodes_object.qbits.envelop_rect()
+        x, y = list(zip(*envelop_rect))
         ax.scatter(x, y, color="grey", s=0.6)
         ax.set_yticklabels([])
         ax.set_xticklabels([])

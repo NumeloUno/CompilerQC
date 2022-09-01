@@ -33,21 +33,21 @@ def energy_from_problem(graph_adj_matrix: np.array, qubit_coord_dict: dict):
 
 
 def get_files_to_problems(
-    problem_folder: str = "training_set", min_C: int = 1, max_C: int = 50
+    problem_folder: str = "training_set", min_C: int = 3, max_C: int = 35, min_N: int = 4, max_N: int = 15,
 ):
     """
     returns all files in problem_folder, if problem has constraints C between min_C and max_C
     """
     filenames = []
     for path in os.listdir(paths.database_path / problem_folder):
-        if min_C <= int(path.split("_")[-1]) <= max_C:
+        if min_C <= int(path.split("_")[-1]) <= max_C and min_N <= int(path.split("_")[-5]) <= max_N:
             for filename in os.listdir(paths.database_path / problem_folder / path):
                 filenames.append(paths.database_path / problem_folder / path / filename)
     return filenames
 
 
 def get_all_distances(
-    problem_folder: str = "training_set", min_C: int = 1, max_C: int = 50
+    problem_folder: str = "training_set", min_C: int = 1, max_C: int = 50, min_N: int = 4, max_N: int = 15,
 ):
     """
     returns energy_from_problem() for all problems in folder problem_folder,
