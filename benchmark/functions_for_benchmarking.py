@@ -160,8 +160,14 @@ def evaluate_optimization(
             # reset mc core
             mc_core.reset(mc_core.T_0, remove_ancillas=True)
             # update core (reset is part of update)
+            # remove ancillas which are already in graph, but not recognized due to removing of short lines in graph
+            # add ancillas first since updates_qbits_from_dict doesnt know them otherwise
+            ancillas_in_core = {qubit:coord for qubit, coord in ancillas_in_core.items() if qubit not in graph.qubits}
+            mc.add_ancillas(ancillas_in_core, update_energy=False)
             mc.update_qbits_from_dict(qubit_coord_dict, assign_to_core=True)
-            mc.add_ancillas(ancillas_in_core)
+            mc.total_energy, mc.number_of_plaquettes = mc.energy(
+                mc.energy.polygon_object.nodes_object.qbits
+            )      
         # check if there are still some qbits left to place
         remaining_qbits = len(mc.energy.polygon_object.nodes_object.qbits.qubits) - len(
             mc.energy.polygon_object.nodes_object.qbits.core_qbits
@@ -191,6 +197,7 @@ def evaluate_optimization(
     # save resutls in dataframe
     mc_schedule.update(
         {
+            "batchsize": batch_size,
             "success_rate": np.mean(success_rate),
             "avg_n_missing_C": np.mean(record_n_missing_C),
             "var_n_missing_C": np.std(record_n_missing_C),
@@ -244,14 +251,13 @@ def run_benchmark(
     path_to_config = paths.parameters_path / args.id_of_benchmark / args.yaml_path
     with open(path_to_config) as f:
         mc_schedule = yaml.load(f, Loader=yaml.FullLoader)
-    name = args.yaml_path[len("./mc_parameters_") : -len(".yaml")]
     # evaluate schedule from yaml and save it
     logger.info("================== benchmark ==================")
     logger.info(
-        f"start benchmarking {args.id_of_benchmark, name} with problem size {graph.N}"
+        f"start benchmarking {args.id_of_benchmark, args.name} with problem size {graph.N}"
     )
     benchmark_df = evaluate_optimization(
-        graph, name, mc_schedule, benchmark_df, args.batch_size, logger
+        graph, args.name, mc_schedule, benchmark_df, args.batch_size, logger
     )
     return benchmark_df
 
@@ -260,6 +266,9 @@ def visualize_search(
     graph: Graph,
     name: str,
     mc_schedule: dict,
+    visualize_core_search: bool,
+    number_of_core_images: int=50,
+    number_of_images: int=1000,
 ):
     """
     create gif of search according to settings in mc_schedule
@@ -270,6 +279,8 @@ def visualize_search(
     else:
         mc.swap_probability = 0
     if mc_schedule["with_core"]:
+        if visualize_core_search:
+            search.visualize_search_process(mc_core, f"core_{name}", number_of_core_images)
         (
             qubit_coord_dict,
             mc.energy.polygon_object.core_corner,
@@ -280,24 +291,31 @@ def visualize_search(
             mc.finite_grid_size = True
             mc.random_qbit = True
         mc_core.reset(mc_core.T_0, remove_ancillas=True)
+        ancillas_in_core = {qubit:coord for qubit, coord in ancillas_in_core.items() if qubit not in graph.qubits}
+        mc.add_ancillas(ancillas_in_core, update_energy=False)
         mc.update_qbits_from_dict(qubit_coord_dict, assign_to_core=True)
-        mc.add_ancillas(ancillas_in_core)
-    remaining_qbits = len(mc.energy.polygon_object.nodes_object.qbits.qubits) - len(
-        mc.energy.polygon_object.nodes_object.qbits.core_qbits
+    search.visualize_search_process(mc, name, number_of_images)
+    mc.remove_ancillas(
+        mc.energy.polygon_object.nodes_object.propose_ancillas_to_remove()
     )
-    search.visualize_search_process(mc, name, 1000)
     mc.reset(current_temperature=mc.T_0, remove_ancillas=True, keep_core=False)
 
-
+        
 def visualize_settings(
     graph: Graph,
     args,
 ):
+    """
+    """
     path_to_config = paths.parameters_path / args.id_of_benchmark / args.yaml_path
     with open(path_to_config) as f:
         mc_schedule = yaml.load(f, Loader=yaml.FullLoader)
-    name = args.yaml_path.split(".")[0]
-    visualize_search(graph, f"{args.yaml_path}_{name}", mc_schedule)
+    visualize_search(graph=graph,
+                     name=f"gif_of_{args.name}",
+                     mc_schedule=mc_schedule,
+                     visualize_core_search=args.visualize_core_search,
+                     number_of_core_images=args.number_of_core_images,
+                     number_of_images=args.number_of_images)
 
 
 def search_max_core(mc_core, K):
@@ -317,14 +335,38 @@ def update(origin_dict, new_dict):
 
 
 def create_and_save_settings(name, new_dicts, new_config):
-    """update default yaml by newdict and save them in mc_parameters_name.yaml"""
-
+    """update default yaml by newdict and save them in mc_parameters_name.yaml
+    note: there are absolute paths in use!"""
+    (paths.parameters_path / "csvs").mkdir(parents=True, exist_ok=True)
+    filenames, log_names = [], []
     for idx, new_dict in enumerate(new_dicts):
         # create folder if it doesnt exists yet
+        filenames.append(f"mc_parameters_{name}_{idx}.yaml")
+        log_names.append(paths.logger_path / name / f"{name}_{idx}")
         (paths.parameters_path / name).mkdir(parents=True, exist_ok=True)
+        (paths.logger_path / name).mkdir(parents=True, exist_ok=True)
         dict_to_save = update(deepcopy(new_config), new_dict)
         with open(
             paths.parameters_path / name / f"mc_parameters_{name}_{idx}.yaml", "w"
         ) as f:
             print(name, idx)
             yaml.dump(dict_to_save, f, default_flow_style=False)
+    pd.DataFrame(data={"filenames":filenames, "log_names":log_names}).to_csv(paths.parameters_path / "csvs" / f"{name}.csv", index=False, index_label=False)        
+    with open(paths.parameters_path / "csvs" / f"run_{name}.sh", 'w') as sh:
+        sh.write(('''\
+#!/bin/bash 
+NUM_PARALLEL_JOBS=10 
+CSV_FILE=%s.csv
+tail -n +2 ${CSV_FILE} | parallel --progress --colsep ',' -j${NUM_PARALLEL_JOBS} \
+python "../../benchmark_optimization.py --yaml_path={1} --batch_size=20 \
+--min_N=4 --max_N=15 --min_C=3 --max_C=91 --max_size=50 --problem_folder=training_set 2>&1 > {2}.log" 
+        ''')%(name))
+    with open(paths.plots / "scripts_to_create_gifs" / f"create_gif_for_{name}.sh", 'w') as sh:
+        sh.write(('''\
+#!/bin/bash 
+NUM_PARALLEL_JOBS=10 
+CSV_FILE=../../parameters/csvs/%s.csv
+tail -n +2 ${CSV_FILE} | parallel --progress --colsep ',' -j${NUM_PARALLEL_JOBS} \
+python "../../benchmark_optimization.py --yaml_path={1} \
+--min_N=4 --max_N=15 --min_C=3 --max_C=91 --max_size=1 --problem_folder=training_set  --visualize=True --number_of_core_images=1000 --number_of_images=50" 
+        ''')%(name))
