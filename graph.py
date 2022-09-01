@@ -236,4 +236,8 @@ class Graph:
         renaming = {
             new_name: old_name for new_name, old_name in enumerate(nodes_to_keep)
         }
-        return cls(modified_adj_matrix, renaming)
+        graph = cls(modified_adj_matrix, renaming)
+        # if graph.K < 4, you cannot build a core
+        if graph.K < 4:
+            graph = Graph.init_without_short_nodes(adj_matrix, shorter_than-1)
+        return graph
