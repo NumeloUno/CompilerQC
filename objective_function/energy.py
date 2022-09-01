@@ -29,7 +29,7 @@ class Energy(Polygons):
         self.decay_weight = False
         self.decay_rate = 1
         self.subset_weight = False
-        self.square_scope = False
+        self.exponential_scaling = 0
         self.sparse_density_penalty = False
         self.sparse_density_factor = 0
         self.line = False
@@ -327,10 +327,10 @@ class Energy(Polygons):
         if self.decay_weight:
             distances_to_plaquette = self.decay_scopes_per_qbit(qbits_of_interest)
             # decay is not working with terms which use the distances_to_plaquette array
-            self.square_scope = self.subset_weight = False
+            self.exponential_scaling, self.subset_weight = 0, False
 
-        if self.square_scope:
-            distances_to_plaquette = distances_to_plaquette ** 2
+        if self.exponential_scaling:
+            distances_to_plaquette = distances_to_plaquette ** self.exponential_scaling
 
         # remove polygons with edges which are already in the diagonal of a 4 plaquette
         if self.subset_weight:
