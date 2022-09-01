@@ -264,15 +264,35 @@ class MC:
         return random.choice(self.possible_coords)
 
     def coord_from_finite_grid(self):
-        if self.n_total_steps == 0 or self.possible_coords_changed:
-            possible_coords = (
-                self.energy.polygon_object.nodes_object.qbits.envelop_rect(
-                    self.padding_finite_grid
-                )
+        """
+        set or create core corner in the first step (0),
+        build coords around and from core corner,
+        substract core_qbit_coords, when core_qbit_coords changed(due to line swap)
+        change possible_coords
+        """
+        if self.n_total_steps == 0:
+            if self.corner is None:
+                self.corner = self.energy.polygon_object.core_corner
+                # if no core has been set, use square around the center as start for shell search
+                if self.corner is None:
+                    x, y = self.energy.polygon_object.center_of_coords(
+                        self.energy.polygon_object.nodes_object.qbits.coords
+                    )
+                    self.corner = (int(x - 0.5), int(x + 0.5)), (int(y - 0.5), int(y + 0.5))
+                    
+            (min_x, max_x), (min_y, max_y) = self.corner
+
+            x, y = np.meshgrid(
+            np.arange(min_x - self.padding_finite_grid, max_x + (self.padding_finite_grid + 1)),
+            np.arange(min_y - self.padding_finite_grid, max_y + (self.padding_finite_grid + 1)),
             )
+
+            self.finite_possible_coords = list(zip(x.flatten(), y.flatten()))
+            
+        if self.n_total_steps == 0 or self.possible_coords_changed:
             self.possible_coords = list(
-                set(possible_coords)
-                - set(self.energy.polygon_object.nodes_object.qbits.core_qbit_coords)
+            set(self.finite_possible_coords)
+            - set(self.energy.polygon_object.nodes_object.qbits.core_qbit_coords)
             )
         return random.choice(self.possible_coords)
 
@@ -307,6 +327,9 @@ class MC:
             self.n_total_steps % (self.repetition_rate * self.shell_time) == 0
             or self.possible_coords_changed
         ):
+            # even if not enough plaquettes, the shape of the core could have changed
+            # thus, the possible coords have to change too
+            self.possible_coords = self.coords_in_softcore()
             if (
                 self.plaquette_density_in_softcore()
                 > self.min_plaquette_density_in_softcore
@@ -445,8 +468,6 @@ class MC:
         an envelop rectengular, with a side x and a side y,
         we can access each row (y) or column (x) by
         the coordinate coord.
-        TODO: instead of corner, we could consider only
-        the corner of the part we want to swap ->  # and qbit.core == True
         """
         corner = self.energy.polygon_object.core_corner
         if self.swap_only_core_qbits_in_line_swaps:
@@ -586,12 +607,13 @@ class MC:
         to expand this function for g(x) > 1, select_move() shouls use random.choices(k>1)
         """
         move = True
-        # swap adjacent lines with swap_probability
-        if random.random() < self.swap_probability:
+        # swap adjacent lines with swap_probability, if it is the first step, move qbits, dont swap lines 
+        # to assure that possible coords and finite possible coords is set properly
+        if random.random() < self.swap_probability and self.n_total_steps > 0:
             operation, move = "swap", False
             new_line_mapping, xy, old_qbits = self.select_lines_in_core()
             # if select_lines_in_core failed (no valid clusters e.g.), move qbits instead of swapping lines
-            if new_line_mapping is None:
+            if new_line_mapping is None or self.swap_only_core_qbits_in_line_swaps:
                 move = True
             else:
                 self.lines_in_core_to_swap = new_line_mapping, xy, old_qbits
@@ -601,11 +623,17 @@ class MC:
                 new_energy, new_n_plaqs = self.energy(qbits_to_move)
                 self.possible_coords_changed = True
                 self.swap_probability *= self.decay_rate_of_swap_probability
-
+                # if not inside a cluster is swapped, but two clusters are swapped
+                # then swap_only_core_qbits_in_line_swaps has to be False, otherwise Non unique coords-error can occur
+                # thats why in the if statement it is asked for swap_only_core_...
+                
         # if not swapping, move a qbit
         if move:
             operation = "move"
             self.qbits_to_move = self.select_move()
+            # even if the move gets rejected, self.possible_coords will be updated, after this update we can
+            # set possible_coords_changed to False again, otherwise, there will be an update every step
+            self.possible_coords_changed = False
             current_energy, current_n_plaqs = self.energy(self.qbits_to_move)
             self.apply_move(*self.qbits_to_move)
             new_energy, new_n_plaqs = self.energy(self.qbits_to_move)
@@ -791,10 +819,11 @@ class MC:
             self.energy.polygon_object.nodes_object.qbits
         )
 
-    def add_ancillas(self, ancillas, only_four_cycles=False):
+    def add_ancillas(self, ancillas, only_four_cycles=False, update_energy: bool=True):
         """
         ancillas are also conncected via 3cycles,
         this can be changed with only_four_cycles=True
+        update_energy: used to prevent error when adding ancillas to graph (non unique coords!)
         """
         # check if ancillas is an empty dictionary
         if ancillas:
@@ -810,10 +839,10 @@ class MC:
                 )
             )
             self.energy.polygon_object.nodes_object.add_ancillas_to_nodes(ancillas)
-
-            delta_energy, delta_number_of_plaquettes = self.energy(ancilla_qbits)
-            self.total_energy += delta_energy
-            self.number_of_plaquettes += delta_number_of_plaquettes
+            if update_energy:
+                delta_energy, delta_number_of_plaquettes = self.energy(ancilla_qbits)
+                self.total_energy += delta_energy
+                self.number_of_plaquettes += delta_number_of_plaquettes
 
     def remove_ancillas(self, ancillas):
         # check if ancillas is an empty dictionary
@@ -1243,10 +1272,12 @@ import matplotlib.pyplot as plt
 import imageio
 
 
-def create_image_for_step(mc):
+def create_image_for_step(mc, envelop_rect):
     mc.apply(1)
     fig, ax = plt.subplots(figsize=(15, 15))
-    ax = mc.energy.polygon_object.visualize(ax=ax, core_corner=mc.corner)
+    if not hasattr(mc, 'corner'):
+        mc.corner = None
+    ax = mc.energy.polygon_object.visualize(ax=ax, core_corner=mc.corner, envelop_rect=envelop_rect)
 
     # Used to return the plot as an image rray
     fig.canvas.draw()  # draw the canvas, cache the renderer
@@ -1255,10 +1286,11 @@ def create_image_for_step(mc):
     return image
 
 
-def visualize_search_process(mc, name, number_of_steps):
-
+def visualize_search_process(mc, name, number_of_images):
+    """ fix envelop of image (otherwise gif will wiggle around)"""
+    envelop_rect = mc.energy.polygon_object.nodes_object.qbits.envelop_rect()
     imageio.mimsave(
-        paths.gifs / f"{name}_{number_of_steps}.gif",
-        [create_image_for_step(mc) for _ in range(number_of_steps)],
+        paths.gifs / f"{name}_nImg_{number_of_images}.gif",
+        [create_image_for_step(mc, envelop_rect) for _ in range(number_of_images)],
         fps=2,
     )
