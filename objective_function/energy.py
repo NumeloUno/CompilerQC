@@ -29,12 +29,12 @@ class Energy(Polygons):
         self.decay_weight = False
         self.decay_rate = 1
         self.subset_weight = False
-        self.exponential_scaling = 0
         self.sparse_density_penalty = False
         self.sparse_density_factor = 0
         self.line = False
         self.line_exponent = 1
         self.bad_line_penalty = 100
+        
 
     def set_scaling_from_model(self, scaling_model: str):
         """load and set plaquette scaling from given model"""
@@ -85,12 +85,16 @@ class Energy(Polygons):
     def scopes_of_polygons(self):
         """return array of the scopes of all changed polygons,"""
         return np.array(
-            list(map(self.scope_of_polygon, self.polygons_coords_of_interest))
+            list(map(self.polygon_object.scope_of_polygon, self.polygons_coords_of_interest))
         )
+    
+    def moments_of_inertia_of_polygons(self):
+        """return array of moment of inertia of all changed polygons """
+        return np.array(list(map(self.polygon_object.moment_of_inertia, self.polygons_coords_of_interest)))
 
-    def scopes_of_polygons_for_analysis(self):
+    def measure_of_polygons_for_analysis(self):
         """
-        return four arrays of scopes:
+        return four arrays of measure:
         nonplaqs3, nonplaqs4, plaqs3, plaqs4
         """
         # consider all polygons
@@ -98,52 +102,56 @@ class Energy(Polygons):
             self.polygon_object.nodes_object.qbits.qubit_to_coord_dict,
             self.polygon_object.polygons,
         )
-
-        scopes = np.array(
-            list(map(self.scope_of_polygon, self.polygons_coords_of_interest))
-        )
+        if self.polygon_object.scope_measure:
+            measure = np.array(
+                list(map(self.polygon_object.scope_of_polygon, self.polygons_coords_of_interest))
+            )
+        if self.polygon_object.MoI_measure:
+            measure = np.array(
+                list(map(self.polygon_object.moments_of_inertia_of_polygons, self.polygons_coords_of_interest))
+            )           
         polygon_coords_lengths = np.array(
             list(map(len, self.polygons_coords_of_interest))
         )
-        nonplaqs3 = scopes[
+        nonplaqs3 = measure[
             np.logical_and(
                 polygon_coords_lengths == 3,
-                scopes != self.polygon_object.unit_triangle_scope,
+                measure != self.polygon_object.unit_triangle,
             )
         ]
-        nonplaqs4 = scopes[
+        nonplaqs4 = measure[
             np.logical_and(
                 polygon_coords_lengths == 4,
-                scopes != self.polygon_object.unit_square_scope,
+                measure != self.polygon_object.unit_square,
             )
         ]
-        plaqs3 = scopes[
+        plaqs3 = measure[
             np.logical_and(
                 polygon_coords_lengths == 3,
-                scopes == self.polygon_object.unit_triangle_scope,
+                measure == self.polygon_object.unit_triangle,
             )
         ]
-        plaqs4 = scopes[
+        plaqs4 = measure[
             np.logical_and(
                 polygon_coords_lengths == 4,
-                scopes == self.polygon_object.unit_square_scope,
+                measure == self.polygon_object.unit_square,
             )
         ]
         return nonplaqs3, nonplaqs4, plaqs3, plaqs4
 
-    def scaled_distance_to_plaquette(self, scopes):
+    def scaled_measure(self, measure):
         """
-        input: array of scopes of polygons
-        return: array of scopes of polygons, if a polygon is a plaquette,
+        input: array of scopes/MoIs of polygons
+        return: array of scopes/MoIs of polygons, if a polygon is a plaquette,
         the scaling_for_plaq is substracted
         """
-        scopes[
-            scopes == self.polygon_object.unit_triangle_scope
+        measure[
+            measure == self.polygon_object.unit_triangle
         ] -= self.scaling_for_plaq3
-        scopes[
-            scopes == self.polygon_object.unit_square_scope
+        measure[
+            measure == self.polygon_object.unit_square
         ] -= self.scaling_for_plaq4
-        return scopes
+        return measure    
 
     def coords_of_changed_polygons(self, polygons_of_interest):
         """
@@ -168,7 +176,7 @@ class Energy(Polygons):
 
     def subset_weights(self, polygons_of_interest):
         """
-        return list of weights for all polygons scopes
+        return list of weights for all polygons scopes/MoIs
         give the polygon a weight if it has no qbits, which
         are in the diagonal of a four plaquette
         note: checked
@@ -226,12 +234,11 @@ class Energy(Polygons):
             for qbit in self.polygon_object.nodes_object.qbits.shell_qbits
         ]
 
-    def decay_scopes_per_qbit(self, qbits_of_interest):
+    def decay_measure_per_qbit(self, qbits_of_interest):
         """
         gives an exponential decaying weight on each polygon,
         for each qbit. Decay is faster for larger decay_rates
         """
-        # scope
         polygons_of_interest = [
             [tuple(polygon) for polygon in qbit.polygons]
             for qbit in qbits_of_interest
@@ -242,20 +249,25 @@ class Energy(Polygons):
             Polygons.polygons_coords(qubit_to_coord_dict, polygons)
             for polygons in polygons_of_interest
         ]
-        qbits_scopes = [
-            (sorted(list(map(self.scope_of_polygon, polygon_coords))))
-            for polygon_coords in polygons_coords_of_interest
-        ]
-
-        scopes = np.array(
+        if self.polygon_object.scope_measure:
+            qbits_measure = [
+                (sorted(list(map(self.polygon_object.scope_of_polygon, polygon_coords))))
+                for polygon_coords in polygons_coords_of_interest
+            ]
+        if self.polygon_object.MoI_measure:
+            qbits_measure = [
+                (sorted(list(map(self.polygon_object.moments_of_inertia_of_polygons, polygon_coords))))
+                for polygon_coords in polygons_coords_of_interest
+            ]
+        measure = np.array(
             [
-                self.scaled_distance_to_plaquette(np.array(qbit_scopes))
-                * np.exp(-self.decay_rate * np.arange(len(qbit_scopes)))
-                for qbit_scopes in qbits_scopes
+                self.scaled_measure(np.array(qbit_measure))
+                * np.exp(-self.decay_rate * np.arange(len(qbit_measure)))
+                for qbit_measure in qbits_measure
             ],
             dtype=object,
         )
-        distances_to_plaquette = np.hstack(scopes.flatten()).sum()
+        distances_to_plaquette = np.hstack(measure.flatten()).sum()
         return distances_to_plaquette
 
     # TODO: maybe make a multiplicator penalty instead of addition
@@ -310,27 +322,29 @@ class Energy(Polygons):
         self.polygons_coords_of_interest = self.coords_of_changed_polygons(
             polygons_of_interest
         )
-        scopes = self.scopes_of_polygons()
+
+        if self.polygon_object.scope_measure:
+            measure = self.scopes_of_polygons() 
+        if self.polygon_object.MoI_measure:
+            measure = self.moments_of_inertia_of_polygons()
+            
         number_of_plaquettes = len(
-            scopes[
+            measure[
                 np.logical_or(
-                    scopes == self.polygon_object.unit_triangle_scope,
-                    scopes == self.polygon_object.unit_square_scope,
+                    measure == self.polygon_object.unit_triangle,
+                    measure == self.polygon_object.unit_square,
                 )
             ]
         )
 
-        distances_to_plaquette = self.scaled_distance_to_plaquette(scopes)
+        distances_to_plaquette = self.scaled_measure(measure)
 
         energy_to_return = 0
 
         if self.decay_weight:
-            distances_to_plaquette = self.decay_scopes_per_qbit(qbits_of_interest)
+            distances_to_plaquette = self.decay_measure_per_qbit(qbits_of_interest)
             # decay is not working with terms which use the distances_to_plaquette array
-            self.exponential_scaling, self.subset_weight = 0, False
-
-        if self.exponential_scaling:
-            distances_to_plaquette = distances_to_plaquette ** self.exponential_scaling
+            self.subset_weight = False
 
         # remove polygons with edges which are already in the diagonal of a 4 plaquette
         if self.subset_weight:
@@ -361,7 +375,7 @@ class Energy_core(Energy):
         scaling_model: str = None,
     ):
         self.polygon_object = polygon_object
-
+        
         # scaling for plaquettes
         self.scaling_for_plaq3 = scaling_for_plaq3
         self.scaling_for_plaq4 = scaling_for_plaq4
@@ -376,6 +390,7 @@ class Energy_core(Energy):
 
         # search for largest conncected core
         self.only_squares_in_core = False
+        
 
     @staticmethod
     def is_rectengular(polygon_coord):
@@ -479,8 +494,8 @@ class Energy_core(Energy):
         number_of_plaquettes = len(
             scopes[
                 np.logical_or(
-                    scopes == self.polygon_object.unit_triangle_scope,
-                    scopes == self.polygon_object.unit_square_scope,
+                    scopes == self.polygon_object.unit_triangle,
+                    scopes == self.polygon_object.unit_square,
                 )
             ]
         )
@@ -488,7 +503,7 @@ class Energy_core(Energy):
         if self.only_number_of_plaquettes:
             return number_of_plaquettes, number_of_plaquettes
 
-        distances_to_plaquette = self.scaled_distance_to_plaquette(scopes)
+        distances_to_plaquette = self.scaled_measure(scopes)
 
         if self.spring_energy:
             return round((distances_to_plaquette ** 2).sum(), 5), number_of_plaquettes
