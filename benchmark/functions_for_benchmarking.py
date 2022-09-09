@@ -294,7 +294,7 @@ def visualize_search(
         ancillas_in_core = {qubit:coord for qubit, coord in ancillas_in_core.items() if qubit not in graph.qubits}
         mc.add_ancillas(ancillas_in_core, update_energy=False)
         mc.update_qbits_from_dict(qubit_coord_dict, assign_to_core=True)
-    search.visualize_search_process(mc, name, number_of_images)
+    search.visualize_search_process(mc, name, number_of_images)# before or after remove ancillas?
     mc.remove_ancillas(
         mc.energy.polygon_object.nodes_object.propose_ancillas_to_remove()
     )
@@ -359,14 +359,17 @@ NUM_PARALLEL_JOBS=10
 CSV_FILE=%s.csv
 tail -n +2 ${CSV_FILE} | parallel --progress --colsep ',' -j${NUM_PARALLEL_JOBS} \
 python "../../benchmark_optimization.py --yaml_path={1} --batch_size=20 \
---min_N=4 --max_N=15 --min_C=3 --max_C=91 --max_size=50 --problem_folder=training_set 2>&1 > {2}.log" 
+--min_N=4 --max_N=40 --min_C=3 --max_C=91 --max_size=50 \
+--problem_folder=problems_by_square_density/fsquare_density_of_1.0 2>&1 > {2}.log" 
         ''')%(name))
     with open(paths.plots / "scripts_to_create_gifs" / f"create_gif_for_{name}.sh", 'w') as sh:
         sh.write(('''\
 #!/bin/bash 
-NUM_PARALLEL_JOBS=10 
+NUM_PARALLEL_JOBS=1
 CSV_FILE=../../parameters/csvs/%s.csv
 tail -n +2 ${CSV_FILE} | parallel --progress --colsep ',' -j${NUM_PARALLEL_JOBS} \
 python "../../benchmark_optimization.py --yaml_path={1} \
---min_N=4 --max_N=15 --min_C=3 --max_C=91 --max_size=1 --problem_folder=training_set  --visualize=True --number_of_core_images=1000 --number_of_images=50" 
+--min_N=4 --max_N=40 --min_C=3 --max_C=91 --max_size=1 \
+--problem_folder=problems_by_square_density/fsquare_density_of_1.0  \
+--visualize=True --number_of_core_images=50 --number_of_images=1000" 
         ''')%(name))
