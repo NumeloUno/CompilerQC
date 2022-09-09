@@ -1277,7 +1277,16 @@ def create_image_for_step(mc, envelop_rect):
     fig, ax = plt.subplots(figsize=(15, 15))
     if not hasattr(mc, 'corner'):
         mc.corner = None
-    ax = mc.energy.polygon_object.visualize(ax=ax, core_corner=mc.corner, envelop_rect=envelop_rect)
+    if hasattr(mc, 'shape_x'):
+        coords_and_color = None
+    else:
+        coords_and_color = [(coord, 0.5) for coord in mc.possible_coords]
+    ax = mc.energy.polygon_object.visualize(
+        ax=ax,
+        core_corner=mc.corner,
+        envelop_rect=envelop_rect,
+        coords_and_color=coords_and_color,
+    )
 
     # Used to return the plot as an image rray
     fig.canvas.draw()  # draw the canvas, cache the renderer
