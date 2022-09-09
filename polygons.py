@@ -4,7 +4,6 @@ from itertools import combinations
 from math import dist, atan2
 from matplotlib import pyplot as plt
 
-
 class Polygons:
     """
     this class converts the edges of a graph to qbits
@@ -15,14 +14,13 @@ class Polygons:
     (e.g. definded by the core bipartite sets).
     """
 
-    unit_triangle_scope = round((np.sqrt(2) + 2) / 3, 5)
-    unit_square_scope = round((2 * np.sqrt(2) + 4) / 4, 5)
-
     def __init__(
         self,
         nodes_object: "Nodes",
         polygons: "list of polygons" = None,
         line_scaling: float = 0,
+        exponent: float = 1,
+        scope_measure: bool=True,
     ):
         """
         qbits: qbits object, qbits represent connections in logical grpah
@@ -38,6 +36,17 @@ class Polygons:
 
         self.line_scaling = line_scaling
         self.core_corner = None
+        
+        self.exponent = exponent
+        self.scope_measure = scope_measure
+        self.MoI_measure = not scope_measure
+
+        if self.scope_measure:
+            self.unit_triangle = self.scope_of_polygon([(0,1),(0,2), (1,2)])
+            self.unit_square = self.scope_of_polygon([(0,1),(0,2), (1,2),(1,1)])
+        if self.MoI_measure:
+            self.unit_triangle = self.moment_of_inertia([(0,1),(0,2), (1,2)])
+            self.unit_square = self.moment_of_inertia([(0,1),(0,2), (1,2),(1,1)])         
 
     @staticmethod
     def create_polygon_from_cycle(cycle: list):
@@ -71,17 +80,21 @@ class Polygons:
             for polygon in polygons
         ]
 
-    @staticmethod
-    def scope_of_polygon(polygon_coord):
+    def scope_of_polygon(self, polygon_coord):
         """
         return scope of the polygon
         """
         return round(
-            sum([dist(*c) for c in list(combinations(polygon_coord, 2))])
+            sum([dist(*c) ** self.exponent for c in list(combinations(polygon_coord, 2))])
             / len(polygon_coord),
             5,
         )
 
+    def moment_of_inertia(self, polygon_coords):
+        center = np.mean(polygon_coords, axis=0)
+        return round(
+            sum([dist(coord, center) ** self.exponent for coord in polygon_coords]), 5)
+    
     @staticmethod
     def corner_of_coords(coords):
         """
@@ -145,9 +158,13 @@ class Polygons:
             self.nodes_object.qbits.qubit_to_coord_dict, self.polygons
         ):
             fill, facecolor, lw = False, None, 0
-            if self.scope_of_polygon(polygon) == self.unit_square_scope:
+            if self.scope_measure:
+                measure = self.self.scope_of_polygon(polygon)
+            if self.MoI_measure:
+                measure = self.moment_of_inertia(polygon)
+            if measure == self.unit_square:
                 fill, facecolor, lw = True, "#3A6B35", 14
-            if self.scope_of_polygon(polygon) == self.unit_triangle_scope:
+            if measure == self.unit_triangle:
                 fill, facecolor, lw = True, "#CBD18F", 14
             patch = plt.Polygon(
                 polygon,
