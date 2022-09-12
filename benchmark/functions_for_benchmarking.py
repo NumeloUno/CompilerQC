@@ -31,9 +31,8 @@ def update_mc(mc, mc_schedule, core: bool = False):
                 continue
             k = k[5:]  # ignore 'core_' in k
             if k.split(".")[0] == "energy":
-                if k.split(".")[1] == "scaling_model":
-                    if v is not None:
-                        mc.energy.set_scaling_from_model(v)
+                if k.split(".")[1] == "polygon_object":
+                    mc.energy.polygon_object.__setattr__(k.split(".")[2], v)
                 else:
                     mc.energy.__setattr__(k.split(".")[1], v)
             else:
@@ -44,9 +43,8 @@ def update_mc(mc, mc_schedule, core: bool = False):
             if k.split("_")[0] == "core":
                 continue
             if k.split(".")[0] == "energy":
-                if k.split(".")[1] == "scaling_model":
-                    if v is not None:
-                        mc.energy.set_scaling_from_model(v)
+                if k.split(".")[1] == "polygon_object":
+                    mc.energy.polygon_object.__setattr__(k.split(".")[2], v)
                 else:
                     mc.energy.__setattr__(k.split(".")[1], v)
             else:
@@ -90,6 +88,7 @@ def initialize_MC_object(graph: Graph, mc_schedule: dict, core: bool = False):
         energy = init_energy(graph)
         mc = MC(energy)
     mc = update_mc(mc, mc_schedule, core)
+    mc.energy.set_scaling_from_model()
     mc.n_moves = int(mc.n_moves * mc.repetition_rate)
     # initialize temperature
     initial_temperature = mc.current_temperature
@@ -126,7 +125,6 @@ def evaluate_optimization(
     """
     logger.info("Initialize mc object")
     mc = initialize_MC_object(graph, mc_schedule)
-    mc.test1, mc.test2 = None, None
     if mc_schedule["with_core"]:
         mc_core = initialize_MC_object(graph, mc_schedule, core=True)
     else:

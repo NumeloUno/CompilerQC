@@ -27,6 +27,7 @@ class Polygons:
         polygons:
         line_scaling: if the distance between two qbits is 1.0 or sqrt(2), hence the qbits are
         adjacent, set their distance to line_scaling
+        if not scope_measure, then MoI_measure is choosen
         """
         self.nodes_object = nodes_object
         if polygons is None:
@@ -39,15 +40,17 @@ class Polygons:
         
         self.exponent = exponent
         self.scope_measure = scope_measure
-        self.MoI_measure = not scope_measure
+        self.set_unit_measure()
 
+    def set_unit_measure(self):
+        """set the unit scope or MoI of an triangle or square plaquette"""
         if self.scope_measure:
             self.unit_triangle = self.scope_of_polygon([(0,1),(0,2), (1,2)])
             self.unit_square = self.scope_of_polygon([(0,1),(0,2), (1,2),(1,1)])
-        if self.MoI_measure:
+        if not self.scope_measure:
             self.unit_triangle = self.moment_of_inertia([(0,1),(0,2), (1,2)])
-            self.unit_square = self.moment_of_inertia([(0,1),(0,2), (1,2),(1,1)])         
-
+            self.unit_square = self.moment_of_inertia([(0,1),(0,2), (1,2),(1,1)])   
+            
     @staticmethod
     def create_polygon_from_cycle(cycle: list):
         """
@@ -159,8 +162,8 @@ class Polygons:
         ):
             fill, facecolor, lw = False, None, 0
             if self.scope_measure:
-                measure = self.self.scope_of_polygon(polygon)
-            if self.MoI_measure:
+                measure = self.scope_of_polygon(polygon)
+            if not self.scope_measure:
                 measure = self.moment_of_inertia(polygon)
             if measure == self.unit_square:
                 fill, facecolor, lw = True, "#3A6B35", 14

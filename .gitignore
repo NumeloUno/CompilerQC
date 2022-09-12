@@ -8,3 +8,10 @@ literature
 *.txt
 *.npy
 database
+trash
+objective_function/energy_scalings
+benchmark/logs
+benchmark/parameters/csvs
+benchmark/plot_scripts
+benchmark/plots
+benchmark/results

@@ -14,39 +14,60 @@ class Energy(Polygons):
     ):
         """
         if a plaquette has been found, assign the scaling_for_plaq to it.
-        If a model ['LHZ', 'MLP' or 'maxC'] is assigned, scale them according to
+        If a model ['LHZ', 'MLP' or 'INIT'] is assigned, scale them according to
         this model
         """
         self.polygon_object = polygon_object
 
-        # scaling for plaquettes
-        self.scaling_for_plaq3 = scaling_for_plaq3
-        self.scaling_for_plaq4 = scaling_for_plaq4
-        if scaling_model is not None:
-            self.set_scaling_from_model(scaling_model)
+
         # polygon weights
 
         self.decay_weight = False
         self.decay_rate = 1
+        
         self.subset_weight = False
+        
         self.sparse_density_penalty = False
-        self.sparse_density_factor = 0
+        self.sparse_density_factor = 1
+        
         self.line = False
         self.line_exponent = 1
-        self.bad_line_penalty = 100
+        self.bad_line_penalty = 1
+        self.line_factor = 1
         
+        self.low_noplaqs_penalty = False
+        self.low_noplaqs_factor = 1
+        
+        # scaling for plaquettes
+        self.scaling_for_plaq3 = scaling_for_plaq3
+        self.scaling_for_plaq4 = scaling_for_plaq4
+        self.scaling_model = scaling_model
+        if self.scaling_model is not None:
+            self.set_scaling_from_model()
+        else: 
+            self.set_scaling_for_energy_terms()
 
-    def set_scaling_from_model(self, scaling_model: str):
-        """load and set plaquette scaling from given model"""
-        assert scaling_model in [
+
+    def set_scaling_from_model(self):
+        """
+        load and set plaquette scaling from given model
+        INIT: estimate energy by energy of initial configuration
+        """
+        assert self.scaling_model in [
             "MLP",
-            "maxC",
+            "INIT",
             "LHZ",
-        ], "selected model does not exist, choose from 'MLP', 'maxC' or 'LHZ'"
-
-        if scaling_model == "MLP":
+        ], "selected model does not exist, choose from 'MLP', 'INIT' or 'LHZ'"
+        
+        assert self.polygon_object.exponent in [0.5, 1, 2, 3, 4, 5, 6] or self.scaling_model=="INIT", "their is no valid LHZ or MLP scaling for this exponent, if you want to keep this exponent, choose INIT as scaling_model"
+        if self.polygon_object.scope_measure: 
+            measure = "Scope"
+        else:
+            measure = "MoI"
+        
+        if self.scaling_model == "MLP":
             loaded_model = pickle.load(
-                open(paths.energy_scalings / "MLPregr_model.sav", "rb")
+                open(paths.energy_scalings / f"MLP_{measure}_{self.polygon_object.exponent}.sav", "rb")  
             )
             predicted_energy = loaded_model.predict(
                 [
@@ -60,15 +81,11 @@ class Energy(Polygons):
                 ]
             )[0]
 
-        if scaling_model == "maxC":
-            poly_coeffs = np.load(paths.energy_scalings / "energy_max_C_fit.npy")
-            poly_function = np.poly1d(poly_coeffs)
-            predicted_energy = poly_function(
-                self.polygon_object.nodes_object.qbits.graph.C
-            )
-
-        if scaling_model == "LHZ":
-            poly_coeffs = np.load(paths.energy_scalings / "LHZ_energy_C_fit.npy")
+        if self.scaling_model == "INIT":
+            predicted_energy, _ = self.__call__(self.polygon_object.nodes_object.qbits)
+            
+        if self.scaling_model == "LHZ":
+            poly_coeffs = np.load(paths.energy_scalings / f"LHZ_{measure}_{self.polygon_object.exponent}.npy")
             poly_function = np.poly1d(poly_coeffs)
             predicted_energy = poly_function(
                 self.polygon_object.nodes_object.qbits.graph.C
@@ -81,6 +98,36 @@ class Energy(Polygons):
             scaling_for_plaq3,
             scaling_for_plaq4,
         )
+        # update unit scope/MoI if the function has been updated
+        self.polygon_object.set_unit_measure()
+        self.set_scaling_for_energy_terms()
+        return predicted_energy
+
+    def set_scaling_for_energy_terms(self):
+        """the different energy terms contribute with different orders to the total energy,
+        by calling this function, they will be scaled to the same order, 
+        with the factors (line_factor, ...) you can vary the strength.
+        Therefore, the blank energy (measured_energy) without any additional energy term is calculated, 
+        then the additional (e.g. line) term is computed with a factor of 1, the ratio 
+        measured_energy / line_energy is the new factor for the line term"""
+        (line_factor, bad_line_penalty,
+         sparse_density_factor, low_noplaqs_factor) = (self.line_factor, self.bad_line_penalty,
+                                                       self.sparse_density_factor, self.low_noplaqs_factor)
+        (self.line_factor, self.bad_line_penalty,
+         self.sparse_density_factor, self.low_noplaqs_factor) = (0, 0 , 0 , 0)
+
+        measure_energy = int(self.__call__(self.polygon_object.nodes_object.qbits)[0])
+        line_energy_value, sparse_density_penalty, low_noplaqs_penalty = measure_energy, measure_energy, measure_energy
+        if self.line:
+            line_energy_value = int(self.line_energy(self.polygon_object.nodes_object.qbits))
+        if self.sparse_density_penalty:
+            sparse_density_penalty = int(sum(self.penalty_for_sparse_plaquette_density()))
+        if self.low_noplaqs_penalty:
+            low_noplaqs_penalty = int(sum(self.penalty_for_low_number_of_plaquettes()))
+        self.line_factor = line_factor * measure_energy / line_energy_value
+        self.bad_line_penalty = bad_line_penalty * measure_energy / line_energy_value
+        self.sparse_density_factor = sparse_density_factor * measure_energy / sparse_density_penalty
+        self.low_noplaqs_factor = low_noplaqs_factor * measure_energy / low_noplaqs_penalty
 
     def scopes_of_polygons(self):
         """return array of the scopes of all changed polygons,"""
@@ -106,9 +153,9 @@ class Energy(Polygons):
             measure = np.array(
                 list(map(self.polygon_object.scope_of_polygon, self.polygons_coords_of_interest))
             )
-        if self.polygon_object.MoI_measure:
+        if not self.polygon_object.scope_measure:
             measure = np.array(
-                list(map(self.polygon_object.moments_of_inertia_of_polygons, self.polygons_coords_of_interest))
+                list(map(self.polygon_object.moment_of_inertia, self.polygons_coords_of_interest))
             )           
         polygon_coords_lengths = np.array(
             list(map(len, self.polygons_coords_of_interest))
@@ -254,9 +301,9 @@ class Energy(Polygons):
                 (sorted(list(map(self.polygon_object.scope_of_polygon, polygon_coords))))
                 for polygon_coords in polygons_coords_of_interest
             ]
-        if self.polygon_object.MoI_measure:
+        if not self.polygon_object.scope_measure:
             qbits_measure = [
-                (sorted(list(map(self.polygon_object.moments_of_inertia_of_polygons, polygon_coords))))
+                (sorted(list(map(self.polygon_object.moment_of_inertia, polygon_coords))))
                 for polygon_coords in polygons_coords_of_interest
             ]
         measure = np.array(
@@ -325,7 +372,7 @@ class Energy(Polygons):
 
         if self.polygon_object.scope_measure:
             measure = self.scopes_of_polygons() 
-        if self.polygon_object.MoI_measure:
+        if not self.polygon_object.scope_measure:
             measure = self.moments_of_inertia_of_polygons()
             
         number_of_plaquettes = len(
@@ -353,12 +400,17 @@ class Energy(Polygons):
 
         if self.line:
             line_energy_value = self.line_energy(qbits_of_interest)
-            energy_to_return += line_energy_value
+            energy_to_return += self.line_factor * line_energy_value
 
         # if a qbit is surrounded by qbits but has no/few plaquettes, penalize it
         if self.sparse_density_penalty:
             energy_to_return += self.sparse_density_factor * sum(
                 self.penalty_for_sparse_plaquette_density()
+            )
+          
+        if self.low_noplaqs_penalty:
+            energy_to_return += self.low_noplaqs_factor * sum(
+                self.penalty_for_low_number_of_plaquettes()
             )
 
         energy_to_return += round(distances_to_plaquette.sum(), 5)
@@ -384,7 +436,6 @@ class Energy_core(Energy):
 
         # energy terms
         self.only_largest_core = False
-        self.spring_energy = False
         self.only_rectangulars = False
         self.only_number_of_plaquettes = False
 

@@ -57,12 +57,13 @@ energy.sparse_density_factor: 1
 energy.line: False
 energy.line_exponent: 1
 # if line ends surrounded by qbits, give it a penalty
-energy.bad_line_penalty: 100
+energy.bad_line_penalty: 1
 # energy scaling
 # energy.scaling_for_plaq3 = 0
 # energy.scaling_for_plaq4 = 0
 # null is understood as None, whereas None would become 'None'
 energy.scaling_model: null
+energy.polygon_object.scope_measure: True
 ############################################
 ######### core Simulated Annealing #########
 ############################################
@@ -90,7 +91,6 @@ core_n_moves: 1000
 ######### core energy function #########
 ########################################
 core_energy.only_largest_core: False
-core_energy.spring_energy: False
 core_energy.only_rectangulars: False
 core_energy.only_number_of_plaquettes: False
 core_energy.only_squares_in_core: False
@@ -98,3 +98,4 @@ core_energy.only_squares_in_core: False
 # core_energy.scaling_for_plaq4 = 0
 # null is understood as None, whereas None would become 'None'
 core_energy.scaling_model: null
+core_energy.polygon_object.scope_measure: True

@@ -13,7 +13,7 @@ def generate_LHZ_problem(N: int):
     physical graph as qbit coord dictionary
     """
     graph = Graph.complete(N)
-    qbits = Qbits.init_qbits_from_dict(graph, dict(zip(graph.qbits, graph.qbits)))
+    qbits = Qbits.init_qbits_from_dict(graph, dict(zip(graph.qubits, graph.qubits)))
     qubit_to_coord_dict = qbits.qubit_to_coord_dict
     adj_matrix = graph.adj_matrix
 
