@@ -2,6 +2,7 @@ import numpy as np
 import networkx as nx
 from CompilerQC import Polygons, paths
 import pickle
+from shapely.geometry import LineString
 
 
 class Energy(Polygons):
@@ -11,6 +12,18 @@ class Energy(Polygons):
         scaling_for_plaq3: float = 0,
         scaling_for_plaq4: float = 0,
         scaling_model: str = None,
+        basic_energy: bool = True,
+        decay_weight: bool = False,
+        decay_rate: float = 1,
+        subset_weight: bool = False,
+        sparse_density_penalty: bool = False,
+        sparse_density_factor: float = 1,
+        line: bool = False,
+        line_exponent: float = 1,
+        bad_line_penalty: float = 0,
+        line_factor: float = 1,
+        low_noplaqs_penalty: bool = False,
+        low_noplaqs_factor: float = 1,
     ):
         """
         if a plaquette has been found, assign the scaling_for_plaq to it.
@@ -21,22 +34,23 @@ class Energy(Polygons):
 
 
         # polygon weights
+        self.basic_energy = basic_energy
 
-        self.decay_weight = False
-        self.decay_rate = 1
+        self.decay_weight = decay_weight
+        self.decay_rate = decay_rate
         
-        self.subset_weight = False
+        self.subset_weight = subset_weight
         
-        self.sparse_density_penalty = False
-        self.sparse_density_factor = 1
+        self.sparse_density_penalty = sparse_density_penalty
+        self.sparse_density_factor = sparse_density_factor
         
-        self.line = False
-        self.line_exponent = 1
-        self.bad_line_penalty = 1
-        self.line_factor = 1
+        self.line = line
+        self.line_exponent = line_exponent
+        self.bad_line_penalty = bad_line_penalty
+        self.line_factor = line_factor
         
-        self.low_noplaqs_penalty = False
-        self.low_noplaqs_factor = 1
+        self.low_noplaqs_penalty = low_noplaqs_penalty
+        self.low_noplaqs_factor = low_noplaqs_factor
         
         # scaling for plaquettes
         self.scaling_for_plaq3 = scaling_for_plaq3
@@ -110,11 +124,13 @@ class Energy(Polygons):
         Therefore, the blank energy (measured_energy) without any additional energy term is calculated, 
         then the additional (e.g. line) term is computed with a factor of 1, the ratio 
         measured_energy / line_energy is the new factor for the line term"""
-        (line_factor, bad_line_penalty,
-         sparse_density_factor, low_noplaqs_factor) = (self.line_factor, self.bad_line_penalty,
+        if not self.basic_energy:
+            return
+        (line_factor,
+         sparse_density_factor, low_noplaqs_factor) = (self.line_factor,
                                                        self.sparse_density_factor, self.low_noplaqs_factor)
-        (self.line_factor, self.bad_line_penalty,
-         self.sparse_density_factor, self.low_noplaqs_factor) = (0, 0 , 0 , 0)
+        (self.line_factor,
+         self.sparse_density_factor, self.low_noplaqs_factor) = (0 , 0 , 0)
 
         measure_energy = int(self.__call__(self.polygon_object.nodes_object.qbits)[0])
         line_energy_value, sparse_density_penalty, low_noplaqs_penalty = measure_energy, measure_energy, measure_energy
@@ -125,7 +141,6 @@ class Energy(Polygons):
         if self.low_noplaqs_penalty:
             low_noplaqs_penalty = int(sum(self.penalty_for_low_number_of_plaquettes()))
         self.line_factor = line_factor * measure_energy / line_energy_value
-        self.bad_line_penalty = bad_line_penalty * measure_energy / line_energy_value
         self.sparse_density_factor = sparse_density_factor * measure_energy / sparse_density_penalty
         self.low_noplaqs_factor = low_noplaqs_factor * measure_energy / low_noplaqs_penalty
 
@@ -339,25 +354,29 @@ class Energy(Polygons):
             qbits_path, distances = self.polygon_object.line_to_node(node)
             distances = np.power(np.array(distances), self.line_exponent)
             line_energy_value += (distances).sum()
-            # check if line is ending or starting bad, if so add penalty
-            start_qbit, end_qbit = qbits_path[0], qbits_path[-1]
-            number_of_free_neighbours_of_start = (
-                self.polygon_object.nodes_object.qbits.neighbours(
-                    start_qbit.coord
-                ).count(np.nan)
-            )
-            number_of_free_neighbours_of_end = (
-                self.polygon_object.nodes_object.qbits.neighbours(end_qbit.coord).count(
-                    np.nan
+            if self.bad_line_penalty:
+                # check if line is self intersecting, if so add penalty
+                if not LineString(([qbit.coord for qbit in qbits_path])).is_simple:
+                    line_energy_value += self.bad_line_penalty                
+                # check if line is ending or starting bad, if so add penalty
+                start_qbit, end_qbit = qbits_path[0], qbits_path[-1]
+                number_of_free_neighbours_of_start = (
+                    self.polygon_object.nodes_object.qbits.neighbours(
+                        start_qbit.coord
+                    ).count(np.nan)
                 )
-            )
-            if (
-                number_of_free_neighbours_of_start == 0
-                and len(start_qbit.plaquettes) < 2
-            ):
-                line_energy_value += self.bad_line_penalty
-            if number_of_free_neighbours_of_end == 0 and len(end_qbit.plaquettes) < 2:
-                line_energy_value += self.bad_line_penalty
+                number_of_free_neighbours_of_end = (
+                    self.polygon_object.nodes_object.qbits.neighbours(end_qbit.coord).count(
+                        np.nan
+                    )
+                )
+                if (
+                    number_of_free_neighbours_of_start == 0
+                    and len(start_qbit.plaquettes) < 2
+                ):
+                    line_energy_value += self.bad_line_penalty
+                if number_of_free_neighbours_of_end == 0 and len(end_qbit.plaquettes) < 2:
+                    line_energy_value += self.bad_line_penalty
         return line_energy_value
 
     def __call__(self, qbits_of_interest):
@@ -413,7 +432,7 @@ class Energy(Polygons):
                 self.penalty_for_low_number_of_plaquettes()
             )
 
-        energy_to_return += round(distances_to_plaquette.sum(), 5)
+        energy_to_return += int(self.basic_energy) * round(distances_to_plaquette.sum(), 5)
 
         return energy_to_return, number_of_plaquettes
 

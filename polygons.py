@@ -215,13 +215,19 @@ class Polygons:
         return ax
 
     def draw_lines(self, ax):
-        """draw lines of nodes in plot"""
+        """draw lines of nodes in plot
+        before calling this function, lines have to be initialized, 
+        easiest way in doing so is by calling energy.line_energy()
+        """
         for node in self.nodes_object.qbits.graph.nodes:
             qbits_path, _ = self.line_to_node(node)
-            ax.plot(
+            a = ax.plot(
                 [qbit.coord[0] for qbit in qbits_path],
                 [qbit.coord[1] for qbit in qbits_path],
+                linewidth = 20,
+                alpha=0.6
             )
+            a[0].set_solid_capstyle('round')
 
     def color_coords(self, coords_and_color, figsize=(15, 15)):
         """color coords according to color in coords_and_color,
