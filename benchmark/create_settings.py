@@ -119,7 +119,7 @@ functions_for_benchmarking.create_and_save_settings(name, new_dicts, new_config)
 name = "Energy"
 new_dicts = [
     {"energy.scaling_model": "MLP"},
-    {"energy.scaling_model": "maxC"},
+    {"energy.scaling_model": "INIT"},
     {"energy.scaling_model": "LHZ"},
     {"energy.scaling_for_plaq3": 0, "energy.scaling_for_plaq4": 0},
     {"energy.scaling_for_plaq3": 100, "energy.scaling_for_plaq4": 100},

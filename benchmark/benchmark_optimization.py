@@ -64,18 +64,12 @@ def benchmark_energy_scaling(args):
     logger.info("=================================================================")
     logger.info(f"benchmark {len(list_of_graphs_to_benchmark)} problem(s) from {args.problem_folder} folder")
     logger.info("=================================================================")
-
     for adj_matrix in list_of_graphs_to_benchmark:
         graph = Graph(adj_matrix=adj_matrix)
-        try:
-            benchmark_df = functions_for_benchmarking.run_benchmark(
-                benchmark_df, graph, args, logger
-            )
-        except:
-            print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-            print(f">>>>>>>>>> benchmark of {args.name} failed <<<<<<<<<<<<")
-            print("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-            pass
+        benchmark_df = functions_for_benchmarking.run_benchmark(
+            benchmark_df, graph, args, logger
+        )
+
     logger.info(f"Write results of {args.name} to csv")
     csv_path = path_to_results(args)
     if (csv_path).exists():
