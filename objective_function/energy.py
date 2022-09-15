@@ -462,13 +462,6 @@ class Energy_core(Energy):
         self.only_squares_in_core = False
         
 
-    @staticmethod
-    def is_rectengular(polygon_coord):
-        """
-        check if a given polygon forms a rectengular
-        """
-        return sum([len(set(coords)) == 2 for coords in list(zip(*polygon_coord))]) == 2
-
     def rectengular_energy(self, qbits_of_interest):
         """
         consider only scopes of rectengular shape
@@ -482,7 +475,7 @@ class Energy_core(Energy):
         self.polygons_coords_of_interest = [
             polygon
             for polygon in self.polygons_coords_of_interest
-            if Energy_core.is_rectengular(polygon)
+            if Polygons.is_rectengular(polygon)
         ]
 
     def qbits_in_max_core(self, K):

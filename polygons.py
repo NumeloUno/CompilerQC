@@ -122,6 +122,16 @@ class Polygons:
         c_y = (min_y + max_y) / 2
         return c_x, c_y
 
+    @staticmethod
+    def is_rectengular(polygon_coord):
+        """
+        check if a given polygon forms a rectengular
+        """
+        if len(polygon_coord) == 4:
+            return sum([len(set(coords)) == 2 for coords in list(zip(*polygon_coord))]) == 2
+        else:
+            return False
+        
     def set_plaquettes_of_qbits(self):
         """
         set the plaquettes of each qbit
