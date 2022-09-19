@@ -10,7 +10,7 @@ import pickle
 from copy import deepcopy
 from CompilerQC import *
 from uuid import uuid4
-
+import math
 import warnings
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
@@ -135,6 +135,8 @@ def evaluate_optimization(
     if mc.with_core:
         if not graph.is_complete:
             mc_core = initialize_MC_object(graph, mc_schedule, core=True)
+        else:
+            mc_core = None
     else:
         mc.swap_probability = 0
     for iteration in range(args.batch_size):
@@ -144,7 +146,7 @@ def evaluate_optimization(
                 qubit_coord_dict,
                 mc.energy.polygon_object.core_corner,
                 ancillas_in_core,
-            ) = search_max_core(mc_core, graph.K)
+            ) = search_max_core(mc_core, graph)
             if not graph.is_complete:
                 # if core is empty, dont allow swaps
                 if len(qubit_coord_dict) == 0:
@@ -296,25 +298,13 @@ def create_and_save_settings(name, new_dicts, new_config):
         ) as f:
             print(name, idx)
             yaml.dump(dict_to_save, f, default_flow_style=False)
-    pd.DataFrame(data={"filenames":filenames}).to_csv(paths.parameters_path / "csvs" / f"{name}.csv", index=False, index_label=False)        
-    with open(paths.parameters_path / "csvs" / f"run_{name}.sh", 'w') as sh:
-        sh.write(('''\
-#!/bin/bash 
-NUM_PARALLEL_JOBS=10 
-CSV_FILE=%s.csv
-tail -n +2 ${CSV_FILE} | parallel --progress --colsep ',' -j${NUM_PARALLEL_JOBS} \
-python "../../benchmark_optimization.py --yaml_path={1} --batch_size=20 \
---min_N=4 --max_N=40 --min_C=3 --max_C=91 --max_size=50 \
---problem_folder=problems_by_square_density/fsquare_density_of_1.0" 
-        ''')%(name))
-    with open(paths.plots / "scripts_to_create_gifs" / f"create_gif_for_{name}.sh", 'w') as sh:
-        sh.write(('''\
-#!/bin/bash 
-NUM_PARALLEL_JOBS=1
-CSV_FILE=../../parameters/csvs/%s.csv
-tail -n +2 ${CSV_FILE} | parallel --progress --colsep ',' -j${NUM_PARALLEL_JOBS} \
-python "../../benchmark_optimization.py --yaml_path={1} \
---min_N=4 --max_N=40 --min_C=3 --max_C=91 --max_size=1 \
---problem_folder=problems_by_square_density/fsquare_density_of_1.0  \
---visualize=True --number_of_core_images=50 --number_of_images=1000" 
-        ''')%(name))
+    for i in range(math.ceil(len(filenames) / 30)):
+        df = pd.DataFrame(data = {"filenames":filenames[i * 30 : (i + 1) * 30]})
+        df["batch_size"] =  1
+        df["min_N"] = 4
+        df["max_N"] = 40 
+        df["min_C"] = 3
+        df["max_C"] = 91
+        df["max_size"] = 50
+        df["problem_folder"] = "lhz" 
+        df.to_csv(paths.parameters_path / "csvs" / f"{name}_part_{i}.csv", index=False, index_label=False)        

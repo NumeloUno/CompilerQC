@@ -62,10 +62,8 @@ class Energy(Polygons):
         self.scaling_for_plaq3 = scaling_for_plaq3
         self.scaling_for_plaq4 = scaling_for_plaq4
         self.scaling_model = scaling_model
-        if self.scaling_model is not None:
-            self.set_scaling_from_model()
-        else: 
-            self.set_scaling_for_energy_terms()
+        self.set_scaling_from_model()
+
 
 
     def set_scaling_from_model(self):
@@ -73,53 +71,56 @@ class Energy(Polygons):
         load and set plaquette scaling from given model
         INIT: estimate energy by energy of initial configuration
         """
-        assert self.scaling_model in [
-            "MLP",
-            "INIT",
-            "LHZ",
-        ], "selected model does not exist, choose from 'MLP', 'INIT' or 'LHZ'"
-        
-        assert self.polygon_object.exponent in [0.5, 1, 2, 3, 4, 5, 6] or self.scaling_model=="INIT", "their is no valid LHZ or MLP scaling for this exponent, if you want to keep this exponent, choose INIT as scaling_model"
-        if self.polygon_object.scope_measure: 
-            measure = "Scope"
-        else:
-            measure = "MoI"
-        
-        if self.scaling_model == "MLP":
-            loaded_model = pickle.load(
-                open(paths.energy_scalings / f"MLP_{measure}_{self.polygon_object.exponent}.sav", "rb")  
-            )
-            predicted_energy = loaded_model.predict(
-                [
+        predicted_energy = None
+        if self.scaling_model is not None:
+            assert self.scaling_model in [
+                "MLP",
+                "INIT",
+                "LHZ",
+            ], "selected model does not exist, choose from 'MLP', 'INIT' or 'LHZ'"
+
+            assert self.polygon_object.exponent in [0.5, 1, 2, 3, 4, 5, 6] or self.scaling_model=="INIT", "their is no valid LHZ or MLP scaling for this exponent, if you want to keep this exponent, choose INIT as scaling_model"
+            if self.polygon_object.scope_measure: 
+                measure = "Scope"
+            else:
+                measure = "MoI"
+
+            if self.scaling_model == "MLP":
+                loaded_model = pickle.load(
+                    open(paths.energy_scalings / f"MLP_{measure}_{self.polygon_object.exponent}.sav", "rb")  
+                )
+                predicted_energy = loaded_model.predict(
                     [
-                        self.polygon_object.nodes_object.qbits.graph.N,
-                        self.polygon_object.nodes_object.qbits.graph.K,
-                        self.polygon_object.nodes_object.qbits.graph.C,
-                        self.polygon_object.nodes_object.qbits.graph.number_of_3_cycles,
-                        self.polygon_object.nodes_object.qbits.graph.number_of_4_cycles,
+                        [
+                            self.polygon_object.nodes_object.qbits.graph.N,
+                            self.polygon_object.nodes_object.qbits.graph.K,
+                            self.polygon_object.nodes_object.qbits.graph.C,
+                            self.polygon_object.nodes_object.qbits.graph.number_of_3_cycles,
+                            self.polygon_object.nodes_object.qbits.graph.number_of_4_cycles,
+                        ]
                     ]
-                ]
-            )[0]
+                )[0]
 
-        if self.scaling_model == "INIT":
-            predicted_energy, _ = self.__call__(self.polygon_object.nodes_object.qbits)
-            
-        if self.scaling_model == "LHZ":
-            poly_coeffs = np.load(paths.energy_scalings / f"LHZ_{measure}_{self.polygon_object.exponent}.npy")
-            poly_function = np.poly1d(poly_coeffs)
-            predicted_energy = poly_function(
-                self.polygon_object.nodes_object.qbits.graph.C
+            if self.scaling_model == "INIT":
+                predicted_energy, _ = self.__call__(self.polygon_object.nodes_object.qbits)
+
+            if self.scaling_model == "LHZ":
+                poly_coeffs = np.load(paths.energy_scalings / f"LHZ_{measure}_{self.polygon_object.exponent}.npy")
+                poly_function = np.poly1d(poly_coeffs)
+                predicted_energy = poly_function(
+                    self.polygon_object.nodes_object.qbits.graph.C
+                )
+
+            scaling_for_plaq3 = scaling_for_plaq4 = (
+                predicted_energy / self.polygon_object.nodes_object.qbits.graph.C
             )
-
-        scaling_for_plaq3 = scaling_for_plaq4 = (
-            predicted_energy / self.polygon_object.nodes_object.qbits.graph.C
-        )
-        self.scaling_for_plaq3, self.scaling_for_plaq4 = (
-            scaling_for_plaq3,
-            scaling_for_plaq4,
-        )
-        # update unit scope/MoI if the function has been updated
-        self.polygon_object.set_unit_measure()
+            self.scaling_for_plaq3, self.scaling_for_plaq4 = (
+                scaling_for_plaq3,
+                scaling_for_plaq4,
+            )
+            # update unit scope/MoI if the function has been updated
+            self.polygon_object.set_unit_measure()
+            
         self.set_scaling_for_energy_terms()
         return predicted_energy
 

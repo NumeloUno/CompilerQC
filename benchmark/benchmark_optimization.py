@@ -147,6 +147,15 @@ if __name__ == "__main__":
         default=1000,
     )
     args = parser.parse_args()
+    print("yaml_path", args.yaml_path)
+    print("batch_size", args.batch_size)
+    print("min_N", args.min_N)
+    print("max_N", args.max_N)
+    print("min_C", args.min_C)
+    print("max_C", args.max_C)
+    print("max_size", args.max_size)
+    print("problem_folder", args.problem_folder)
+
     # save results using id (which is also in filename of mc_parameters.yaml) in filename
     args.id_of_benchmark = args.yaml_path.split("_")[2]
     names = args.yaml_path.split(".")[0].split("_")

@@ -16,7 +16,7 @@ print("===================================")
 print("==== Delete old settings/csvs =====")
 print("===================================")
 for p in Path("parameters/").glob("*"):
-    if p.name not in ["run_parameters.sh", "Default"]:
+    if p.name not in ["run_script.sh", "run_parameters.sh", "Default"]:
         print(p.name)
         shutil.rmtree(f"parameters/{p.name}", ignore_errors=True)
 print("===================================")
@@ -490,3 +490,73 @@ new_dicts = [{k: v for d in L for k, v in d.items()} for L in individual_setting
 functions_for_benchmarking.create_and_save_settings(
     f"{name}WithCore", new_dicts, new_config
 )
+
+
+name = "EnergyForLHZGraphs"
+# open default yaml and update it by default settings
+with open(paths.parameters_path / "Default/default.yaml") as f:
+    config = yaml.load(f, Loader=yaml.FullLoader)
+default_update = {
+    "random_qbit": True,
+    "finite_grid_size": True,
+    "padding_finite_grid": 1,
+    "temperature_kirkpatrick": True,
+    "alpha": 0.99,
+    "init_T_by_std": True,
+    "repetition_rate_factor": 6,
+}
+new_config = functions_for_benchmarking.update(config, default_update)
+
+individual_settings = [
+    [
+        {"with_core": True},
+        {"with_core": False}
+    ],
+    [
+        {"energy.polygon_object.scope_measure": True},
+        {"energy.polygon_object.scope_measure": False}
+    ],
+    [
+        {"energy.scaling_for_plaq3": 0, "energy.scaling_for_plaq4": 0},
+        {"energy.scaling_for_plaq3": 1000000, "energy.scaling_for_plaq4": 1000000},
+        {"energy.scaling_model": 'LHZ'},
+        {"energy.scaling_model": 'INIT'}
+    ],
+    [
+#         {"energy.polygon_object.exponent":0.5},
+        {"energy.polygon_object.exponent":1},
+        {"energy.polygon_object.exponent":2},
+#         {"energy.polygon_object.exponent":3},
+#         {"energy.polygon_object.exponent":4},
+#         {"energy.polygon_object.exponent":5},
+#         {"energy.polygon_object.exponent":6},
+    ],
+    [
+        {"energy.decay_weight": False},
+        {"energy.decay_weight": True, "energy.decay_rate": 1},
+#         {"energy.decay_weight": True, "energy.decay_rate": 1.5},        
+    ],
+    [
+        {"energy.line": False},
+        {"energy.line": True, "energy.line_exponent": 2},
+#         {"energy.line": True, "energy.line_exponent": 3}
+    ],
+#     [    
+#         {"energy.subset_weight": True},       
+#         {"energy.subset_weight": False},
+#     ],
+#     [
+#         {"energy.sparse_density_penalty": True},
+#         {"energy.sparse_density_penalty": False},
+#     ],
+#     [
+#         {"energy.low_noplaqs_penalty": True},
+#         {"energy.low_noplaqs_penalty": False},
+#     ]
+]
+individual_settings = list(itertools.product(*individual_settings))
+new_dicts = [{k: v for d in L for k, v in d.items()} for L in individual_settings]
+functions_for_benchmarking.create_and_save_settings(
+    f"{name}", new_dicts, new_config
+)
+

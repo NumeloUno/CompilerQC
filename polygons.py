@@ -28,6 +28,7 @@ class Polygons:
         line_scaling: if the distance between two qbits is 1.0 or sqrt(2), hence the qbits are
         adjacent, set their distance to line_scaling
         if not scope_measure, then MoI_measure is choosen
+        exponent: in the measure functions (scope or MoI)
         """
         self.nodes_object = nodes_object
         if polygons is None:
