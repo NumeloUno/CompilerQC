@@ -241,3 +241,18 @@ class Graph:
         if graph.K < 4:
             graph = Graph.init_without_short_nodes(adj_matrix, shorter_than-1)
         return graph
+    
+    @property
+    def is_complete(self):
+        return self.K == self.N / 2 * (self.N - 1)
+
+    def max_complete_bipartite_core_for_LHZ(self):
+        """
+        returns the qubit_to_coord_dict for the maximum complete bipartite 
+        core for LHZ
+        """
+        assert self.is_complete, "this funtion is only valid for complete connected graphs"
+        nodes = np.arange(self.N)
+        x, y = np.meshgrid(nodes[: self.N // 2], nodes[self.N // 2 :])
+        x, y = x.flatten(), y.flatten()
+        return dict(zip(zip(x, y), zip(x, y)))
