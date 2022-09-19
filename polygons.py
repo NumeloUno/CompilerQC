@@ -132,6 +132,25 @@ class Polygons:
         else:
             return False
         
+    @staticmethod
+    def move_to_center(qubit_coord_dict, K):
+        """
+        move coords in qubit_coord_dict
+        to center of later initialization
+        with K qubits
+        """
+        core_center_x, core_center_y = Polygons.center_of_coords(
+            qubit_coord_dict.values()
+        )
+        center_envelop_of_all_coord = np.sqrt(K) / 2
+        delta_cx, delta_cy = int(center_envelop_of_all_coord - core_center_x), int(
+            center_envelop_of_all_coord - core_center_y
+        )
+
+        for qubit, coord in qubit_coord_dict.items():
+            qubit_coord_dict[qubit] = tuple(np.add(coord, (delta_cx, delta_cy)))
+        return qubit_coord_dict
+            
     def set_plaquettes_of_qbits(self):
         """
         set the plaquettes of each qbit
@@ -358,3 +377,20 @@ class Polygons:
             if set(ancillas).isdisjoint(polygon):
                 remaining_polygons.append(polygon)
         self.polygons = remaining_polygons
+
+    @staticmethod
+    def number_of_swap_gates(polygon_coord):
+        """
+        converts the distance to the qbit 
+        (which is closest to Center)
+        in swap counts
+        """
+        center = np.mean(polygon_coord, axis=0)
+        closest_coord_to_center = sorted([(dist(coord, center), coord) for coord in polygon_coord])[0][1]
+        number_of_swap_gates = 0
+        for coord in polygon_coord:
+            # -1 since it should not be on the same place as the center qbit
+            distance_to_closest_coord = np.abs(np.subtract(closest_coord_to_center, coord)).sum() - 1
+            if distance_to_closest_coord > 0:
+                number_of_swap_gates += distance_to_closest_coord
+        return number_of_swap_gates
