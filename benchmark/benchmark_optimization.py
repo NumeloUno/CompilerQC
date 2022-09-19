@@ -2,11 +2,8 @@
 from tqdm import tqdm
 from CompilerQC import *
 import numpy as np
-import pickle
 import argparse
-import os.path
 import pandas as pd
-import csv
 from pathlib import Path
 
 path_to_results = lambda args: (
