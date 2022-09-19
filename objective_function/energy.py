@@ -3,6 +3,12 @@ import networkx as nx
 from CompilerQC import Polygons, paths
 import pickle
 from shapely.geometry import LineString
+import shapely
+from shapely.ops import unary_union
+from shapely.geometry import CAP_STYLE, JOIN_STYLE, MultiPoint, Polygon
+import math
+from shapely.validation import make_valid
+from itertools import combinations
 
 
 class Energy(Polygons):
@@ -24,6 +30,7 @@ class Energy(Polygons):
         line_factor: float = 1,
         low_noplaqs_penalty: bool = False,
         low_noplaqs_factor: float = 1,
+        all_constraints: bool=False,
     ):
         """
         if a plaquette has been found, assign the scaling_for_plaq to it.
@@ -31,8 +38,7 @@ class Energy(Polygons):
         this model
         """
         self.polygon_object = polygon_object
-
-
+        self.all_constraints = all_constraints
         # polygon weights
         self.basic_energy = basic_energy
 
@@ -140,9 +146,9 @@ class Energy(Polygons):
             sparse_density_penalty = int(sum(self.penalty_for_sparse_plaquette_density()))
         if self.low_noplaqs_penalty:
             low_noplaqs_penalty = int(sum(self.penalty_for_low_number_of_plaquettes()))
-        self.line_factor = line_factor * measure_energy / line_energy_value
-        self.sparse_density_factor = sparse_density_factor * measure_energy / sparse_density_penalty
-        self.low_noplaqs_factor = low_noplaqs_factor * measure_energy / low_noplaqs_penalty
+        self.line_factor = line_factor * measure_energy / (1 + line_energy_value)
+        self.sparse_density_factor = sparse_density_factor * measure_energy / (1 + sparse_density_penalty)
+        self.low_noplaqs_factor = low_noplaqs_factor * measure_energy / (1 + low_noplaqs_penalty)
 
     def scopes_of_polygons(self):
         """return array of the scopes of all changed polygons,"""
@@ -379,16 +385,56 @@ class Energy(Polygons):
                     line_energy_value += self.bad_line_penalty
         return line_energy_value
 
+    def consider_all_constraints(self):
+        """
+        weight all constraints, even those which are fulfilled implict
+        """
+        plaquettes = [([self.polygon_object.nodes_object.qbits[qubit].coord for qubit in plaquette]) for plaquette in self.polygon_object.nodes_object.qbits.found_plaqs()]
+        plaquettes_ = [(Polygon(plaquette).envelope) if len(plaquette)==4 else Polygon(plaquette) for plaquette in plaquettes]
+        union = unary_union(plaquettes_)
+
+        # the case where two triangle plaquettes from a rectengular four constraint is not covered yet
+        triangle_plaquettes = [plaq for plaq in plaquettes if len(plaq)==3]
+        four_constraints = []
+        for combi in list(combinations(triangle_plaquettes, 2)):
+            constraint = set(combi[0] + combi[1]) - set(combi[0]).intersection(combi[1])
+            if len(constraint) == 4:
+                four_constraints.append(constraint)
+                
+        constraints, ps = [], []
+        for polygon_coord in self.polygon_object.polygons_coords(qubit_to_coord_dict=self.polygon_object.nodes_object.qbits.qubit_to_coord_dict, polygons=self.polygon_object.polygons):
+            p = Polygon(polygon_coord)
+            if not p.is_valid:
+                p = make_valid(p)
+            if math.isclose(union.intersection(p).area, p.area):
+                constraints.append(-self.scaling_for_plaq4 / self.polygon_object.scope_of_polygon(polygon_coord) ** 2)
+                ps.append(polygon_coord)
+            elif set(polygon_coord) in four_constraints:
+                constraints.append(-self.scaling_for_plaq4 / self.polygon_object.scope_of_polygon(polygon_coord) ** 2)
+                ps.append(polygon_coord)
+            else:
+                constraints.append(self.polygon_object.scope_of_polygon(polygon_coord))
+                
+        self.constraints = constraints
+        self.ps = ps
+        
+        return np.array(constraints), len(plaquettes)
+
+    # insert in __call__:
+    
     def __call__(self, qbits_of_interest):
         """
         return the energy and number of plaquettes of the polygons belonging to
         qbits of interest
         """
+        if self.all_constraints:
+            energy_to_return, number_of_plaquettes = self.consider_all_constraints()
+            return energy_to_return.sum(), number_of_plaquettes
+
         polygons_of_interest = self.changed_polygons(qbits_of_interest)
         self.polygons_coords_of_interest = self.coords_of_changed_polygons(
             polygons_of_interest
         )
-
         if self.polygon_object.scope_measure:
             measure = self.scopes_of_polygons() 
         if not self.polygon_object.scope_measure:
@@ -505,16 +551,7 @@ class Energy_core(Energy):
         }
 
         # move core to center of later initialization
-        core_center_x, core_center_y = Polygons.center_of_coords(
-            qubit_coord_dict.values()
-        )
-        center_envelop_of_all_coord = np.sqrt(K) / 2
-        delta_cx, delta_cy = int(center_envelop_of_all_coord - core_center_x), int(
-            center_envelop_of_all_coord - core_center_y
-        )
-
-        for qubit, coord in qubit_coord_dict.items():
-            qubit_coord_dict[qubit] = tuple(np.add(coord, (delta_cx, delta_cy)))
+        qubit_coord_dict = Polygons.move_to_center(qubit_coord_dict, K)
         # coords of envelop of core
         core_coords = list(qubit_coord_dict.values())
         corner = Polygons.corner_of_coords(core_coords)
