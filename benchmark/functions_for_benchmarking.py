@@ -10,6 +10,7 @@ import pickle
 from copy import deepcopy
 from CompilerQC import *
 import logging
+from uuid import uuid4
 
 import warnings
 
@@ -17,7 +18,15 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 
 import pandas as pd
 
-
+def save_object(obj, filename):
+    with open(filename, 'wb') as outp:  # Overwrites any existing file.
+        pickle.dump(obj, outp, pickle.HIGHEST_PROTOCOL)
+        
+path_to_results = lambda args: (
+    paths.benchmark_results_path
+    / f"benchmark_{(args.problem_folder).replace('/','_')}_with_{args.id_of_benchmark}"
+)
+        
 def update_mc(mc, mc_schedule, core: bool = False):
     """
     update attributes in MC or Energy
@@ -112,10 +121,9 @@ def initialize_MC_object(graph: Graph, mc_schedule: dict, core: bool = False):
 
 def evaluate_optimization(
     graph: Graph,
-    name: str,
     mc_schedule: dict,
     dataframe: pd.DataFrame,
-    batch_size: int,
+    args: "arguments from parser",
     logger: "logging object",
 ):
     """
@@ -130,13 +138,13 @@ def evaluate_optimization(
     else:
         mc.swap_probability = 0
     # benchmark
-    success_rate = np.zeros(batch_size)
-    record_n_total_steps = np.zeros(batch_size)
-    record_n_missing_C = np.zeros(batch_size)
-    record_core_size = np.zeros(batch_size)
-    record_n_core_qbits = np.zeros(batch_size)
-    number_of_ancillas = np.zeros(batch_size)
-    for iteration in range(batch_size):
+    success_rate = np.zeros(args.batch_size)
+    record_n_total_steps = np.zeros(args.batch_size)
+    record_n_missing_C = np.zeros(args.batch_size)
+    record_core_size = np.zeros(args.batch_size)
+    record_n_core_qbits = np.zeros(args.batch_size)
+    number_of_ancillas = np.zeros(args.batch_size)
+    for iteration in range(args.batch_size):
         # search for core
         if mc_schedule["with_core"]:
             logger.info(f"search core in iteration {iteration}")
@@ -177,6 +185,7 @@ def evaluate_optimization(
         mc.remove_ancillas(
             mc.energy.polygon_object.nodes_object.propose_ancillas_to_remove()
         )
+        save_object(mc, path_to_results(args) / f'{args.name}/{str(uuid4())}_N_K_C_{graph.N}_{graph.K}_{graph.C}_.pkl')
         # save results in arrays
         n_missing_C = graph.C - mc.number_of_plaquettes
         record_n_total_steps[iteration] = mc.n_total_steps
@@ -195,7 +204,7 @@ def evaluate_optimization(
     # save resutls in dataframe
     mc_schedule.update(
         {
-            "batchsize": batch_size,
+            "batchsize": args.batch_size,
             "success_rate": np.mean(success_rate),
             "avg_n_missing_C": np.mean(record_n_missing_C),
             "var_n_missing_C": np.std(record_n_missing_C),
@@ -215,7 +224,7 @@ def evaluate_optimization(
             "core_init_temperature": None,
             "core_N": None,
             "core_C": None,
-            "name": name,
+            "name": args.name,
             "number_of_ancillas": np.mean(number_of_ancillas),
         }
     )
@@ -255,7 +264,7 @@ def run_benchmark(
         f"start benchmarking {args.id_of_benchmark, args.name} with problem size {graph.N}"
     )
     benchmark_df = evaluate_optimization(
-        graph, args.name, mc_schedule, benchmark_df, args.batch_size, logger
+        graph, mc_schedule, benchmark_df, args, logger
     )
     return benchmark_df
 
