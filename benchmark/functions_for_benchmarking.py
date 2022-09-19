@@ -9,7 +9,6 @@ import argparse
 import pickle
 from copy import deepcopy
 from CompilerQC import *
-import logging
 from uuid import uuid4
 
 import warnings
@@ -122,47 +121,34 @@ def initialize_MC_object(graph: Graph, mc_schedule: dict, core: bool = False):
 def evaluate_optimization(
     graph: Graph,
     mc_schedule: dict,
-    dataframe: pd.DataFrame,
     args: "arguments from parser",
-    logger: "logging object",
 ):
     """
     evaluate monte carlo/ simulated annealing schedule for batch_size timed and returns
     a success probability -> measure of how good the choosen schedule (temperature,
     configuration distribution, ...) is
     """
-    logger.info("Initialize mc object")
     mc = initialize_MC_object(graph, mc_schedule)
     if mc_schedule["with_core"]:
         mc_core = initialize_MC_object(graph, mc_schedule, core=True)
     else:
         mc.swap_probability = 0
-    # benchmark
-    success_rate = np.zeros(args.batch_size)
-    record_n_total_steps = np.zeros(args.batch_size)
-    record_n_missing_C = np.zeros(args.batch_size)
-    record_core_size = np.zeros(args.batch_size)
-    record_n_core_qbits = np.zeros(args.batch_size)
-    number_of_ancillas = np.zeros(args.batch_size)
     for iteration in range(args.batch_size):
         # search for core
         if mc_schedule["with_core"]:
-            logger.info(f"search core in iteration {iteration}")
             (
                 qubit_coord_dict,
                 mc.energy.polygon_object.core_corner,
                 ancillas_in_core,
             ) = search_max_core(mc_core, graph.K)
-            logger.info(
-                f"found core with {mc_core.number_of_plaquettes} / {graph.C} plaquettes"
-            )
-            record_n_core_qbits[iteration] = len(qubit_coord_dict)
-            record_core_size[iteration] = mc_core.number_of_plaquettes
             # if core is empty, dont allow swaps
             if len(qubit_coord_dict) == 0:
                 mc.swap_probability = 0
                 mc.finite_grid_size = True
                 mc.random_qbit = True
+            else:
+                save_object(mc_core, path_to_results(args) / f'{args.name}/{str(uuid4())}_CORE_N_K_C_{graph.N}_{graph.K}_{graph.C}_.pkl')
+
             # reset mc core
             mc_core.reset(mc_core.T_0, remove_ancillas=True)
             # update core (reset is part of update)
@@ -179,74 +165,18 @@ def evaluate_optimization(
             mc.energy.polygon_object.nodes_object.qbits.core_qbits
         )
         if remaining_qbits > 0:
-            logger.info(f"place {remaining_qbits} remaining qubits")
             mc.apply(mc.n_moves)
         # remove ancillas which dont reduce d.o.f
         mc.remove_ancillas(
             mc.energy.polygon_object.nodes_object.propose_ancillas_to_remove()
         )
         save_object(mc, path_to_results(args) / f'{args.name}/{str(uuid4())}_N_K_C_{graph.N}_{graph.K}_{graph.C}_.pkl')
-        # save results in arrays
-        n_missing_C = graph.C - mc.number_of_plaquettes
-        record_n_total_steps[iteration] = mc.n_total_steps
-        record_n_missing_C[iteration] = n_missing_C
-        success_rate[iteration] = n_missing_C == 0
-        number_of_ancillas[iteration] = len(
-            [
-                qbit
-                for qbit in mc.energy.polygon_object.nodes_object.qbits
-                if qbit.ancilla == True
-            ]
-        )
-
         # reset mc object
         mc.reset(current_temperature=mc.T_0, remove_ancillas=True, keep_core=False)
-    # save resutls in dataframe
-    mc_schedule.update(
-        {
-            "batchsize": args.batch_size,
-            "success_rate": np.mean(success_rate),
-            "avg_n_missing_C": np.mean(record_n_missing_C),
-            "var_n_missing_C": np.std(record_n_missing_C),
-            "avg_n_total_steps": np.mean(record_n_total_steps),
-            "var_n_total_steps": np.std(record_n_total_steps),
-            "avg_core_size": np.mean(record_core_size),
-            "std_core_size": np.std(record_core_size),
-            "avg_n_core_qbits": np.mean(record_n_core_qbits),
-            "std_n_core_qbits": np.std(record_n_core_qbits),
-            "N": graph.N,
-            "C": graph.C,
-            "energy.scaling_for_plaq3": mc.energy.scaling_for_plaq3,
-            "energy.scaling_for_plaq4": mc.energy.scaling_for_plaq4,
-            "init_temperature": mc.T_0,
-            "core_energy.scaling_for_plaq3": None,
-            "core_energy.scaling_for_plaq4": None,
-            "core_init_temperature": None,
-            "core_N": None,
-            "core_C": None,
-            "name": args.name,
-            "number_of_ancillas": np.mean(number_of_ancillas),
-        }
-    )
-    if mc_schedule["with_core"]:
-        mc_schedule.update(
-            {
-                "core_energy.scaling_for_plaq3": mc_core.energy.scaling_for_plaq3,
-                "core_energy.scaling_for_plaq4": mc_core.energy.scaling_for_plaq4,
-                "core_init_temperature": mc_core.T_0,
-                "core_N": mc_core.energy.polygon_object.nodes_object.qbits.graph.N,
-                "core_C": mc_core.energy.polygon_object.nodes_object.qbits.graph.C,
-            }
-        )
-    dataframe = dataframe.append(mc_schedule, ignore_index=True, sort=False)
-    return dataframe
-
 
 def run_benchmark(
-    benchmark_df: pd.DataFrame,
     graph: Graph,
     args,
-    logger: "logging object",
 ):
     """
     evaluate simulated annealing schedules from mc_parameters yaml
@@ -259,14 +189,9 @@ def run_benchmark(
     with open(path_to_config) as f:
         mc_schedule = yaml.load(f, Loader=yaml.FullLoader)
     # evaluate schedule from yaml and save it
-    logger.info("================== benchmark ==================")
-    logger.info(
-        f"start benchmarking {args.id_of_benchmark, args.name} with problem size {graph.N}"
+    evaluate_optimization(
+        graph, mc_schedule, args
     )
-    benchmark_df = evaluate_optimization(
-        graph, mc_schedule, benchmark_df, args, logger
-    )
-    return benchmark_df
 
 
 def visualize_search(
@@ -345,20 +270,18 @@ def create_and_save_settings(name, new_dicts, new_config):
     """update default yaml by newdict and save them in mc_parameters_name.yaml
     note: there are absolute paths in use!"""
     (paths.parameters_path / "csvs").mkdir(parents=True, exist_ok=True)
-    filenames, log_names = [], []
+    filenames = []
     for idx, new_dict in enumerate(new_dicts):
         # create folder if it doesnt exists yet
         filenames.append(f"mc_parameters_{name}_{idx}.yaml")
-        log_names.append(paths.logger_path / name / f"{name}_{idx}")
         (paths.parameters_path / name).mkdir(parents=True, exist_ok=True)
-        (paths.logger_path / name).mkdir(parents=True, exist_ok=True)
         dict_to_save = update(deepcopy(new_config), new_dict)
         with open(
             paths.parameters_path / name / f"mc_parameters_{name}_{idx}.yaml", "w"
         ) as f:
             print(name, idx)
             yaml.dump(dict_to_save, f, default_flow_style=False)
-    pd.DataFrame(data={"filenames":filenames, "log_names":log_names}).to_csv(paths.parameters_path / "csvs" / f"{name}.csv", index=False, index_label=False)        
+    pd.DataFrame(data={"filenames":filenames}).to_csv(paths.parameters_path / "csvs" / f"{name}.csv", index=False, index_label=False)        
     with open(paths.parameters_path / "csvs" / f"run_{name}.sh", 'w') as sh:
         sh.write(('''\
 #!/bin/bash 
@@ -367,7 +290,7 @@ CSV_FILE=%s.csv
 tail -n +2 ${CSV_FILE} | parallel --progress --colsep ',' -j${NUM_PARALLEL_JOBS} \
 python "../../benchmark_optimization.py --yaml_path={1} --batch_size=20 \
 --min_N=4 --max_N=40 --min_C=3 --max_C=91 --max_size=50 \
---problem_folder=problems_by_square_density/fsquare_density_of_1.0 2>&1 > {2}.log" 
+--problem_folder=problems_by_square_density/fsquare_density_of_1.0" 
         ''')%(name))
     with open(paths.plots / "scripts_to_create_gifs" / f"create_gif_for_{name}.sh", 'w') as sh:
         sh.write(('''\

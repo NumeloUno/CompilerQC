@@ -6,7 +6,6 @@ import pickle
 import argparse
 import os.path
 import pandas as pd
-import logging
 import csv
 from pathlib import Path
 
@@ -30,7 +29,6 @@ def graphs_to_benchmark(args):
         max_N=args.max_N,
     )
     graphs = []
-#    np.random.shuffle(problems)
     for file in problems[:args.max_size]:
         # read graph and qubit to coord translation from file
         graph_adj_matrix, qubit_coord_dict = functions_for_database.problem_from_file(
@@ -45,42 +43,12 @@ def benchmark_energy_scaling(args):
     benchmark the search of compiled graphs for
     fully connected logical graphs,
     scale plaqs by prediction of MLP
-    logger note: duplicate-log-output-when-using-python-logging-module
     """
-    benchmark_df = pd.DataFrame()
-    logger = logging.getLogger()
-    fhandler = logging.FileHandler(
-        filename=paths.logger_path / args.id_of_benchmark / f"{args.name}.log", mode="a"
-    )
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    fhandler.setFormatter(formatter)
-    if logger.hasHandlers():
-        logger.handlers.clear()
-    logger.addHandler(fhandler)
-    logger.setLevel(logging.INFO)
-    
     list_of_graphs_to_benchmark = graphs_to_benchmark(args)
-    logger.info("=================================================================")
-    logger.info(f"benchmark {len(list_of_graphs_to_benchmark)} problem(s) from {args.problem_folder} folder")
-    logger.info("=================================================================")
     Path(path_to_results(args) / f'{args.name}').mkdir(parents=True, exist_ok=True)
     for adj_matrix in list_of_graphs_to_benchmark:
         graph = Graph(adj_matrix=adj_matrix)
-        benchmark_df = functions_for_benchmarking.run_benchmark(
-            benchmark_df, graph, args, logger
-        )
-
-    logger.info(f"Write results of {args.name} to csv")
-    csv_path = path_to_results(args) / "results.csv"
-    if (csv_path).exists():
-        with open(csv_path, "r") as file:
-            fieldnames = csv.DictReader(file).fieldnames
-        benchmark_df[fieldnames].to_csv(csv_path, mode="a", header=False, index=False)
-    else:
-        benchmark_df.to_csv(csv_path, mode="a", header=True, index=False)
-
+        functions_for_benchmarking.run_benchmark(graph, args)
 
 def visualize_benchmarks(args):
     """
