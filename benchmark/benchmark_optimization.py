@@ -8,10 +8,11 @@ import os.path
 import pandas as pd
 import logging
 import csv
+from pathlib import Path
 
 path_to_results = lambda args: (
     paths.benchmark_results_path
-    / f"benchmark_{(args.problem_folder).replace('/','_')}_with_{args.id_of_benchmark}.csv"
+    / f"benchmark_{(args.problem_folder).replace('/','_')}_with_{args.id_of_benchmark}"
 )
 
 
@@ -64,6 +65,7 @@ def benchmark_energy_scaling(args):
     logger.info("=================================================================")
     logger.info(f"benchmark {len(list_of_graphs_to_benchmark)} problem(s) from {args.problem_folder} folder")
     logger.info("=================================================================")
+    Path(path_to_results(args) / f'{args.name}').mkdir(parents=True, exist_ok=True)
     for adj_matrix in list_of_graphs_to_benchmark:
         graph = Graph(adj_matrix=adj_matrix)
         benchmark_df = functions_for_benchmarking.run_benchmark(
@@ -71,7 +73,7 @@ def benchmark_energy_scaling(args):
         )
 
     logger.info(f"Write results of {args.name} to csv")
-    csv_path = path_to_results(args)
+    csv_path = path_to_results(args) / "results.csv"
     if (csv_path).exists():
         with open(csv_path, "r") as file:
             fieldnames = csv.DictReader(file).fieldnames
