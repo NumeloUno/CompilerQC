@@ -20,12 +20,6 @@ for p in Path("parameters/").glob("*"):
         print(p.name)
         shutil.rmtree(f"parameters/{p.name}", ignore_errors=True)
 print("===================================")
-print("======== Delete old logs ==========")
-print("===================================")
-for p in Path("logs/").glob("*"):
-    print(p.name)
-    shutil.rmtree(f"logs/{p.name}", ignore_errors=True)
-print("===================================")
 print("=Delete old scripts to create gifs=")
 print("===================================")
 for p in Path("plots/scripts_to_create_gifs").glob("*"):
@@ -44,7 +38,7 @@ default_update = {
     "with_core": True,
     "random_qbit": True,
     "finite_grid_size": True,
-    "padding_finite_grid": 2,
+    "padding_finite_grid": 1,
     "repetition_rate_factor": 5,
     "temperature_kirkpatrick": True,
     "core_temperature_kirkpatrick": True,
@@ -197,7 +191,7 @@ new_dicts = [
     {"swap_probability": 0.1, "decay_rate_of_swap_probability": 0.9},
     {"swap_probability": 0.1, "decay_rate_of_swap_probability": 0.6},
     {"swap_probability": 0.1, "decay_rate_of_swap_probability": 0.3},
-    {"finite_grid_size": True, "padding_finite_grid": 2},
+    {"finite_grid_size": True, "padding_finite_grid": 1},
     {
         "min_plaquette_density_in_softcore": 0.75,
         "shell_time": 50,
@@ -335,7 +329,7 @@ new_dicts = [
     {"linear_in_moves": True, "temperature_kirkpatrick": False},
     {"temperature_C": True, "temperature_kirkpatrick": False},
     {"temperature_linearC": True, "temperature_kirkpatrick": False},
-    {"finite_grid_size": True, "padding_finite_grid": 2},
+    {"finite_grid_size": True, "padding_finite_grid": 1},
     {
         "random_qbit": True,
     },
@@ -406,7 +400,7 @@ default_update = {
     "with_core": True,
     "random_qbit": True,
     "finite_grid_size": True,
-    "padding_finite_grid": 2,
+    "padding_finite_grid": 1,
     "repetition_rate_factor": 5,
     "temperature_kirkpatrick": True,
     "core_temperature_kirkpatrick": True,
