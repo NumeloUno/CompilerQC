@@ -89,7 +89,8 @@ class MC:
         self.total_energy, self.number_of_plaquettes = self.energy(
             self.energy.polygon_object.nodes_object.qbits
         )
-
+        
+        self.variance_energy_of_last_steps = []
         self.recording = recording
         if self.recording:
             self.record_temperature = []
@@ -106,19 +107,7 @@ class MC:
     def init_from_yaml(cls, graph: Graph, path_to_config: str = "Default/default.yaml"):
         with open(paths.parameters_path / path_to_config) as f:
             mc_schedule = yaml.load(f, Loader=yaml.FullLoader)
-        energy = CompilerQC.functions_for_benchmarking.init_energy(graph)
-        mc = cls(energy)
-        mc = CompilerQC.functions_for_benchmarking.update_mc(
-            mc, mc_schedule, core=False
-        )
-        mc.n_moves = int(mc.n_moves * mc.repetition_rate)
-        # initialize temperature
-        initial_temperature = mc.current_temperature
-        if initial_temperature == 0:
-            initial_temperature = mc.initial_temperature()
-        mc.T_0 = initial_temperature
-        mc.current_temperature = initial_temperature
-        return mc
+        return CompilerQC.functions_for_benchmarking.initialize_MC_object(graph, mc_schedule, core=False)
 
     def reset(self, current_temperature, remove_ancillas: bool, keep_core: bool):
         """reset complete MC search"""
@@ -243,8 +232,19 @@ class MC:
             return qbit, target_qbit
         else:
             return qbit, target_coord
-
-    def coord_from_infinite_grid(self):
+        
+    def set_corner(self):
+        if self.corner is None:
+            self.corner = self.energy.polygon_object.core_corner
+            # if no core has been set, use square around the center as start for shell search
+            if self.corner is None:        
+                x, y = self.energy.polygon_object.center_of_coords(
+                    self.energy.polygon_object.nodes_object.qbits.coords
+                )
+                self.corner = (int(x - 0.5), int(x + 0.5)), (int(y - 0.5), int(y + 0.5))
+        return self.corner
+    
+    def coords_from_infinite_grid(self):
         """
         generate random coord in grid
         sample from envelop rectengular of compiled graph
@@ -261,9 +261,12 @@ class MC:
                 set(possible_coords)
                 - set(self.energy.polygon_object.nodes_object.qbits.core_qbit_coords)
             )
+    
+    def coord_from_infinite_grid(self):
+        self.coords_from_infinite_grid()
         return random.choice(self.possible_coords)
 
-    def coord_from_finite_grid(self):
+    def coords_from_finite_grid(self):
         """
         set or create core corner in the first step (0),
         build coords around and from core corner,
@@ -271,22 +274,11 @@ class MC:
         change possible_coords
         """
         if self.n_total_steps == 0:
-            if self.corner is None:
-                self.corner = self.energy.polygon_object.core_corner
-                # if no core has been set, use square around the center as start for shell search
-                if self.corner is None:
-                    x, y = self.energy.polygon_object.center_of_coords(
-                        self.energy.polygon_object.nodes_object.qbits.coords
-                    )
-                    self.corner = (int(x - 0.5), int(x + 0.5)), (int(y - 0.5), int(y + 0.5))
-                    
-            (min_x, max_x), (min_y, max_y) = self.corner
-
+            (min_x, max_x), (min_y, max_y) = self.set_corner()
             x, y = np.meshgrid(
             np.arange(min_x - self.padding_finite_grid, max_x + (self.padding_finite_grid + 1)),
             np.arange(min_y - self.padding_finite_grid, max_y + (self.padding_finite_grid + 1)),
             )
-
             self.finite_possible_coords = list(zip(x.flatten(), y.flatten()))
             
         if self.n_total_steps == 0 or self.possible_coords_changed:
@@ -294,6 +286,9 @@ class MC:
             set(self.finite_possible_coords)
             - set(self.energy.polygon_object.nodes_object.qbits.core_qbit_coords)
             )
+            
+    def coord_from_finite_grid(self):
+        self.coords_from_finite_grid()
         return random.choice(self.possible_coords)
 
     def coords_in_softcore(self):
@@ -307,19 +302,13 @@ class MC:
             - set(self.energy.polygon_object.nodes_object.qbits.core_qbit_coords)
         )
         return coords_in_softcore
-
-    def coord_from_softcore(self):
+    
+    def coords_from_softcore(self):
         """
         softcore = core + plaquettes around it from shell qbits
         """
         if self.corner is None:
-            self.corner = self.energy.polygon_object.core_corner
-            # if no core has been set, use square around the center as start for shell search
-            if self.corner is None:
-                x, y = self.energy.polygon_object.center_of_coords(
-                    self.energy.polygon_object.nodes_object.qbits.coords
-                )
-                self.corner = (int(x - 0.5), int(x + 0.5)), (int(y - 0.5), int(y + 0.5))
+            self.set_corner()
             self.possible_coords = self.coords_in_softcore()
 
         # check every few hundert steps if shell should be expanded
@@ -329,6 +318,7 @@ class MC:
         ):
             # even if not enough plaquettes, the shape of the core could have changed
             # thus, the possible coords have to change too
+            self.move_core_corner_to_center_of_plaquettes()
             self.possible_coords = self.coords_in_softcore()
             if (
                 self.plaquette_density_in_softcore()
@@ -338,7 +328,12 @@ class MC:
                 (min_x, max_x), (min_y, max_y) = self.corner
                 self.corner = (min_x - 1, max_x + 1), (min_y - 1, max_y + 1)
                 self.possible_coords = self.coords_in_softcore()
-
+        
+    def coord_from_softcore(self):
+        """
+        softcore = core + plaquettes around it from shell qbits
+        """
+        self.coords_from_softcore()
         return random.choice(self.possible_coords)
 
     def coords_around_core(self):
@@ -349,6 +344,11 @@ class MC:
         core_qbit_coords = (
             self.energy.polygon_object.nodes_object.qbits.core_qbit_coords
         )
+        # if no core qbits, choose qbits in corner
+        if core_qbit_coords == []:
+            self.coords_from_softcore() 
+            return self.possible_coords
+        
         for coord in core_qbit_coords:
             coords_around_core.extend(
                 Qbits.neighbour_coords_without_origin(coord, self.radius)
@@ -370,6 +370,24 @@ class MC:
 
         return random.choice(self.possible_coords)
 
+    def move_core_corner_to_center_of_plaquettes(self):
+        """
+        if there exist no core qbits, move core_corner to center of plaquettes,
+        so that no plaquettes will aggregate at the edge of the core_corner
+        """
+        if len(self.energy.polygon_object.nodes_object.qbits.core_qbits) == 0:
+            coords = {coord for polygon in self.energy.polygon_object.coords_of_polygons(
+                self.energy.polygon_object.nodes_object.qbits.found_plaqs())
+             for coord in polygon}
+            coords = coords.intersection(self.possible_coords)
+            if len(coords) > 0:
+                center_of_plaqs = Polygons.center_of_coords(coords)
+                ((min_x, max_x), (min_y, max_y)) = self.corner
+                c_x, c_y = (min_x + max_x) / 2, (min_y + max_y) / 2
+                delta_x, delta_y = np.subtract(center_of_plaqs, (c_x, c_y))
+                self.corner = (int(min_x + delta_x), int(max_x + delta_x)), (int(min_y + delta_y), int(max_y + delta_y))
+
+    
     def qbit_with_same_node_as_neighbour(self, target_coord):
         neighbour_qbits_in_envelop = list(
             map(
@@ -681,20 +699,22 @@ class MC:
             if (
                 self.number_of_plaquettes
                 == self.energy.polygon_object.nodes_object.qbits.graph.C
+                or self.is_constant
             ):
-                return 0  # ? what is the best value np.nan, None, ?
+                print(f"{self.number_of_plaquettes} of {self.energy.polygon_object.nodes_object.qbits.graph.C} plaquettes found")
+                return 0
             self.update_mean_and_variance()
             current_energy, new_energy, operation = self.step()
             self.metropolis(current_energy, new_energy, operation)
-        #             assert self.number_of_plaquettes == len(
-        #                 self.energy.polygon_object.nodes_object.qbits.found_plaqs()
-        #             ) or self.number_of_plaquettes == len(
-        #                 [
-        #                     p
-        #                     for p in self.energy.polygon_object.nodes_object.qbits.found_plaqs()
-        #                     if len(p) == 4
-        #                 ]
-        #             ), "number of plaqs is wrong!"
+#             assert self.number_of_plaquettes == len(
+#                 self.energy.polygon_object.nodes_object.qbits.found_plaqs()
+#             ) or self.number_of_plaquettes == len(
+#                 [
+#                     p
+#                     for p in self.energy.polygon_object.nodes_object.qbits.found_plaqs()
+#                     if len(p) == 4
+#                 ]
+#             ), "number of plaqs is wrong!"
 
         # self.prof.disable()
         return new_energy - current_energy
@@ -782,7 +802,28 @@ class MC:
                 self.current_temperature = new_temperature
 
         return self.current_temperature
-
+    
+    @property
+    def is_constant(self):
+        """
+        if the last six markov chains
+        were not varying in energy, stop search
+        """
+        length = 6 * self.repetition_rate
+        if (len(self.variance_energy_of_last_steps) == length
+            and sum(self.variance_energy_of_last_steps) == 0):
+            return True
+        else:
+            False
+            
+    def update_variance_energy(self):
+        """
+        for stop criterium in self.is_constant
+        """
+        length = 6 * self.repetition_rate
+        self.variance_energy_of_last_steps.append(self.variance_energy)
+        self.variance_energy_of_last_steps = self.variance_energy_of_last_steps[-length:]
+        
     def update_mean_and_variance(self):
         """
         update mean and variance on the fly according to Welford algorithm on wikipedia
@@ -795,6 +836,7 @@ class MC:
             self.variance_energy,
             self.total_energy,
         )
+        self.update_variance_energy()
         if self.recording:
             self.record_total_energy.append(self.total_energy)
             self.record_mean_energy.append(self.mean_energy)
@@ -997,19 +1039,7 @@ class MC_core(MC):
     def init_from_yaml(cls, graph: Graph, path_to_config: str = "Default/default.yaml"):
         with open(paths.parameters_path / path_to_config) as f:
             mc_schedule = yaml.load(f, Loader=yaml.FullLoader)
-        energy_core = CompilerQC.functions_for_benchmarking.init_energy_core(graph)
-        mc_core = cls(energy_core)
-        mc_core = CompilerQC.functions_for_benchmarking.update_mc(
-            mc_core, mc_schedule, core=True
-        )
-        mc_core.n_moves = int(mc_core.n_moves * mc_core.repetition_rate)
-        # initialize temperature
-        initial_temperature = mc_core.current_temperature
-        if initial_temperature == 0:
-            initial_temperature = mc_core.initial_temperature()
-        mc_core.T_0 = initial_temperature
-        mc_core.current_temperature = initial_temperature
-        return mc_core
+        return CompilerQC.functions_for_benchmarking.initialize_MC_object(graph, mc_schedule)
 
     def reset(self, current_temperature, remove_ancillas: bool):
         """reset complete MC search,
@@ -1303,3 +1333,25 @@ def visualize_search_process(mc, name, number_of_images):
         [create_image_for_step(mc, envelop_rect) for _ in range(number_of_images)],
         fps=2,
     )
+
+    
+    
+# def number of total missing swap gates
+
+# %%time
+# polygons_of_interest = energy.changed_polygons(qbits)
+# generating_constraints = energy.polygon_object.get_generating_constraints()
+# polygons = polygon_object.coords_of_changed_polygons(polygons_of_interest)
+# while len(generating_constraints) < graph.C:
+#     l = []
+#     for polygon_coord in polygons:
+#         if not Polygons.is_constraint_fulfilled(polygon_coord, generating_constraints):
+#             number_of_swap_gates = Polygons.number_of_swap_gates(polygon_coord)
+#             if number_of_swap_gates > 0:
+#                 l.append((number_of_swap_gates, polygon_coord))
+#             if number_of_swap_gates == 1:
+#                 break
+#     swaps, polygon_coord = sorted(l)[0]
+#     generating_constraints = list(map(list,generating_constraints.values())) + [polygon_coord]
+# #     print(swaps, len(generating_constraints))
+#     generating_constraints = polygon_object.get_generating_constraints(constraints=generating_constraints)
