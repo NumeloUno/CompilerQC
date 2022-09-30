@@ -3,6 +3,10 @@ import random
 from itertools import combinations
 from math import dist, atan2
 from matplotlib import pyplot as plt
+from shapely.geometry import MultiPoint
+import galois
+import warnings
+
 
 class Polygons:
     """
@@ -72,7 +76,18 @@ class Polygons:
         return: list of coords of single polygon
         """
         return list(map(qubit_to_coord_dict.get, polygon))
-
+    
+    def coords_of_changed_polygons(self, polygons_of_interest):
+        warnings.warn("function is deprecated, replace with coords_of_polygons()")
+        self.coords_of_polygons(polygons_of_interest)
+        
+    def coords_of_polygons(self, polygons_of_interest):
+        """
+        return unique polygons coords which changed during the move
+        """
+        qubit_to_coord_dict = self.nodes_object.qbits.qubit_to_coord_dict
+        return Polygons.polygons_coords(qubit_to_coord_dict, polygons_of_interest)
+    
     @staticmethod
     def polygons_coords(qubit_to_coord_dict: dict, polygons):
         """
@@ -169,6 +184,28 @@ class Polygons:
     def number_of_plaqs(self):
         return len(self.nodes_object.qbits.found_plaqs())
 
+    @staticmethod
+    def scale(polygon_coord, radius):
+        """
+        shrunk polygon, 
+        just for visualization reasons
+        """
+        center = Polygons.center_of_coords(polygon_coord)
+        shrunk_polygon = []
+        for coord in polygon_coord:
+            l = np.subtract(coord, center)
+            l = l * (1 - radius / (np.linalg.norm(l)))
+            shrunk_polygon.append(tuple(np.add(l, center)))
+        return shrunk_polygon
+    
+    @staticmethod
+    def rotate_coords_by_45(coord, rotate: bool):
+        if rotate:
+            x, y = np.subtract(coord, (1,0))
+            return (1 / np.sqrt(2) * (x + y) - 1.4, 1 / np.sqrt(2) * (-x + y))
+        else:
+            return coord
+
     def visualize(
         self,
         ax=None,
@@ -177,95 +214,131 @@ class Polygons:
         core_corner=None,
         check_ancilla_in_core: bool = True,
         envelop_rect=None,
+        rotate: bool=False,
+        radius=0.2,
     ):
-        if ax is None:
-            _, ax = plt.subplots(figsize=figsize)
-        if envelop_rect is None:
-            envelop_rect = self.nodes_object.qbits.envelop_rect()
-        x, y = list(zip(*envelop_rect))
-        ax.scatter(x, y, color="grey", s=0.6)
-        ax.set_yticklabels([])
-        ax.set_xticklabels([])
+        if ax is None: _, ax = plt.subplots(figsize=figsize)
+        ax.set_aspect('equal', 'box')
+        ax.axis('off')
+
+        if envelop_rect is None: envelop_rect = self.nodes_object.qbits.envelop_rect()
+        ax.scatter(*list(zip(*envelop_rect)), color="white", s=0.6, alpha=0)
+
+        if core_corner is not None:
+            (min_x, max_x), (min_y, max_y) = core_corner
+            envelop = [Polygons.rotate_coords_by_45(p, rotate) 
+                       for p in [(min_x, min_y), (min_x, max_y), (max_x, max_y), (max_x, min_y)]]
+            patch = plt.Polygon(
+                envelop, zorder=10, fill=False, lw=10, edgecolor="black", alpha=0.5
+            )
+            ax.add_patch(patch)
+
         # color plaquettes
         for polygon in self.polygons_coords(
             self.nodes_object.qbits.qubit_to_coord_dict, self.polygons
         ):
-            fill, facecolor, lw = False, None, 0
+            # if center is part of polygon, error will be thrown
+            if Polygons.center_of_coords(polygon) in polygon:
+                continue
+            fill, facecolor, lw, alpha, edge_alpha = False, None, 0, 0, 0
             if self.scope_measure:
                 measure = self.scope_of_polygon(polygon)
             if not self.scope_measure:
                 measure = self.moment_of_inertia(polygon)
             if measure == self.unit_square:
-                fill, facecolor, lw = True, "#3A6B35", 14
+                fill, facecolor, lw, alpha, edge_alpha = True, "limegreen", 1, 0.5, 1
+                polygon = Polygons.scale(polygon, radius)
             if measure == self.unit_triangle:
-                fill, facecolor, lw = True, "#CBD18F", 14
+                fill, facecolor, lw, alpha, edge_alpha = True, "blue", 1, 0.3, 1
+                polygon = Polygons.scale(polygon, radius)
+            # if points are on a line, it is not a polygon anymore but a LineString object
+            try: polygon = list(zip(*MultiPoint(polygon).convex_hull.exterior.xy))
+            except: pass
+            polygon = [Polygons.rotate_coords_by_45(p, rotate)
+                       for p in polygon]
             patch = plt.Polygon(
                 polygon,
                 zorder=0,
                 fill=fill,
-                lw=lw,
-                edgecolor="white",
+                lw=0,
                 facecolor=facecolor,
+                alpha=alpha,
+            )
+            edge = plt.Polygon(
+                polygon,
+                zorder=0,
+                fill=False,
+                lw=lw,
+                edgecolor="black",
+                alpha=edge_alpha
             )
             ax.add_patch(patch)
+            ax.add_patch(edge)
         # color qbits
         for qbit in self.nodes_object.qbits:
+            coord = Polygons.rotate_coords_by_45(qbit.coord, rotate)
+            if len(str(qbit.qubit)) - 4 == 2:
+                fontsize = 82 * radius
+            if len(str(qbit.qubit)) - 4 == 3:
+                fontsize = 70 * radius
+            if len(str(qbit.qubit)) - 4 == 4:
+                fontsize = 60 * radius
+
             label = ax.annotate(
                 r"{},{}".format(*qbit.qubit),
-                xy=qbit.coord,
+                xy=coord,
                 ha="center",
                 va="center",
-                fontsize=13,
+                fontsize=fontsize,
+                zorder=20,
             )
             if qbit.core == False:
                 circle = plt.Circle(
-                    qbit.coord, radius=0.2, alpha=1.0, lw=0.7, ec="black", fc="#FFC57F"
+                    coord, radius=radius, alpha=1.0, lw=0.7, ec="black", fc="antiquewhite", zorder=20
                 )
             if qbit.core == True:
                 circle = plt.Circle(
-                    qbit.coord, radius=0.2, alpha=1.0, lw=0.7, ec="black", fc="#E3B448"
+                    coord, radius=radius, alpha=1.0, lw=0.7, ec="black", fc="tan"
                 )
             if qbit.ancilla == True:
                 circle = plt.Circle(
-                    qbit.coord, radius=0.2, alpha=1.0, lw=0.7, ec="black", fc="#FF7b7b"
+                    coord, radius=radius, alpha=1.0, lw=0.7, ec="black", fc="lightcoral"
                 )
                 if check_ancilla_in_core:
                     assert (
                         qbit.ancilla == True and qbit.core == True
                     ), "ancilla is not part of the core ?!"
             ax.add_patch(circle)
-
-        if core_corner is not None:
-            (min_x, max_x), (min_y, max_y) = core_corner
-            envelop = [(min_x, min_y), (min_x, max_y), (max_x, max_y), (max_x, min_y)]
-            patch = plt.Polygon(
-                envelop, zorder=0, fill=False, lw=2, edgecolor="black", alpha=0.5
-            )
-            ax.add_patch(patch)
         return ax
 
-    def draw_lines(self, ax):
+    def draw_lines(self, ax, rotate: bool=False):
         """draw lines of nodes in plot
         before calling this function, lines have to be initialized, 
-        easiest way in doing so is by calling energy.line_energy()
+        easiest way to do so is by calling energy.line_energy()
         """
         for node in self.nodes_object.qbits.graph.nodes:
             qbits_path, _ = self.line_to_node(node)
             a = ax.plot(
-                [qbit.coord[0] for qbit in qbits_path],
-                [qbit.coord[1] for qbit in qbits_path],
-                linewidth = 20,
-                alpha=0.6
+                [Polygons.rotate_coords_by_45(qbit.coord, rotate)[0] for qbit in qbits_path],
+                [Polygons.rotate_coords_by_45(qbit.coord, rotate)[1] for qbit in qbits_path],
+                linewidth = 10,
+                alpha=0.8
             )
             a[0].set_solid_capstyle('round')
+        return ax
 
-    def color_coords(self, coords_and_color, figsize=(15, 15)):
+    def color_coords(
+        self,
+        ax,
+        coords_and_color,
+        rotate: bool=False,
+        radius: float=3000,
+    ):
         """color coords according to color in coords_and_color,
         coords_and_color is of the from [((x,y), float between 0 and 1), ...]"""
-        _, ax = plt.subplots(figsize=figsize)
         for coord, color in coords_and_color:
-            ax.scatter(*coord, color=str(color), s=3000)
-        self.visualize(ax=ax)
+            coord = Polygons.rotate_coords_by_45(coord, rotate)
+            ax.scatter(*coord, color=str(color), s=radius)
 
     def modified_distance(self, x, y):
         """distance between coord x and coord y
@@ -395,3 +468,44 @@ class Polygons:
             if distance_to_closest_coord > 0:
                 number_of_swap_gates += distance_to_closest_coord
         return number_of_swap_gates
+    
+    def get_generating_constraints(self, constraints: list=None):
+        """
+        returns dict of generating constraints
+        constraints: dict of min qubit of constraint: constraint
+        """
+        coords_of_plaquettes = constraints
+        if coords_of_plaquettes is None:
+            coords_of_plaquettes = self.coords_of_polygons(self.nodes_object.qbits.found_plaqs())
+        coord_to_qbit_dict = self.nodes_object.qbits.coord_to_qbit_dict
+        # if basis froms already echelon form matrix, skip this part
+        if set(map(min, sorted(coords_of_plaquettes))) != len(coords_of_plaquettes):
+            qubit_to_idx = {qubit: idx for idx, qubit in enumerate(sorted(coord_to_qbit_dict))}
+            idx_to_qubit = {idx: qubit for idx, qubit in enumerate(sorted(coord_to_qbit_dict))}
+            a = np.zeros((len(coords_of_plaquettes), len(qubit_to_idx)), dtype=int)
+            for j, plaq in enumerate(coords_of_plaquettes):
+                for qubit in plaq:
+                    a[j][qubit_to_idx[qubit]] = 1
+            GF = galois.GF(2)
+            g = GF(x=a.astype(int))
+            coords_of_plaquettes = [[idx_to_qubit[i] for i in (np.where(j==1))[0]] for j in g.row_reduce()]
+
+        generating_constraints = {constraint[0]:set(constraint) for constraint in sorted(coords_of_plaquettes)}
+        return generating_constraints
+
+    @staticmethod
+    def is_constraint_fulfilled(test_constraint: list, constraints: dict):
+        """
+        check if test_constraint is implicitly fulfilled
+        by constraints (which are generators or basis)
+        constraints: dict of min qubit of plaquette: plaquette
+        """
+        test_constraint = (sorted(test_constraint))
+        while len(test_constraint) > 0:
+            constraint = constraints.get(test_constraint[0])
+            if constraint is None:
+                return False
+            test_constraint = set(test_constraint)
+            test_constraint = sorted((test_constraint - constraint).union(constraint - test_constraint))
+        return not test_constraint
+
