@@ -429,3 +429,7 @@ class Qbit:
     def polygons_coords(self, qubit_to_coord_dict: dict):
         """return coords of polygons which belong to this qbit"""
         return Polygons.polygons_coords(qubit_to_coord_dict, self.polygons)
+   
+    def number_of_plaquettes(self):
+        assert self.plaquettes is not None, "call set_plaquettes_of_qbits() before"
+        return len(self.plaquettes)

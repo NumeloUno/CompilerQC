@@ -99,6 +99,7 @@ def initialize_MC_object(graph: Graph, mc_schedule: dict, core: bool = False):
 
     mc = update_mc(mc, mc_schedule, core)
     mc.energy.set_scaling_from_model()
+    mc.energy.polygon_object.set_unit_measure()
     mc.n_moves = int(mc.n_moves * mc.repetition_rate)
     # initialize temperature
     initial_temperature = mc.current_temperature
