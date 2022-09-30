@@ -3,13 +3,8 @@ import networkx as nx
 from CompilerQC import Polygons, paths
 import pickle
 from shapely.geometry import LineString
-import shapely
-from shapely.ops import unary_union
-from shapely.geometry import CAP_STYLE, JOIN_STYLE, MultiPoint, Polygon
 import math
-from shapely.validation import make_valid
 from itertools import combinations
-
 
 class Energy(Polygons):
     def __init__(
@@ -222,13 +217,6 @@ class Energy(Polygons):
         ] -= self.scaling_for_plaq4
         return measure    
 
-    def coords_of_changed_polygons(self, polygons_of_interest):
-        """
-        return unique polygons coords which changed during the move
-        """
-        qubit_to_coord_dict = self.polygon_object.nodes_object.qbits.qubit_to_coord_dict
-        return Polygons.polygons_coords(qubit_to_coord_dict, polygons_of_interest)
-
     def changed_polygons(self, qbits_of_interest: list):
         """
         return unique polygons which changed during the move
@@ -386,56 +374,42 @@ class Energy(Polygons):
                     line_energy_value += self.bad_line_penalty
         return line_energy_value
 
+
     def consider_all_constraints(self):
         """
         weight all constraints, even those which are fulfilled implict
         """
-        plaquettes = [([self.polygon_object.nodes_object.qbits[qubit].coord for qubit in plaquette]) for plaquette in self.polygon_object.nodes_object.qbits.found_plaqs()]
-        plaquettes_ = [(Polygon(plaquette).envelope) if len(plaquette)==4 else Polygon(plaquette) for plaquette in plaquettes]
-        union = unary_union(plaquettes_)
-
-        # the case where two triangle plaquettes from a rectengular four constraint is not covered yet
-        triangle_plaquettes = [plaq for plaq in plaquettes if len(plaq)==3]
-        four_constraints = []
-        for combi in list(combinations(triangle_plaquettes, 2)):
-            constraint = set(combi[0] + combi[1]) - set(combi[0]).intersection(combi[1])
-            if len(constraint) == 4:
-                four_constraints.append(constraint)
-                
-        constraints, ps = [], []
-        for polygon_coord in self.polygon_object.polygons_coords(qubit_to_coord_dict=self.polygon_object.nodes_object.qbits.qubit_to_coord_dict, polygons=self.polygon_object.polygons):
-            p = Polygon(polygon_coord)
-            if not p.is_valid:
-                p = make_valid(p)
-            if math.isclose(union.intersection(p).area, p.area):
-                constraints.append(-self.scaling_for_plaq4 / self.polygon_object.scope_of_polygon(polygon_coord) ** 2)
-                ps.append(polygon_coord)
-            elif set(polygon_coord) in four_constraints:
-                constraints.append(-self.scaling_for_plaq4 / self.polygon_object.scope_of_polygon(polygon_coord) ** 2)
-                ps.append(polygon_coord)
+        generating_constraints = self.polygon_object.get_generating_constraints()
+        scaled_constraints = []
+        for polygon_coord in self.polygons_coords_of_interest:
+            if Polygons.is_constraint_fulfilled(polygon_coord, generating_constraints):
+                scaled_constraints.append(-self.scaling_for_plaq4 / self.polygon_object.scope_of_polygon(polygon_coord))
             else:
-                constraints.append(self.polygon_object.scope_of_polygon(polygon_coord))
+                scaled_constraints.append(self.polygon_object.scope_of_polygon(polygon_coord))
                 
-        self.constraints = constraints
-        self.ps = ps
-        
-        return np.array(constraints), len(plaquettes)
-
-    # insert in __call__:
+        return np.array(scaled_constraints), len(generating_constraints)
     
     def __call__(self, qbits_of_interest):
         """
         return the energy and number of plaquettes of the polygons belonging to
         qbits of interest
         """
+#         if self.all_constraints:
+#             polygons_of_interest = self.changed_polygons(self.polygon_object.nodes_object.qbits)
+#             self.polygons_coords_of_interest = self.coords_of_polygons(
+#                 polygons_of_interest
+#             )
+#             energy_to_return, number_of_plaquettes = self.consider_all_constraints()
+#             return energy_to_return.sum(), number_of_plaquettes
+
+        polygons_of_interest = self.changed_polygons(qbits_of_interest)
+        self.polygons_coords_of_interest = self.polygon_object.coords_of_polygons(
+            polygons_of_interest
+        )
         if self.all_constraints:
             energy_to_return, number_of_plaquettes = self.consider_all_constraints()
             return energy_to_return.sum(), number_of_plaquettes
 
-        polygons_of_interest = self.changed_polygons(qbits_of_interest)
-        self.polygons_coords_of_interest = self.coords_of_changed_polygons(
-            polygons_of_interest
-        )
         if self.polygon_object.scope_measure:
             measure = self.scopes_of_polygons() 
         if not self.polygon_object.scope_measure:
@@ -516,7 +490,7 @@ class Energy_core(Energy):
         it will simply find a config with as least rectengulars as possible
         """
         polygons_of_interest = self.changed_polygons(qbits_of_interest)
-        self.polygons_coords_of_interest = self.coords_of_changed_polygons(
+        self.polygons_coords_of_interest = self.polygon_object.coords_of_polygons(
             polygons_of_interest
         )
         self.polygons_coords_of_interest = [
@@ -587,7 +561,7 @@ class Energy_core(Energy):
             self.rectengular_energy(qbits_of_interest)
         else:
             polygons_of_interest = self.changed_polygons(qbits_of_interest)
-            self.polygons_coords_of_interest = self.coords_of_changed_polygons(
+            self.polygons_coords_of_interest = self.polygon_object.coords_of_polygons(
                 polygons_of_interest
             )
 
