@@ -46,6 +46,38 @@ def get_files_to_problems(
                 filenames.append(paths.database_path / problem_folder / path / filename)
     return filenames
 
+def uniform_sample_from_folder(
+    max_size: int = 50,
+    min_C: int = 3,
+    max_C: int = 60,
+    min_N: int = 3,
+    max_N: int = 20,
+    problem_folder: str='training_set',
+):
+    folders, Cs = [], []
+    for folder in os.listdir(paths.database_path / problem_folder):
+        N, K, C = [int(folder.split('_')[i]) for i in [-5, -3, -1]]
+        if min_N <= N <= max_N and min_C <= C <= max_C:
+            for _ in os.listdir(paths.database_path / problem_folder /folder): 
+                Cs.append(C)
+            folders.append(folder)
+    # uniform sampling over all different Cs        
+    min_occurence = min([Cs.count(C) for C in set(Cs)])
+    if min_occurence * len(set(Cs)) > max_size:
+        min_occurence = int(min_occurence * max_size / (min_occurence * len(set(Cs))))
+        if min_occurence == 0:
+            min_occurence = 1
+    uniform_dict = {C:min_occurence for C in set(Cs)}
+    problems_to_benchmark = []
+    for C_ in uniform_dict.keys():   
+        problems_with_C = []
+        for folder in folders:
+            N, K, C = [int(folder.split('_')[i]) for i in [-5, -3, -1]]
+            if C_ == C:
+                for problem in os.listdir(paths.database_path / problem_folder /folder):
+                    problems_with_C.append(paths.database_path / problem_folder /folder / problem)
+        problems_to_benchmark.extend(problems_with_C[:uniform_dict[C_]])
+    return problems_to_benchmark
 
 def get_all_distances(
     problem_folder: str = "training_set",
