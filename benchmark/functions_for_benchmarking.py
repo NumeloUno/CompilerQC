@@ -140,6 +140,7 @@ def evaluate_optimization(
             mc_core = None
     else:
         mc.swap_probability = 0
+    initial_swap_probability = mc.swap_probability
     for iteration in range(args.batch_size):
         # search for core
         if mc.with_core:
@@ -181,7 +182,7 @@ def evaluate_optimization(
         mc.name, mc.batch_size = args.name, args.batch_size
         save_object(mc, path_to_results(args) / f'{args.name}/{_id}_N_K_C_{graph.N}_{graph.K}_{graph.C}_.pkl')
         # reset mc object
-        mc.reset(current_temperature=mc.T_0, remove_ancillas=True, keep_core=False)
+        mc.reset(current_temperature=mc.T_0,initial_swap_probability=initial_swap_probability, remove_ancillas=True, keep_core=False)
 
 def run_benchmark(
     graph: Graph,
@@ -284,7 +285,7 @@ def update(origin_dict, new_dict):
     return updated_dict
 
 
-def create_and_save_settings(name, new_dicts, new_config):
+def create_and_save_settings(name, new_dicts, new_config, save: bool=False):
     """update default yaml by newdict and save them in mc_parameters_name.yaml
     note: there are absolute paths in use!"""
     (paths.parameters_path / "csvs").mkdir(parents=True, exist_ok=True)
@@ -299,13 +300,14 @@ def create_and_save_settings(name, new_dicts, new_config):
         ) as f:
             print(name, idx)
             yaml.dump(dict_to_save, f, default_flow_style=False)
-    for i in range(math.ceil(len(filenames) / 30)):
-        df = pd.DataFrame(data = {"filenames":filenames[i * 30 : (i + 1) * 30]})
-        df["batch_size"] =  1
-        df["min_N"] = 4
-        df["max_N"] = 40 
-        df["min_C"] = 3
-        df["max_C"] = 91
-        df["max_size"] = 50
-        df["problem_folder"] = "lhz" 
-        df.to_csv(paths.parameters_path / "csvs" / f"{name}_part_{i}.csv", index=False, index_label=False)        
+    if save:
+        for i in range(math.ceil(len(filenames) / 30)):
+            df = pd.DataFrame(data = {"filenames":filenames[i * 30 : (i + 1) * 30]})
+            df["batch_size"] =  20
+            df["min_N"] = 4
+            df["max_N"] = 40 
+            df["min_C"] = 3
+            df["max_C"] = 91
+            df["max_size"] = 50
+            df["problem_folder"] = "lhz" 
+            df.to_csv(paths.parameters_path / "csvs" / f"{name}_part_{i}.csv", index=False, index_label=False)        
