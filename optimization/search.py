@@ -27,9 +27,9 @@ class MC:
         energy_object: Energy,
         delta: float = 0.05,
         chi_0: float = 0.8,
-        alpha: float = 0.95,
-        repetition_rate_factor: float = 1,
-        recording: bool = False,
+        alpha: float = 0.99,
+        repetition_rate_factor: float = 6,
+        recording: bool = True,
     ):
         """
         repetition rate: how many moves with constant temperature
@@ -50,7 +50,8 @@ class MC:
         self.qbit_with_same_node = False
 
         # choose coords
-        self.min_plaquette_density_in_softcore = 0.75
+        N = self.energy.polygon_object.nodes_object.qbits.graph.N
+        self.min_plaquette_density_in_softcore = (N / 2 * (N + 1)) / N ** 2
         self.corner = None
         self.possible_coords_changed = False
 
@@ -81,9 +82,9 @@ class MC:
 
         # search schedule
         self.swap_probability = 0
-        self.decay_rate_of_swap_probability = 1
+        self.decay_rate_of_swap_probability = 0.95
         self.swap_only_core_qbits_in_line_swaps = False
-        self.shell_time = 10
+        self.shell_time = 50
 
         # compute total energy once at the beginning
         self.total_energy, self.number_of_plaquettes = self.energy(
@@ -385,7 +386,12 @@ class MC:
                 ((min_x, max_x), (min_y, max_y)) = self.corner
                 c_x, c_y = (min_x + max_x) / 2, (min_y + max_y) / 2
                 delta_x, delta_y = np.subtract(center_of_plaqs, (c_x, c_y))
-                self.corner = (int(min_x + delta_x), int(max_x + delta_x)), (int(min_y + delta_y), int(max_y + delta_y))
+                new_min_x = (int(min_x + delta_x))
+                new_max_x = new_min_x + (max_x - min_x)
+                new_min_y = (int(min_y + delta_y))
+                new_max_y = new_min_y + (max_y - min_y)
+    
+                self.corner = ((new_min_x, new_max_x), (new_min_y, new_max_y))
 
     
     def qbit_with_same_node_as_neighbour(self, target_coord):
@@ -440,6 +446,8 @@ class MC:
         coords_in_and_around_core_without_upper_left_edge = set(
             coords_in_and_around_core
         ) - set(upper_left_edge)
+        if len(coords_in_and_around_core_without_upper_left_edge) == 0:
+            return 0
         plaquette_density = len(
             self.energy.polygon_object.nodes_object.qbits.found_plaquettes_around_coords(
                 coords_in_and_around_core_without_upper_left_edge
@@ -809,7 +817,7 @@ class MC:
         if the last six markov chains
         were not varying in energy, stop search
         """
-        length = 6 * self.repetition_rate
+        length = 30 * self.repetition_rate
         if (len(self.variance_energy_of_last_steps) == length
             and sum(self.variance_energy_of_last_steps) == 0):
             return True
@@ -820,7 +828,7 @@ class MC:
         """
         for stop criterium in self.is_constant
         """
-        length = 6 * self.repetition_rate
+        length = 30 * self.repetition_rate
         self.variance_energy_of_last_steps.append(self.variance_energy)
         self.variance_energy_of_last_steps = self.variance_energy_of_last_steps[-length:]
         
@@ -855,7 +863,7 @@ class MC:
         self, core_qbit_to_core_dict, assign_to_core: bool = True
     ):
         self.energy.polygon_object.nodes_object.qbits.update_qbits_from_dict(
-            core_qbit_to_core_dict, assign_to_core=True
+            core_qbit_to_core_dict, assign_to_core=assign_to_core
         )
         self.total_energy, self.number_of_plaquettes = self.energy(
             self.energy.polygon_object.nodes_object.qbits
