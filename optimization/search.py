@@ -134,7 +134,6 @@ class MC:
         self.possible_coords_changed = False
         self.radius = 0
         self.variance_energy_of_last_steps = []
-        self.recording = recording
         if self.recording:
             self.init_recording()   
         self.total_energy, self.number_of_plaquettes = self.energy(

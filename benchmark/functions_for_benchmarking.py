@@ -107,13 +107,19 @@ def initialize_MC_object(graph: Graph, mc_schedule: dict, core: bool = False):
         initial_temperature = mc.initial_temperature()
     mc.T_0 = initial_temperature
     mc.current_temperature = initial_temperature
+    initial_swap_probability = mc.swap_probability
     if core:
         # remove_ancillas False since there shouldnt be any ancillas, so we dont have to remove them
-        mc.reset(current_temperature=initial_temperature, remove_ancillas=False)
+        mc.reset(
+            current_temperature=initial_temperature,
+            initial_swap_probability=initial_swap_probability,
+            remove_ancillas=False
+        )
     else:
         # remove_ancillas False since there shouldnt be any ancillas, so we dont have to remove them
         mc.reset(
             current_temperature=initial_temperature,
+            initial_swap_probability=initial_swap_probability,
             remove_ancillas=False,
             keep_core=False,
         )
