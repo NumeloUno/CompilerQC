@@ -18,15 +18,16 @@ def graphs_to_benchmark(args):
     return a list of adjacency matrices of these
     logical problems
     """
-    problems = functions_for_database.get_files_to_problems(
+    problems = functions_for_database.uniform_sample_from_folder(
         problem_folder=args.problem_folder,
         min_C=args.min_C,
         max_C=args.max_C,
         min_N=args.min_N,
         max_N=args.max_N,
+        max_size=args.max_size,
     )
     graphs = []
-    for file in problems[:args.max_size]:
+    for file in problems:
         # read graph and qubit to coord translation from file
         graph_adj_matrix, qubit_coord_dict = functions_for_database.problem_from_file(
             file
