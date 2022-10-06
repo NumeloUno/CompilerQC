@@ -380,35 +380,41 @@ class Energy(Polygons):
         weight all constraints, even those which are fulfilled implict
         """
         generating_constraints = self.polygon_object.get_generating_constraints()
-        scaled_constraints = []
+        energy_to_return = 0 
         for polygon_coord in self.polygons_coords_of_interest:
+            if self.polygon_object.scope_measure:
+                measure = self.polygon_object.scope_of_polygon(polygon_coord) 
+            if not self.polygon_object.scope_measure:
+                measure = self.polygon_object.moment_of_inertia(polygon_coord)
             if Polygons.is_constraint_fulfilled(polygon_coord, generating_constraints):
-                scaled_constraints.append(-self.scaling_for_plaq4 / self.polygon_object.scope_of_polygon(polygon_coord))
+                if measure == self.polygon_object.unit_square:
+                    energy_to_return -= self.scaling_for_plaq4
+                if measure == self.polygon_object.unit_triangle:
+                    energy_to_return -= self.scaling_for_plaq3
+                else:
+                    energy_to_return -= self.scaling_for_plaq4 / measure
             else:
-                scaled_constraints.append(self.polygon_object.scope_of_polygon(polygon_coord))
+                energy_to_return += measure
                 
-        return np.array(scaled_constraints), len(generating_constraints)
+        return energy_to_return, len(generating_constraints)
     
     def __call__(self, qbits_of_interest):
         """
         return the energy and number of plaquettes of the polygons belonging to
         qbits of interest
         """
-#         if self.all_constraints:
-#             polygons_of_interest = self.changed_polygons(self.polygon_object.nodes_object.qbits)
-#             self.polygons_coords_of_interest = self.coords_of_polygons(
-#                 polygons_of_interest
-#             )
-#             energy_to_return, number_of_plaquettes = self.consider_all_constraints()
-#             return energy_to_return.sum(), number_of_plaquettes
+        if self.all_constraints:
+            polygons_of_interest = self.changed_polygons(self.polygon_object.nodes_object.qbits)
+            self.polygons_coords_of_interest = self.polygon_object.coords_of_polygons(
+                polygons_of_interest
+            )
+            energy_to_return, number_of_plaquettes = self.consider_all_constraints()
+            return energy_to_return, number_of_plaquettes
 
         polygons_of_interest = self.changed_polygons(qbits_of_interest)
         self.polygons_coords_of_interest = self.polygon_object.coords_of_polygons(
             polygons_of_interest
         )
-        if self.all_constraints:
-            energy_to_return, number_of_plaquettes = self.consider_all_constraints()
-            return energy_to_return.sum(), number_of_plaquettes
 
         if self.polygon_object.scope_measure:
             measure = self.scopes_of_polygons() 
@@ -423,9 +429,11 @@ class Energy(Polygons):
                 )
             ]
         )
-
-        distances_to_plaquette = self.scaled_measure(measure)
-
+        if self.basic_energy:
+            distances_to_plaquette = self.scaled_measure(measure)
+        else:
+            distances_to_plaquette = np.zeros(len(polygons_of_interest))
+            
         energy_to_return = 0
 
         if self.decay_weight:
@@ -453,7 +461,7 @@ class Energy(Polygons):
                 self.penalty_for_low_number_of_plaquettes()
             )
 
-        energy_to_return += int(self.basic_energy) * round(distances_to_plaquette.sum(), 5)
+        energy_to_return += round(distances_to_plaquette.sum(), 5)
 
         return energy_to_return, number_of_plaquettes
 
