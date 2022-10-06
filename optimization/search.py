@@ -94,23 +94,26 @@ class MC:
         self.variance_energy_of_last_steps = []
         self.recording = recording
         if self.recording:
-            self.record_temperature = []
-            self.record_total_energy = []
-            self.record_mean_energy = []
-            self.record_variance_energy = []
-            self.record_good_moves = []
-            self.record_bad_moves = []
-            self.record_rejected_moves = []
-            self.record_acc_probability = []
-            self.record_delta_energy = []
+            self.init_recording()
 
+    def init_recording(self):
+        self.record_temperature = []
+        self.record_total_energy = []
+        self.record_mean_energy = []
+        self.record_variance_energy = []
+        self.record_good_moves = []
+        self.record_bad_moves = []
+        self.record_rejected_moves = []
+        self.record_acc_probability = []
+        self.record_delta_energy = []
+        
     @classmethod
     def init_from_yaml(cls, graph: Graph, path_to_config: str = "Default/default.yaml"):
         with open(paths.parameters_path / path_to_config) as f:
             mc_schedule = yaml.load(f, Loader=yaml.FullLoader)
         return CompilerQC.functions_for_benchmarking.initialize_MC_object(graph, mc_schedule, core=False)
 
-    def reset(self, current_temperature, remove_ancillas: bool, keep_core: bool):
+    def reset(self, current_temperature, initial_swap_probability, remove_ancillas: bool, keep_core: bool):
         """reset complete MC search"""
         if remove_ancillas:
             self.remove_ancillas(
@@ -127,11 +130,21 @@ class MC:
                 self.energy.polygon_object.nodes_object.qbits, with_core=True
             )
         self.n_total_steps = 0
+        self.corner = None
+        self.possible_coords_changed = False
+        self.radius = 0
+        self.variance_energy_of_last_steps = []
+        self.recording = recording
+        if self.recording:
+            self.init_recording()   
         self.total_energy, self.number_of_plaquettes = self.energy(
             self.energy.polygon_object.nodes_object.qbits
         )
         self.current_temperature = current_temperature
+        self.swap_probability = initial_swap_probability
 
+            
+            
     def apply_move(self, qbit, coord_or_qbit):
         """
         move qbit to coord
@@ -634,7 +647,7 @@ class MC:
         """
         move = True
         # swap adjacent lines with swap_probability, if it is the first step, move qbits, dont swap lines 
-        # to assure that possible coords and finite possible coords is set properly
+        # to assure that possible coords and finite possible coords are set properly
         if random.random() < self.swap_probability and self.n_total_steps > 0:
             operation, move = "swap", False
             new_line_mapping, xy, old_qbits = self.select_lines_in_core()
@@ -817,7 +830,7 @@ class MC:
         if the last six markov chains
         were not varying in energy, stop search
         """
-        length = 30 * self.repetition_rate
+        length = 6 * self.repetition_rate
         if (len(self.variance_energy_of_last_steps) == length
             and sum(self.variance_energy_of_last_steps) == 0):
             return True
@@ -828,7 +841,7 @@ class MC:
         """
         for stop criterium in self.is_constant
         """
-        length = 30 * self.repetition_rate
+        length = 6 * self.repetition_rate
         self.variance_energy_of_last_steps.append(self.variance_energy)
         self.variance_energy_of_last_steps = self.variance_energy_of_last_steps[-length:]
         
@@ -1065,6 +1078,13 @@ class MC_core(MC):
             self.energy.polygon_object.nodes_object.qbits
         )
         self.n_total_steps = 0
+        self.corner = None
+        self.possible_coords_changed = False
+        self.radius = 0
+        self.variance_energy_of_last_steps = []
+        self.recording = recording
+        if self.recording:
+            self.init_recording()  
         self.total_energy, self.number_of_plaquettes = self.energy(
             self.energy.polygon_object.nodes_object.qbits
         )
@@ -1150,7 +1170,7 @@ class MC_core(MC):
         energies = []
         for i in range(number_of_samples):
             energies.append(self.total_energy)
-            self.reset(current_temperature=None, remove_ancillas=False)
+            self.reset(current_temperature=None, initial_swap_probability=None, remove_ancillas=False)
         return -np.std(energies) / np.log(chi_0)
 
     @staticmethod
