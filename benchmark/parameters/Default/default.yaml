@@ -2,16 +2,15 @@
 ######### Simulated Annealing #########
 #######################################
 # choose qbits
-random_qbit: False
+random_qbit: True
 number_of_plaquettes_weight: 0
 sparse_plaquette_density_weight: 0
 length_of_node_weight: 0
 qbit_with_same_node: False
 # choose coords
 neighbour_coords: False
-finite_grid_size: False
-padding_finite_grid: 0
-min_plaquette_density_in_softcore: 0.75
+finite_grid_size: True
+padding_finite_grid: 1
 envelop_shell_search: False
 shell_search: False
 same_node_coords: False
@@ -19,17 +18,17 @@ greedy: False
 # choose temperature
 chi_0: 0.8
 delta: 0.05
-alpha: 0.95
-repetition_rate_factor: 1
+alpha: 0.99
+repetition_rate_factor: 6
 temperature_adaptive: False
-temperature_kirkpatrick: False
+temperature_kirkpatrick: True
 temperature_kirkpatrick_sigma: False
 linear_in_moves: False
 temperature_C: False
 temperature_linearC: False
 # if current_temperature is 0, then initial temperature is estimated
 current_temperature: 0
-init_T_by_std: False
+init_T_by_std: True
 T_1: False
 T_0_estimation: False
 # search schedule
@@ -38,7 +37,7 @@ decay_rate_of_swap_probability: 1
 swap_only_core_qbits_in_line_swaps: False
 # how long to stay in shell until increasing it
 shell_time: 10
-with_core: True
+with_core: False
 n_moves: 1000
 ###################################
 ######### energy function #########
@@ -62,18 +61,19 @@ energy.bad_line_penalty: 1
 # energy.scaling_for_plaq3 = 0
 # energy.scaling_for_plaq4 = 0
 # null is understood as None, whereas None would become 'None'
-energy.scaling_model: null
+energy.scaling_model: "INIT"
 energy.polygon_object.scope_measure: True
+energy.polygon_object.exponent: 1
 ############################################
 ######### core Simulated Annealing #########
 ############################################
 # choose temperature
 core_chi_0: 0.8
 core_delta: 0.05
-core_alpha: 0.95
-core_repetition_rate_factor: 1
+core_alpha: 0.99
+core_repetition_rate_factor: 5
 core_temperature_adaptive: False
-core_temperature_kirkpatrick: False
+core_temperature_kirkpatrick: True
 core_temperature_kirkpatrick_sigma: False
 core_linear_in_moves: False
 core_temperature_C: False
@@ -85,17 +85,17 @@ core_cluster_shuffling_probability: 0.0
 #ancillas
 core_ancilla_insertion_probability: 0.0
 core_ancilla_deletion_probability: 0.0
-core_only_four_cycles_for_ancillas: False
-core_n_moves: 1000
+core_only_four_cycles_for_ancillas: True
+core_n_moves: 500
 ########################################
 ######### core energy function #########
 ########################################
-core_energy.only_largest_core: False
+core_energy.only_largest_core: True
 core_energy.only_rectangulars: False
 core_energy.only_number_of_plaquettes: False
-core_energy.only_squares_in_core: False
+core_energy.only_squares_in_core: True
 # core_energy.scaling_for_plaq3 = 0
 # core_energy.scaling_for_plaq4 = 0
 # null is understood as None, whereas None would become 'None'
-core_energy.scaling_model: null
+core_energy.scaling_model: "INIT"
 core_energy.polygon_object.scope_measure: True
