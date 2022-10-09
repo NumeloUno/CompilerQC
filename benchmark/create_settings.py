@@ -101,19 +101,19 @@ new_dicts = [
         "random_qbit": True,
     },
     {
-        "number_of_plaquettes_weight": 0.4,
+        "number_of_plaquettes_weight": True,
         "random_qbit": False,
     },
     {
-        "sparse_plaquette_density_weight": 0.4,
+        "sparse_plaquette_density_weight": True,
         "random_qbit": False,
     },
     {
-        "length_of_node_weight": 0.4,
+        "length_of_node_weight": 0.05,
         "random_qbit": False,
     },
     {
-        "length_of_node_weight": 0.6,
+        "length_of_node_weight": 0.05,
         "envelop_shell_search": True,
         "random_qbit": False,
         "finite_grid_size": False,
@@ -146,8 +146,8 @@ individual_settings1 = [
 individual_settings2 = [
 
     [
-        {"energy.scaling_for_plaq3": 0, "energy.scaling_for_plaq4": 0},
-        {"energy.scaling_for_plaq3": 1000000, "energy.scaling_for_plaq4": 1000000},
+        {"energy.scaling_for_plaq3": 0, "energy.scaling_for_plaq4": 0, "energy.scaling_model":None},
+        {"energy.scaling_for_plaq3": 1000000, "energy.scaling_for_plaq4": 1000000, "energy.scaling_model":None},
         {"energy.scaling_model": 'LHZ'},
         {"energy.scaling_model": 'INIT'},
     ]
@@ -223,3 +223,106 @@ functions_for_benchmarking.create_and_save_settings(
     f"{name}", new_dicts, new_config
 )
 ########################################################################################
+name = "AdvancedMcForLHZGraphsWithCore"
+individual_settings = [
+    [
+        {'with_core':True},
+    ],
+    [
+        {"swap_only_core_qbits_in_line_swaps": False},
+        {"swap_only_core_qbits_in_line_swaps": True},
+        {"swap_probability": 0.05, "decay_rate_of_swap_probability": 0.95},
+        {"swap_probability": 0.1, "decay_rate_of_swap_probability": 0.95},
+        {"swap_probability": 0.15, "decay_rate_of_swap_probability": 0.95},
+        {
+            "shell_time": 50,
+            "envelop_shell_search": True,
+            "finite_grid_size": False,
+        },
+        {
+            "shell_time": 200,
+            "envelop_shell_search": True,
+            "finite_grid_size": False,
+        },
+        {
+            "random_qbit": True,
+        },
+        {
+            "number_of_plaquettes_weight": True,
+            "random_qbit": False,
+        },
+        {
+            "sparse_plaquette_density_weight": True,
+            "random_qbit": False,
+        },
+        {
+            "length_of_node_weight": 0.05,
+            "random_qbit": False,
+        },
+        {
+            "length_of_node_weight": 0.05,
+            "envelop_shell_search": True,
+            "random_qbit": False,
+            "finite_grid_size": False,
+        },
+        {
+            "qbit_with_same_node": True,
+            "random_qbit": False,
+        },
+    ]
+]
+individual_settings = list(itertools.product(*individual_settings))
+new_dicts = [{k: v for d in L for k, v in d.items()} for L in individual_settings]
+functions_for_benchmarking.create_and_save_settings(name, new_dicts, new_config, save=True)
+########################################################################################
+name = "McForDatabaseWithCore"
+individual_settings = [
+    [
+        {'with_core':True},
+    ],
+    [
+        {"swap_only_core_qbits_in_line_swaps": False},
+        {"swap_only_core_qbits_in_line_swaps": True},
+        {"swap_probability": 0.05, "decay_rate_of_swap_probability": 0.95},
+        {"swap_probability": 0.1, "decay_rate_of_swap_probability": 0.95},
+        {"swap_probability": 0.15, "decay_rate_of_swap_probability": 0.95},
+        {
+            "shell_time": 50,
+            "envelop_shell_search": True,
+            "finite_grid_size": False,
+        },
+        {
+            "shell_time": 200,
+            "envelop_shell_search": True,
+            "finite_grid_size": False,
+        },
+        {
+            "random_qbit": True,
+        },
+        {
+            "number_of_plaquettes_weight": True,
+            "random_qbit": False,
+        },
+        {
+            "sparse_plaquette_density_weight": True,
+            "random_qbit": False,
+        },
+        {
+            "length_of_node_weight": 0.05,
+            "random_qbit": False,
+        },
+        {
+            "length_of_node_weight": 0.05,
+            "envelop_shell_search": True,
+            "random_qbit": False,
+            "finite_grid_size": False,
+        },
+        {
+            "qbit_with_same_node": True,
+            "random_qbit": False,
+        },
+    ]
+]
+individual_settings = list(itertools.product(*individual_settings))
+new_dicts = [{k: v for d in L for k, v in d.items()} for L in individual_settings]
+functions_for_benchmarking.create_and_save_settings(name, new_dicts, new_config, save=True)
