@@ -588,7 +588,4 @@ class Energy_core(Energy):
 
         distances_to_plaquette = self.scaled_measure(scopes)
 
-        if self.spring_energy:
-            return round((distances_to_plaquette ** 2).sum(), 5), number_of_plaquettes
-        else:
-            return round((distances_to_plaquette).sum(), 5), number_of_plaquettes
+        return round((distances_to_plaquette).sum(), 5), number_of_plaquettes
