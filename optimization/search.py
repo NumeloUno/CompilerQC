@@ -43,9 +43,10 @@ class MC:
         self.n_total_steps = 0
 
         # choose qbits
-        self.number_of_plaquettes_weight = 0
-        self.sparse_plaquette_density_weight = 0
+        self.number_of_plaquettes_weight = False
+        self.sparse_plaquette_density_weight = False
         self.length_of_node_weight = 0
+        self.length_of_node_weigths = None
         self.random_qbit = False
         self.qbit_with_same_node = False
 
@@ -131,6 +132,7 @@ class MC:
             )
         self.n_total_steps = 0
         self.corner = None
+        self.length_of_node_weigths = None
         self.possible_coords_changed = False
         self.radius = 0
         self.variance_energy_of_last_steps = []
@@ -193,36 +195,32 @@ class MC:
         if self.random_qbit:
             qbit = self.energy.polygon_object.nodes_object.qbits.random_shell_qbit()
         elif self.number_of_plaquettes_weight:
-            if random.random() < 1 - self.number_of_plaquettes_weight:
-                qbit = self.energy.polygon_object.nodes_object.qbits.random_shell_qbit()
-            else:
-                number_of_plaquettes_weight = (
-                    self.energy.penalty_for_low_number_of_plaquettes()
-                )
-                qbit = self.energy.polygon_object.nodes_object.qbits.random_weighted_shell_qbit(
-                    weights=number_of_plaquettes_weight
-                )
+            number_of_plaquettes_weight = (
+                self.energy.penalty_for_low_number_of_plaquettes()
+            )
+            qbit = self.energy.polygon_object.nodes_object.qbits.random_weighted_shell_qbit(
+                weights=number_of_plaquettes_weight
+            )
         elif self.sparse_plaquette_density_weight:
-            if random.random() < 1 - self.sparse_plaquette_density_weight:
-                qbit = self.energy.polygon_object.nodes_object.qbits.random_shell_qbit()
-            else:
-                sparse_plaquette_density_weight = (
-                    self.energy.penalty_for_sparse_plaquette_density()
-                )
-                qbit = self.energy.polygon_object.nodes_object.qbits.random_weighted_shell_qbit(
-                    weights=sparse_plaquette_density_weight
-                )
+            sparse_plaquette_density_weight = (
+                self.energy.penalty_for_sparse_plaquette_density()
+            )
+            qbit = self.energy.polygon_object.nodes_object.qbits.random_weighted_shell_qbit(
+                weights=sparse_plaquette_density_weight
+            )
         elif self.length_of_node_weight:
-            if random.random() < 1 - self.length_of_node_weight:
-                qbit = self.energy.polygon_object.nodes_object.qbits.random_shell_qbit()
-            else:
-                length_of_node_weight = [
-                    np.multiply(*qbit.length_of_its_nodes)
-                    for qbit in self.energy.polygon_object.nodes_object.qbits.shell_qbits
-                ]
-                qbit = self.energy.polygon_object.nodes_object.qbits.random_weighted_shell_qbit(
-                    weights=length_of_node_weight
-                )
+            if self.length_of_node_weigths is None:
+                self.length_of_node_weights = np.array([
+                        np.multiply(*qbit.length_of_its_nodes)
+                        for qbit in self.energy.polygon_object.nodes_object.qbits.shell_qbits
+                    ])
+            self.length_of_node_weights = (self.length_of_node_weights
+                                           - (self.length_of_node_weight * 1 / self.energy.polygon_object.nodes_object.qbits.graph.K)
+                                           * (self.length_of_node_weights - self.length_of_node_weights.mean()))
+
+            qbit = self.energy.polygon_object.nodes_object.qbits.random_weighted_shell_qbit(
+                weights=self.length_of_node_weights
+            )
 
         elif (
             self.qbit_with_same_node
@@ -1077,11 +1075,7 @@ class MC_core(MC):
             self.energy.polygon_object.nodes_object.qbits
         )
         self.n_total_steps = 0
-        self.corner = None
-        self.possible_coords_changed = False
-        self.radius = 0
         self.variance_energy_of_last_steps = []
-        self.recording = recording
         if self.recording:
             self.init_recording()  
         self.total_energy, self.number_of_plaquettes = self.energy(
@@ -1169,7 +1163,7 @@ class MC_core(MC):
         energies = []
         for i in range(number_of_samples):
             energies.append(self.total_energy)
-            self.reset(current_temperature=None, initial_swap_probability=None, remove_ancillas=False)
+            self.reset(current_temperature=None, remove_ancillas=False)
         return -np.std(energies) / np.log(chi_0)
 
     @staticmethod
