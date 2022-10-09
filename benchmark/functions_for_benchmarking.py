@@ -98,7 +98,8 @@ def initialize_MC_object(graph: Graph, mc_schedule: dict, core: bool = False):
         mc.with_core = mc_schedule["with_core"]
 
     mc = update_mc(mc, mc_schedule, core)
-    mc.energy.set_scaling_from_model()
+    if not core:
+        mc.energy.set_scaling_from_model()
     mc.energy.polygon_object.set_unit_measure()
     mc.n_moves = int(mc.n_moves * mc.repetition_rate)
     # initialize temperature
@@ -107,15 +108,14 @@ def initialize_MC_object(graph: Graph, mc_schedule: dict, core: bool = False):
         initial_temperature = mc.initial_temperature()
     mc.T_0 = initial_temperature
     mc.current_temperature = initial_temperature
-    initial_swap_probability = mc.swap_probability
     if core:
         # remove_ancillas False since there shouldnt be any ancillas, so we dont have to remove them
         mc.reset(
             current_temperature=initial_temperature,
-            initial_swap_probability=initial_swap_probability,
             remove_ancillas=False
         )
     else:
+        initial_swap_probability = mc.swap_probability
         # remove_ancillas False since there shouldnt be any ancillas, so we dont have to remove them
         mc.reset(
             current_temperature=initial_temperature,
