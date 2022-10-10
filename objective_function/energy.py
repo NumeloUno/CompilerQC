@@ -25,6 +25,7 @@ class Energy(Polygons):
         line_factor: float = 1,
         low_noplaqs_penalty: bool = False,
         low_noplaqs_factor: float = 1,
+        count_constraints: bool=False,
         all_constraints: bool=False,
     ):
         """
@@ -33,6 +34,7 @@ class Energy(Polygons):
         this model
         """
         self.polygon_object = polygon_object
+        self.count_constraints = count_constraints
         self.all_constraints = all_constraints
         # polygon weights
         self.basic_energy = basic_energy
@@ -398,15 +400,33 @@ class Energy(Polygons):
                 
         return energy_to_return, len(generating_constraints)
     
+
+    def count_all_constraints(self):
+        """
+        count all constraints, even those which are fulfilled implict
+        """
+        generating_constraints = self.polygon_object.get_generating_constraints()
+        count = 1
+        for polygon_coord in self.polygons_coords_of_interest:
+            if Polygons.is_constraint_fulfilled(polygon_coord, generating_constraints):
+                count -= 1 / len(self.polygon_object.polygons)
+        return (count + 1e-3) ** 2, len(generating_constraints)
+    
     def __call__(self, qbits_of_interest):
         """
         return the energy and number of plaquettes of the polygons belonging to
         qbits of interest
         """
-        if self.all_constraints:
-            polygons_of_interest = self.changed_polygons(self.polygon_object.nodes_object.qbits)
+        if self.count_constraints:
             self.polygons_coords_of_interest = self.polygon_object.coords_of_polygons(
-                polygons_of_interest
+                self.polygon_object.polygons
+            )
+            number_of_constraints, number_of_plaquettes = self.count_all_constraints()
+            return number_of_constraints, number_of_plaquettes
+
+        if self.all_constraints:
+            self.polygons_coords_of_interest = self.polygon_object.coords_of_polygons(
+                self.polygon_object.polygons
             )
             energy_to_return, number_of_plaquettes = self.consider_all_constraints()
             return energy_to_return, number_of_plaquettes
