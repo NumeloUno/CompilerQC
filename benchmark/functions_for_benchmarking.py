@@ -290,8 +290,21 @@ def update(origin_dict, new_dict):
     updated_dict.update(new_dict)
     return updated_dict
 
+def create_sh_script(name, part, parameters_path=str(paths.parameters_path)):
+    with open(f"sh_scripts/run_{name}_part_{part}.sh", 'w') as sh:
+            sh.write(('''\
+#!/bin/bash 
+NUM_PARALLEL_JOBS=10 
+part=%s
+name=%s
+CSV_FILE=%s/csvs/${name}_part_${part}.csv
+tail -n +2 ${CSV_FILE} | parallel --progress --colsep ',' -j${NUM_PARALLEL_JOBS} \
+python "../benchmark_optimization.py --yaml_path={1} --batch_size={2} \
+--min_N={3} --max_N={4} --min_C={5} --max_C={6} --max_size={7} \
+--problem_folder={8}"  
+            ''')%(part, name, parameters_path))
 
-def create_and_save_settings(name, new_dicts, new_config, save: bool=False):
+def create_and_save_settings(name, new_dicts, new_config, problem_folder: str=None, save: bool=True):
     """update default yaml by newdict and save them in mc_parameters_name.yaml
     note: there are absolute paths in use!"""
     (paths.parameters_path / "csvs").mkdir(parents=True, exist_ok=True)
@@ -307,13 +320,27 @@ def create_and_save_settings(name, new_dicts, new_config, save: bool=False):
             print(name, idx)
             yaml.dump(dict_to_save, f, default_flow_style=False)
     if save:
-        for i in range(math.ceil(len(filenames) / 30)):
-            df = pd.DataFrame(data = {"filenames":filenames[i * 30 : (i + 1) * 30]})
-            df["batch_size"] =  20
-            df["min_N"] = 4
-            df["max_N"] = 40 
-            df["min_C"] = 3
-            df["max_C"] = 91
-            df["max_size"] = 50
-            df["problem_folder"] = "lhz" 
-            df.to_csv(paths.parameters_path / "csvs" / f"{name}_part_{i}.csv", index=False, index_label=False)        
+        if problem_folder == 'lhz':
+            for part in range(math.ceil(len(filenames) / 30)):
+                df = pd.DataFrame(data = {"filenames":filenames[part * 30 : (part + 1) * 30]})
+                df["batch_size"] =  20
+                df["min_N"] = 4
+                df["max_N"] = 40 
+                df["min_C"] = 3
+                df["max_C"] = 91
+                df["max_size"] = 50
+                df["problem_folder"] = problem_folder
+                df.to_csv(paths.parameters_path / "csvs" / f"{name}_part_{part}.csv", index=False, index_label=False)
+                create_sh_script(name=name, part=part)
+        if problem_folder == 'training_set':
+            for part in range(math.ceil(len(filenames) / 30)):
+                df = pd.DataFrame(data = {"filenames":filenames[part * 30 : (part + 1) * 30]})
+                df["batch_size"] =  10
+                df["min_N"] = 4
+                df["max_N"] = 20 
+                df["min_C"] = 3
+                df["max_C"] = 40
+                df["max_size"] = 50
+                df["problem_folder"] = problem_folder
+                df.to_csv(paths.parameters_path / "csvs" / f"{name}_part_{part}.csv", index=False, index_label=False)
+                create_sh_script(name=name, part=part)
