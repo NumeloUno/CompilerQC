@@ -14,10 +14,15 @@ import shutil
 import os
 import itertools
 print("===================================")
+print("==== Delete old sh_scripts =====")
+print("===================================")
+for p in Path("sh_scripts/").glob("*.sh"):
+    shutil.rmtree(f"parameters/{p.name}", ignore_errors=True)
+print("===================================")
 print("==== Delete old settings/csvs =====")
 print("===================================")
 for p in Path("parameters/").glob("*"):
-    if p.name not in ["run_script.sh", "run_parameters.sh", "Default", "csvs"]:
+    if p.name not in ["Default"]:
         print(p.name)
         shutil.rmtree(f"parameters/{p.name}", ignore_errors=True)
 print("===================================")
@@ -39,8 +44,9 @@ default_update = {}
 new_config = functions_for_benchmarking.update(config, default_update)
 
 ########################################################################################
-    
-name = "CoreEnergyForDatabase"
+number = ""
+########################################################################################
+name = f"CoreEnergyForDatabase{number}"
 new_dicts = [
     {"core_energy.scaling_for_plaq4": 0, "core_energy.scaling_model": None},
     {"core_energy.scaling_for_plaq4": 1000000, "core_energy.scaling_model": None},
@@ -52,11 +58,11 @@ new_dicts = [
     {"core_energy.all_constraints": True},
     {"core_energy.only_number_of_plaquettes": True},
 ]
-functions_for_benchmarking.create_and_save_settings(name, new_dicts, new_config)
+functions_for_benchmarking.create_and_save_settings(name, new_dicts, new_config, problem_folder='training_set')
 
 ########################################################################################
     
-name = "CoreMcForDatabase"
+name = f"CoreMcForDatabase{number}"
 new_dicts = [
     {"core_cluster_shuffling_probability": 0},
     {"core_cluster_shuffling_probability": 0.05},
@@ -76,11 +82,11 @@ new_dicts = [
     {"core_ancilla_insertion_probability": 0.08, "core_ancilla_deletion_probability": 1},
 
 ]
-functions_for_benchmarking.create_and_save_settings(name, new_dicts, new_config)
+functions_for_benchmarking.create_and_save_settings(name, new_dicts, new_config, problem_folder='training_set')
 
 ########################################################################################
 
-name = "McForDatabase"
+name = f"McForDatabase{number}"
 new_dicts = [
     {"swap_only_core_qbits_in_line_swaps": False},
     {"swap_only_core_qbits_in_line_swaps": True},
@@ -123,10 +129,10 @@ new_dicts = [
         "random_qbit": False,
     },
 ]
-functions_for_benchmarking.create_and_save_settings(name, new_dicts, new_config)
+functions_for_benchmarking.create_and_save_settings(name, new_dicts, new_config, problem_folder='training_set')
 
 ########################################################################################
-name = "EnergyForLHZGraphs"
+name = f"EnergyForLHZGraphs{number}"
 individual_settings1 = [
     [        
         {"energy.polygon_object.scope_measure": False},
@@ -180,13 +186,16 @@ individual_settings3 = [
 ]
 
 individual_settings4 = [
-
     [
         {"energy.all_constraints":True,
          "energy.scaling_for_plaq3": 0,
-         "energy.scaling_for_plaq4": 0},
+         "energy.scaling_for_plaq4": 0,
+         "energy.scaling_model":None},
         {"energy.all_constraints": True,
          "energy.scaling_model": 'LHZ'},
+        {"energy.count_constraints": True,
+         "energy.scaling_model":None,
+         "chi_0": 0.001,}
     ]
 ]
 individual_settings1 = list(itertools.product(*individual_settings1))
@@ -197,10 +206,10 @@ individual_settings4 = list(itertools.product(*individual_settings4))
 individual_settings = (individual_settings1 + individual_settings2 + individual_settings3 + individual_settings4)
 new_dicts = [{k: v for d in L for k, v in d.items()} for L in individual_settings]
 functions_for_benchmarking.create_and_save_settings(
-    f"{name}", new_dicts, new_config
+    f"{name}", new_dicts, new_config, problem_folder='lhz'
 )
 ########################################################################################
-name = "McForLHZGraphs"
+name = f"McForLHZGraphs{number}"
 individual_settings = [
     [     
         {"repetition_rate_factor": 2},
@@ -220,10 +229,10 @@ individual_settings = [
 individual_settings = list(itertools.product(*individual_settings))
 new_dicts = [{k: v for d in L for k, v in d.items()} for L in individual_settings]
 functions_for_benchmarking.create_and_save_settings(
-    f"{name}", new_dicts, new_config
+    f"{name}", new_dicts, new_config, problem_folder='lhz'
 )
 ########################################################################################
-name = "AdvancedMcForLHZGraphsWithCore"
+name = f"AdvancedMcForLHZGraphsWithCore{number}"
 individual_settings = [
     [
         {'with_core':True},
@@ -273,9 +282,9 @@ individual_settings = [
 ]
 individual_settings = list(itertools.product(*individual_settings))
 new_dicts = [{k: v for d in L for k, v in d.items()} for L in individual_settings]
-functions_for_benchmarking.create_and_save_settings(name, new_dicts, new_config, save=True)
+functions_for_benchmarking.create_and_save_settings(name, new_dicts, new_config, problem_folder='lhz')
 ########################################################################################
-name = "McForDatabaseWithCore"
+name = f"McForDatabaseWithCore{number}"
 individual_settings = [
     [
         {'with_core':True},
@@ -325,4 +334,4 @@ individual_settings = [
 ]
 individual_settings = list(itertools.product(*individual_settings))
 new_dicts = [{k: v for d in L for k, v in d.items()} for L in individual_settings]
-functions_for_benchmarking.create_and_save_settings(name, new_dicts, new_config, save=True)
+functions_for_benchmarking.create_and_save_settings(name, new_dicts, new_config, problem_folder='training_set')
