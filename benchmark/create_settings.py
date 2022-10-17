@@ -44,7 +44,7 @@ default_update = {}
 new_config = functions_for_benchmarking.update(config, default_update)
 
 ########################################################################################
-number = ""
+number = "1"
 ########################################################################################
 name = f"CoreEnergyForDatabase{number}"
 new_dicts = [
@@ -52,9 +52,12 @@ new_dicts = [
     {"core_energy.scaling_for_plaq4": 1000000, "core_energy.scaling_model": None},
     {"core_energy.only_squares_in_core": True},
     {"core_energy.only_squares_in_core": False},
+    {"core_energy.polygon_object.exponent": 0.5},
     {"core_energy.polygon_object.exponent": 1},
     {"core_energy.polygon_object.exponent": 2},
     {"core_energy.polygon_object.exponent": 3},
+    {"core_energy.polygon_object.exponent": 4},
+    {"core_energy.polygon_object.exponent": 5},
     {"core_energy.all_constraints": True},
     {"core_energy.only_number_of_plaquettes": True},
 ]
@@ -68,6 +71,7 @@ new_dicts = [
     {"core_cluster_shuffling_probability": 0.05},
     {"core_cluster_shuffling_probability": 0.1},
     {"core_cluster_shuffling_probability": 0.15},
+    {"core_cluster_shuffling_probability": 0.3},
     {
         "core_only_four_cycles_for_ancillas": False,
         "core_energy.only_squares_in_core": False,
@@ -76,10 +80,14 @@ new_dicts = [
     {"core_ancilla_insertion_probability": 0.02, "core_ancilla_deletion_probability": 0},
     {"core_ancilla_insertion_probability": 0.04, "core_ancilla_deletion_probability": 0},
     {"core_ancilla_insertion_probability": 0.08, "core_ancilla_deletion_probability": 0},
+    {"core_ancilla_insertion_probability": 0.16, "core_ancilla_deletion_probability": 0},
+    {"core_ancilla_insertion_probability": 0.32, "core_ancilla_deletion_probability": 0},
     {"core_ancilla_insertion_probability": 0.01, "core_ancilla_deletion_probability": 1},
     {"core_ancilla_insertion_probability": 0.02, "core_ancilla_deletion_probability": 1},
     {"core_ancilla_insertion_probability": 0.04, "core_ancilla_deletion_probability": 1},
     {"core_ancilla_insertion_probability": 0.08, "core_ancilla_deletion_probability": 1},
+    {"core_ancilla_insertion_probability": 0.16, "core_ancilla_deletion_probability": 1},
+    {"core_ancilla_insertion_probability": 0.32, "core_ancilla_deletion_probability": 1},
 
 ]
 functions_for_benchmarking.create_and_save_settings(name, new_dicts, new_config, problem_folder='training_set')
@@ -93,6 +101,7 @@ new_dicts = [
     {"swap_probability": 0.05, "decay_rate_of_swap_probability": 0.95},
     {"swap_probability": 0.1, "decay_rate_of_swap_probability": 0.95},
     {"swap_probability": 0.15, "decay_rate_of_swap_probability": 0.95},
+    {"swap_probability": 0.30, "decay_rate_of_swap_probability": 0.95},
     {
         "shell_time": 50,
         "envelop_shell_search": True,
@@ -100,6 +109,11 @@ new_dicts = [
     },
     {
         "shell_time": 200,
+        "envelop_shell_search": True,
+        "finite_grid_size": False,
+    },
+    {
+        "shell_time": 500,
         "envelop_shell_search": True,
         "finite_grid_size": False,
     },
@@ -144,8 +158,12 @@ individual_settings1 = [
     ],
     [
         {"energy.polygon_object.exponent":0.5},
+        {"energy.polygon_object.exponent":1},
         {"energy.polygon_object.exponent":2},
         {"energy.polygon_object.exponent":3},
+        {"energy.polygon_object.exponent":4},
+        {"energy.polygon_object.exponent":5},
+
     ],
 ]
 
@@ -161,18 +179,22 @@ individual_settings2 = [
 
 individual_settings3 = [
     [
+        {"energy.decay_weight": True, "energy.decay_rate": 0.1,
+        "energy.line": False},
         {"energy.decay_weight": True, "energy.decay_rate": 0.5,
         "energy.line": False},
         {"energy.decay_weight": True, "energy.decay_rate": 1,
         "energy.line": False},
         {"energy.decay_weight": True, "energy.decay_rate": 1.5,
         "energy.line": False},
-        
-        {"energy.decay_weight": True, "energy.decay_rate": 1,
+        {"energy.decay_weight": True, "energy.decay_rate": 0.5,
+        "energy.line": True, "energy.line_exponent": 0.5},        
+        {"energy.decay_weight": True, "energy.decay_rate": 0.5,
         "energy.line": True, "energy.line_exponent": 1},
-        {"energy.decay_weight": True, "energy.decay_rate": 1,
+        {"energy.decay_weight": True, "energy.decay_rate": 0.5,
         "energy.line": True, "energy.line_exponent": 2},
-        
+        {"energy.line": True, "energy.line_exponent": 0.5,
+        "energy.basic_energy": True,},        
         {"energy.line": True, "energy.line_exponent": 1,
         "energy.basic_energy": True,},
         {"energy.line": True, "energy.line_exponent": 2,
@@ -181,6 +203,8 @@ individual_settings3 = [
         {"energy.line": True, "energy.line_exponent": 1,
         "energy.basic_energy": False,},
         {"energy.line": True, "energy.line_exponent": 2,
+        "energy.basic_energy": False,},
+        {"energy.line": True, "energy.line_exponent": 4,
         "energy.basic_energy": False,},
     ]
 ]
@@ -254,6 +278,11 @@ individual_settings = [
             "finite_grid_size": False,
         },
         {
+            "shell_time": 500,
+            "envelop_shell_search": True,
+            "finite_grid_size": False,
+        },
+        {
             "random_qbit": True,
         },
         {
@@ -302,6 +331,11 @@ individual_settings = [
         },
         {
             "shell_time": 200,
+            "envelop_shell_search": True,
+            "finite_grid_size": False,
+        },
+        {
+            "shell_time": 500,
             "envelop_shell_search": True,
             "finite_grid_size": False,
         },
