@@ -131,7 +131,7 @@ def evaluate_optimization(
     graph: Graph,
     mc_schedule: dict,
     args: "arguments from parser",
-    _id: str=str(uuid4()),
+    _id: str=None,
 ):
     """
     evaluate monte carlo/ simulated annealing schedule for batch_size timed and returns
@@ -162,7 +162,7 @@ def evaluate_optimization(
                     mc.finite_grid_size = True
                     mc.random_qbit = True
                 else:
-                    save_object(mc_core, path_to_results(args) / f'{args.name}/{_id}_CORE_N_K_C_{graph.N}_{graph.K}_{graph.C}_.pkl')
+                    save_object(mc_core, path_to_results(args) / f'{args.name}/{_id}_{iteration}_CORE_N_K_C_{graph.N}_{graph.K}_{graph.C}_.pkl')
 
                 # reset mc core
                 mc_core.reset(mc_core.T_0, remove_ancillas=True)
@@ -186,7 +186,7 @@ def evaluate_optimization(
             mc.energy.polygon_object.nodes_object.propose_ancillas_to_remove()
         )
         mc.name, mc.batch_size = args.name, args.batch_size
-        save_object(mc, path_to_results(args) / f'{args.name}/{_id}_N_K_C_{graph.N}_{graph.K}_{graph.C}_.pkl')
+        save_object(mc, path_to_results(args) / f'{args.name}/{_id}_{iteration}_N_K_C_{graph.N}_{graph.K}_{graph.C}_.pkl')
         # reset mc object
         mc.reset(current_temperature=mc.T_0,initial_swap_probability=initial_swap_probability, remove_ancillas=True, keep_core=False)
 
@@ -205,8 +205,9 @@ def run_benchmark(
     with open(path_to_config) as f:
         mc_schedule = yaml.load(f, Loader=yaml.FullLoader)
     # evaluate schedule from yaml and save it
+    _id = str(uuid4())
     evaluate_optimization(
-        graph, mc_schedule, args
+        graph, mc_schedule, args, _id
     )
 
 
@@ -323,9 +324,9 @@ def create_and_save_settings(name, new_dicts, new_config, problem_folder: str=No
         if problem_folder == 'lhz':
             for part in range(math.ceil(len(filenames) / 30)):
                 df = pd.DataFrame(data = {"filenames":filenames[part * 30 : (part + 1) * 30]})
-                df["batch_size"] =  20
+                df["batch_size"] =  50
                 df["min_N"] = 4
-                df["max_N"] = 40 
+                df["max_N"] = 12 
                 df["min_C"] = 3
                 df["max_C"] = 91
                 df["max_size"] = 50
@@ -335,7 +336,7 @@ def create_and_save_settings(name, new_dicts, new_config, problem_folder: str=No
         if problem_folder == 'training_set':
             for part in range(math.ceil(len(filenames) / 30)):
                 df = pd.DataFrame(data = {"filenames":filenames[part * 30 : (part + 1) * 30]})
-                df["batch_size"] =  10
+                df["batch_size"] = 30
                 df["min_N"] = 4
                 df["max_N"] = 20 
                 df["min_C"] = 3
