@@ -236,7 +236,7 @@ class MC:
         assert qbit is not None, "oh! there is no qbit selected"
         assert target_coord is not None, "oh! there is no targetcoord selected"
         # return
-        if target_coord in self.energy.polygon_object.nodes_object.qbits.coords:
+        if target_coord in set(self.energy.polygon_object.nodes_object.qbits.coords).intersection(self.possible_coords):
             target_qbit = self.energy.polygon_object.nodes_object.qbits.qbit_from_coord(
                 target_coord
             )
@@ -259,7 +259,7 @@ class MC:
         """
         generate random coord in grid
         sample from envelop rectengular of compiled graph
-        for running time reasons: only every repetition_rate times
+        for run time reasons: only every repetition_rate times
         """
         if (
             self.n_total_steps % (self.repetition_rate * self.shell_time) == 0
@@ -1041,17 +1041,10 @@ class MC_core(MC):
             self.energy.polygon_object.nodes_object.qbits
         )
 
+        self.variance_energy_of_last_steps = []
         self.recording = recording
         if self.recording:
-            self.record_temperature = []
-            self.record_total_energy = []
-            self.record_mean_energy = []
-            self.record_variance_energy = []
-            self.record_good_moves = []
-            self.record_bad_moves = []
-            self.record_rejected_moves = []
-            self.record_acc_probability = []
-            self.record_delta_energy = []
+            self.init_recording()
 
     @classmethod
     def init_from_yaml(cls, graph: Graph, path_to_config: str = "Default/default.yaml"):
