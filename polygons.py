@@ -311,7 +311,7 @@ class Polygons:
             ax.add_patch(circle)
         return ax
 
-    def draw_lines(self, ax, rotate: bool=False):
+    def draw_lines(self, ax, linewidth: float=10., alpha: float=0.8, rotate: bool=False):
         """draw lines of nodes in plot
         before calling this function, lines have to be initialized, 
         easiest way to do so is by calling energy.line_energy()
@@ -321,8 +321,8 @@ class Polygons:
             a = ax.plot(
                 [Polygons.rotate_coords_by_45(qbit.coord, rotate)[0] for qbit in qbits_path],
                 [Polygons.rotate_coords_by_45(qbit.coord, rotate)[1] for qbit in qbits_path],
-                linewidth = 10,
-                alpha=0.8
+                linewidth = linewidth,
+                alpha=alpha,
             )
             a[0].set_solid_capstyle('round')
         return ax
