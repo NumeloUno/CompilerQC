@@ -22,7 +22,7 @@ def save_object(obj, filename):
         pickle.dump(obj, outp, pickle.HIGHEST_PROTOCOL)
         
 path_to_results = lambda args: (
-    paths.benchmark_results_path
+    paths.benchmark_results_path / f"run_{args.run}"
     / f"benchmark_{(args.problem_folder).replace('/','_')}_with_{args.id_of_benchmark}"
 )
         
@@ -90,6 +90,8 @@ def initialize_MC_object(graph: Graph, mc_schedule: dict, core: bool = False):
     """
     # initialise MC search
     if core:
+        if graph.is_complete:
+            return None
         energy_core = init_energy_core(graph)
         mc = MC_core(energy_core)
     else:
@@ -138,18 +140,10 @@ def evaluate_optimization(
     a success probability -> measure of how good the choosen schedule (temperature,
     configuration distribution, ...) is
     """
-    mc = initialize_MC_object(graph, mc_schedule)
-    if mc.with_core:
-        if not graph.is_complete:
-            mc_core = initialize_MC_object(graph, mc_schedule, core=True)
-        else:
-            mc_core = None
-    else:
-        mc.swap_probability = 0
-    initial_swap_probability = mc.swap_probability
     for iteration in range(args.batch_size):
-        # search for core
+        mc = initialize_MC_object(graph, mc_schedule)
         if mc.with_core:
+            mc_core = initialize_MC_object(graph, mc_schedule, core=True)
             (
                 qubit_coord_dict,
                 mc.energy.polygon_object.core_corner,
@@ -164,13 +158,11 @@ def evaluate_optimization(
                 else:
                     save_object(mc_core, path_to_results(args) / f'{args.name}/{_id}_{iteration}_CORE_N_K_C_{graph.N}_{graph.K}_{graph.C}_.pkl')
 
-                # reset mc core
-                mc_core.reset(mc_core.T_0, remove_ancillas=True)
-                # update core (reset is part of update)
                 # remove ancillas which are already in graph, but not recognized due to removing of short lines in graph
                 # add ancillas first since updates_qbits_from_dict doesnt know them otherwise
                 ancillas_in_core = {qubit:coord for qubit, coord in ancillas_in_core.items() if qubit not in graph.qubits}
                 mc.add_ancillas(ancillas_in_core, update_energy=False)
+                
             mc.update_qbits_from_dict(qubit_coord_dict, assign_to_core=True)
             mc.total_energy, mc.number_of_plaquettes = mc.energy(
                 mc.energy.polygon_object.nodes_object.qbits
@@ -185,11 +177,9 @@ def evaluate_optimization(
         mc.remove_ancillas(
             mc.energy.polygon_object.nodes_object.propose_ancillas_to_remove()
         )
-        mc.name, mc.batch_size = args.name, args.batch_size
+        mc.name, mc.batch_size, mc.run = args.name, args.batch_size, args.run
         save_object(mc, path_to_results(args) / f'{args.name}/{_id}_{iteration}_N_K_C_{graph.N}_{graph.K}_{graph.C}_.pkl')
-        # reset mc object
-        mc.reset(current_temperature=mc.T_0,initial_swap_probability=initial_swap_probability, remove_ancillas=True, keep_core=False)
-
+        
 def run_benchmark(
     graph: Graph,
     args,
@@ -201,7 +191,7 @@ def run_benchmark(
     """
 
     # load yaml
-    path_to_config = paths.parameters_path / args.id_of_benchmark / args.yaml_path
+    path_to_config = paths.parameters_path / f"run_{args.run}" / args.id_of_benchmark / args.yaml_path
     with open(path_to_config) as f:
         mc_schedule = yaml.load(f, Loader=yaml.FullLoader)
     # evaluate schedule from yaml and save it
@@ -256,7 +246,7 @@ def visualize_settings(
 ):
     """
     """
-    path_to_config = paths.parameters_path / args.id_of_benchmark / args.yaml_path
+    path_to_config = paths.parameters_path / f"run_{args.run}" / args.id_of_benchmark / args.yaml_path
     with open(path_to_config) as f:
         mc_schedule = yaml.load(f, Loader=yaml.FullLoader)
     visualize_search(graph=graph,
@@ -291,32 +281,32 @@ def update(origin_dict, new_dict):
     updated_dict.update(new_dict)
     return updated_dict
 
-def create_sh_script(name, part, parameters_path=str(paths.parameters_path)):
-    with open(f"sh_scripts/run_{name}_part_{part}.sh", 'w') as sh:
+def create_sh_script(name, number, part):
+    with open(paths.parameters_path / f"run_{number}/sh_scripts/run_{name}_part_{part}.sh", 'w') as sh:
             sh.write(('''\
 #!/bin/bash 
 NUM_PARALLEL_JOBS=10 
 part=%s
 name=%s
-CSV_FILE=%s/csvs/${name}_part_${part}.csv
+number=%s
+CSV_FILE=%s/run_${number}/csvs/${name}_part_${part}.csv
 tail -n +2 ${CSV_FILE} | parallel --progress --colsep ',' -j${NUM_PARALLEL_JOBS} \
-python "../benchmark_optimization.py --yaml_path={1} --batch_size={2} \
+python "%s/benchmark/benchmark_optimization.py --yaml_path={1} --batch_size={2} \
 --min_N={3} --max_N={4} --min_C={5} --max_C={6} --max_size={7} \
---problem_folder={8}"  
-            ''')%(part, name, parameters_path))
+--problem_folder={8} --run=${number}"  
+            ''')%(part, name, number, str(paths.parameters_path), str(paths.cwd)))
 
-def create_and_save_settings(name, new_dicts, new_config, problem_folder: str=None, save: bool=True):
+def create_and_save_settings(name, number, new_dicts, new_config, problem_folder: str=None, save: bool=True):
     """update default yaml by newdict and save them in mc_parameters_name.yaml
     note: there are absolute paths in use!"""
-    (paths.parameters_path / "csvs").mkdir(parents=True, exist_ok=True)
     filenames = []
     for idx, new_dict in enumerate(new_dicts):
         # create folder if it doesnt exists yet
         filenames.append(f"mc_parameters_{name}_{idx}.yaml")
-        (paths.parameters_path / name).mkdir(parents=True, exist_ok=True)
+        (paths.parameters_path / f"run_{number}" / name).mkdir(parents=True, exist_ok=True)
         dict_to_save = update(deepcopy(new_config), new_dict)
         with open(
-            paths.parameters_path / name / f"mc_parameters_{name}_{idx}.yaml", "w"
+            paths.parameters_path / f"run_{number}" / name / f"mc_parameters_{name}_{idx}.yaml", "w"
         ) as f:
             print(name, idx)
             yaml.dump(dict_to_save, f, default_flow_style=False)
@@ -331,8 +321,8 @@ def create_and_save_settings(name, new_dicts, new_config, problem_folder: str=No
                 df["max_C"] = 91
                 df["max_size"] = 50
                 df["problem_folder"] = problem_folder
-                df.to_csv(paths.parameters_path / "csvs" / f"{name}_part_{part}.csv", index=False, index_label=False)
-                create_sh_script(name=name, part=part)
+                df.to_csv(paths.parameters_path / f"run_{number}" / "csvs" /  f"{name}_part_{part}.csv", index=False, index_label=False)
+                create_sh_script(name=name, number=number, part=part)
         if problem_folder == 'training_set':
             for part in range(math.ceil(len(filenames) / 30)):
                 df = pd.DataFrame(data = {"filenames":filenames[part * 30 : (part + 1) * 30]})
@@ -343,5 +333,70 @@ def create_and_save_settings(name, new_dicts, new_config, problem_folder: str=No
                 df["max_C"] = 40
                 df["max_size"] = 50
                 df["problem_folder"] = problem_folder
-                df.to_csv(paths.parameters_path / "csvs" / f"{name}_part_{part}.csv", index=False, index_label=False)
-                create_sh_script(name=name, part=part)
+                df.to_csv(paths.parameters_path / f"run_{number}" / "csvs" / f"{name}_part_{part}.csv", index=False, index_label=False)
+                create_sh_script(name=name, number=number, part=part)
+                
+                
+
+# def evaluate_optimization(
+#     graph: Graph,
+#     mc_schedule: dict,
+#     args: "arguments from parser",
+#     _id: str=None,
+# ):
+#     """
+#     evaluate monte carlo/ simulated annealing schedule for batch_size timed and returns
+#     a success probability -> measure of how good the choosen schedule (temperature,
+#     configuration distribution, ...) is
+#     """
+#     mc = initialize_MC_object(graph, mc_schedule)
+#     if mc.with_core:
+#         if not graph.is_complete:
+#             mc_core = initialize_MC_object(graph, mc_schedule, core=True)
+#         else:
+#             mc_core = None
+#     else:
+#         mc.swap_probability = 0
+#     initial_swap_probability = mc.swap_probability
+#     for iteration in range(args.batch_size):
+#         # search for core
+#         if mc.with_core:
+#             (
+#                 qubit_coord_dict,
+#                 mc.energy.polygon_object.core_corner,
+#                 ancillas_in_core,
+#             ) = search_max_core(mc_core, graph)
+#             if not graph.is_complete:
+#                 # if core is empty, dont allow swaps
+#                 if len(qubit_coord_dict) == 0:
+#                     mc.swap_probability = 0
+#                     mc.finite_grid_size = True
+#                     mc.random_qbit = True
+#                 else:
+#                     save_object(mc_core, path_to_results(args) / f'{args.name}/{_id}_{iteration}_CORE_N_K_C_{graph.N}_{graph.K}_{graph.C}_.pkl')
+
+#                 # reset mc core
+#                 mc_core.reset(mc_core.T_0, remove_ancillas=True)
+#                 # update core (reset is part of update)
+#                 # remove ancillas which are already in graph, but not recognized due to removing of short lines in graph
+#                 # add ancillas first since updates_qbits_from_dict doesnt know them otherwise
+#                 ancillas_in_core = {qubit:coord for qubit, coord in ancillas_in_core.items() if qubit not in graph.qubits}
+#                 mc.add_ancillas(ancillas_in_core, update_energy=False)
+#             mc.update_qbits_from_dict(qubit_coord_dict, assign_to_core=True)
+#             mc.total_energy, mc.number_of_plaquettes = mc.energy(
+#                 mc.energy.polygon_object.nodes_object.qbits
+#             )      
+#         # check if there are still some qbits left to place
+#         remaining_qbits = len(mc.energy.polygon_object.nodes_object.qbits.qubits) - len(
+#             mc.energy.polygon_object.nodes_object.qbits.core_qbits
+#         )
+#         if remaining_qbits > 0:
+#             mc.apply(mc.n_moves)
+#         # remove ancillas which dont reduce d.o.f
+#         mc.remove_ancillas(
+#             mc.energy.polygon_object.nodes_object.propose_ancillas_to_remove()
+#         )
+#         mc.name, mc.batch_size = args.name, args.batch_size
+#         save_object(mc, path_to_results(args) / f'{args.name}/{_id}_{iteration}_N_K_C_{graph.N}_{graph.K}_{graph.C}_.pkl')
+#         # reset mc object
+#         mc.reset(current_temperature=mc.T_0,initial_swap_probability=initial_swap_probability, remove_ancillas=True, keep_core=False)
