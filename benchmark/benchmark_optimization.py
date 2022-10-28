@@ -7,10 +7,9 @@ import pandas as pd
 from pathlib import Path
 
 path_to_results = lambda args: (
-    paths.benchmark_results_path
+    paths.benchmark_results_path / f"run_{args.run}"
     / f"benchmark_{(args.problem_folder).replace('/','_')}_with_{args.id_of_benchmark}"
 )
-
 
 def graphs_to_benchmark(args):
     """
@@ -125,6 +124,11 @@ if __name__ == "__main__":
         type=int,
         default=100,
         help="number of different problems to benchmark on",
+    )
+    parser.add_argument(
+        "--run",
+        type=int,
+        help="which run to benchmark?",
     )
     parser.add_argument(
         "--visualize",
