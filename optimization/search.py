@@ -926,6 +926,30 @@ class MC:
                 ancillas
             )
 
+    def number_of_total_swap_gates(self):
+        """
+        counts the number of swap gates
+        needed to fulfill all constraints
+        this function is just approximated
+        and is an upper bound
+        """
+        generating_constraints = self.energy.polygon_object.get_generating_constraints()
+        polygons_coords = self.energy.polygon_object.coords_of_polygons(self.energy.polygon_object.polygons)
+        total_number_of_swap_gates = 0
+        while len(generating_constraints) < self.energy.polygon_object.nodes_object.qbits.graph.C:
+            list_of_number_of_swap_gates = []
+            for idx, polygon_coord in enumerate(polygons_coords):
+                if not Polygons.is_constraint_fulfilled(polygon_coord, generating_constraints):
+                    number_of_swap_gates = Polygons.number_of_swap_gates(polygon_coord)
+#                     if number_of_swap_gates > 0:
+                    list_of_number_of_swap_gates.append((number_of_swap_gates, polygon_coord))
+                    if number_of_swap_gates <= 1:
+                        break
+            swaps, polygon_coord = sorted(list_of_number_of_swap_gates)[0]
+            total_number_of_swap_gates += swaps
+            generating_constraints = list(map(list,generating_constraints.values())) + [polygon_coord]
+            generating_constraints = self.energy.polygon_object.get_generating_constraints(constraints=generating_constraints)
+        return total_number_of_swap_gates
 
 from copy import deepcopy
 from CompilerQC import Qbits, Polygons, Energy
@@ -1347,25 +1371,3 @@ def visualize_search_process(mc, name, number_of_images):
         [create_image_for_step(mc, envelop_rect) for _ in range(number_of_images)],
         fps=2,
     )
-
-    
-    
-# def number of total missing swap gates
-
-# %%time
-# polygons_of_interest = energy.changed_polygons(qbits)
-# generating_constraints = energy.polygon_object.get_generating_constraints()
-# polygons = polygon_object.coords_of_changed_polygons(polygons_of_interest)
-# while len(generating_constraints) < graph.C:
-#     l = []
-#     for polygon_coord in polygons:
-#         if not Polygons.is_constraint_fulfilled(polygon_coord, generating_constraints):
-#             number_of_swap_gates = Polygons.number_of_swap_gates(polygon_coord)
-#             if number_of_swap_gates > 0:
-#                 l.append((number_of_swap_gates, polygon_coord))
-#             if number_of_swap_gates == 1:
-#                 break
-#     swaps, polygon_coord = sorted(l)[0]
-#     generating_constraints = list(map(list,generating_constraints.values())) + [polygon_coord]
-# #     print(swaps, len(generating_constraints))
-#     generating_constraints = polygon_object.get_generating_constraints(constraints=generating_constraints)
