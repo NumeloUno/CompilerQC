@@ -8,6 +8,11 @@
 # Move to folder and run e.g.:find -name "*yaml" | parallel python ../../benchmark_optimization.py --yaml_path={} -b=10 -minN=10 -maxN=10   or run sh ../run_....sh
 # or move to csvs folder in parameters and run sh files, the csvs are created in this script, by calling the function create_... in functions_for_benchmarking, there you can also change settings for all csvs, thats not ideal i know
 
+########################################################################################
+number = "2"
+delete = True
+########################################################################################
+
 from pathlib import Path
 import shutil
 import os
@@ -16,38 +21,27 @@ import pickle
 import yaml
 from CompilerQC import *
 # delete all folder
-print("===================================")
-print("==== Delete old sh_scripts =====")
-print("===================================")
-for p in Path("sh_scripts/").glob("*.sh"):
-    shutil.rmtree(f"parameters/{p.name}", ignore_errors=True)
-print("===================================")
-print("==== Delete old settings/csvs =====")
-print("===================================")
-for p in Path("parameters/").glob("*"):
-    if p.name not in ["Default"]:
-        print(p.name)
-        shutil.rmtree(f"parameters/{p.name}", ignore_errors=True)
-Path("parameters/dictionaries").mkdir(parents=True, exist_ok=True)
-print("===================================")
-print("=Delete old scripts to create gifs=")
-print("===================================")
-for p in Path("plots/scripts_to_create_gifs").glob("*"):
-    print(p.name)
-    os.remove(p)
+if delete:
+    print("===========================================================")
+    print("==== Delete old settings/sh_scripts/csvs/dictionaties =====")
+    print("===========================================================")
+    shutil.rmtree(paths.parameters_path / f"run_{number}", ignore_errors=True)
 
-print("=============================================")
-print("==== Create new settings (yamls and csvs) ===")
-print("=============================================")
+print("===========================================================")
+print("========== Create new settings (yamls and csvs) ===========")
+print("===========================================================")
+Path(paths.parameters_path / f"run_{number}").mkdir(parents=True, exist_ok=True)
+Path(paths.parameters_path / f"run_{number}/csvs").mkdir(parents=True, exist_ok=True)
+Path(paths.parameters_path / f"run_{number}/sh_scripts").mkdir(parents=True, exist_ok=True)
+Path(paths.parameters_path / f"run_{number}/dictionaries").mkdir(parents=True, exist_ok=True)
+    
 # open default yaml and update it by general settings
 with open(paths.parameters_path / "Default/default.yaml") as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
 default_update = {}
 new_config = functions_for_benchmarking.update(config, default_update)
 
-########################################################################################
-number = "1"
-########################################################################################
+
 name = f"CoreEnergyForDatabase{number}"
 new_dicts = [
     {"core_energy.scaling_for_plaq4": 0, "core_energy.scaling_model": None},
@@ -63,8 +57,8 @@ new_dicts = [
     {"core_energy.all_constraints": True},
     {"core_energy.only_number_of_plaquettes": True},
 ]
-functions_for_benchmarking.create_and_save_settings(name, new_dicts, new_config, problem_folder='training_set')
-with open(paths.parameters_path / f"dictionaries/{name}.pkl", "wb") as f:
+functions_for_benchmarking.create_and_save_settings(name, number, new_dicts, new_config, problem_folder='training_set')
+with open(paths.parameters_path / f"run_{number}/dictionaries/{name}.pkl", "wb") as f:
     pickle.dump(new_dicts, f)
 
 ########################################################################################
@@ -94,8 +88,8 @@ new_dicts = [
     {"core_ancilla_insertion_probability": 0.32, "core_ancilla_deletion_probability": 1},
 
 ]
-functions_for_benchmarking.create_and_save_settings(name, new_dicts, new_config, problem_folder='training_set')
-with open(paths.parameters_path / f"dictionaries/{name}.pkl", "wb") as f:
+functions_for_benchmarking.create_and_save_settings(name, number, new_dicts, new_config, problem_folder='training_set')
+with open(paths.parameters_path / f"run_{number}/dictionaries/{name}.pkl", "wb") as f:
     pickle.dump(new_dicts, f)
 f.close()
 ########################################################################################
@@ -149,8 +143,8 @@ new_dicts = [
         "random_qbit": False,
     },
 ]
-functions_for_benchmarking.create_and_save_settings(name, new_dicts, new_config, problem_folder='training_set')
-with open(paths.parameters_path / f"dictionaries/{name}.pkl", "wb") as f:
+functions_for_benchmarking.create_and_save_settings(name, number, new_dicts, new_config, problem_folder='training_set')
+with open(paths.parameters_path / f"run_{number}/dictionaries/{name}.pkl", "wb") as f:
     pickle.dump(new_dicts, f)
 f.close()
 ########################################################################################
@@ -239,9 +233,9 @@ individual_settings4 = list(itertools.product(*individual_settings4))
 individual_settings = (individual_settings1 + individual_settings2 + individual_settings3 + individual_settings4)
 new_dicts = [{k: v for d in L for k, v in d.items()} for L in individual_settings]
 functions_for_benchmarking.create_and_save_settings(
-    f"{name}", new_dicts, new_config, problem_folder='lhz'
+    f"{name}", number, new_dicts, new_config, problem_folder='lhz'
 )
-with open(paths.parameters_path / f"dictionaries/{name}.pkl", "wb") as f:
+with open(paths.parameters_path / f"run_{number}/dictionaries/{name}.pkl", "wb") as f:
     pickle.dump(new_dicts, f)
 f.close()
 ########################################################################################
@@ -266,9 +260,9 @@ individual_settings = [
 individual_settings = list(itertools.product(*individual_settings))
 new_dicts = [{k: v for d in L for k, v in d.items()} for L in individual_settings]
 functions_for_benchmarking.create_and_save_settings(
-    f"{name}", new_dicts, new_config, problem_folder='lhz'
+    f"{name}", number, new_dicts, new_config, problem_folder='lhz'
 )
-with open(paths.parameters_path / f"dictionaries/{name}.pkl", "wb") as f:
+with open(paths.parameters_path / f"run_{number}/dictionaries/{name}.pkl", "wb") as f:
     pickle.dump(new_dicts, f)
 f.close()
 ########################################################################################
@@ -328,8 +322,8 @@ individual_settings = [
 ]
 individual_settings = list(itertools.product(*individual_settings))
 new_dicts = [{k: v for d in L for k, v in d.items()} for L in individual_settings]
-functions_for_benchmarking.create_and_save_settings(name, new_dicts, new_config, problem_folder='lhz')
-with open(paths.parameters_path / f"dictionaries/{name}.pkl", "wb") as f:
+functions_for_benchmarking.create_and_save_settings(name, number, new_dicts, new_config, problem_folder='lhz')
+with open(paths.parameters_path / f"run_{number}/dictionaries/{name}.pkl", "wb") as f:
     pickle.dump(new_dicts, f)
 f.close()
 ########################################################################################
@@ -389,8 +383,8 @@ individual_settings = [
 ]
 individual_settings = list(itertools.product(*individual_settings))
 new_dicts = [{k: v for d in L for k, v in d.items()} for L in individual_settings]
-functions_for_benchmarking.create_and_save_settings(name, new_dicts, new_config, problem_folder='training_set')
-with open(paths.parameters_path / f"dictionaries/{name}.pkl", "wb") as f:
+functions_for_benchmarking.create_and_save_settings(name, number, new_dicts, new_config, problem_folder='training_set')
+with open(paths.parameters_path / f"run_{number}/dictionaries/{name}.pkl", "wb") as f:
     pickle.dump(new_dicts, f)
 f.close()
 ########################################################################################
