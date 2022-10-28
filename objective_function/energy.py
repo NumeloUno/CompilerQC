@@ -406,11 +406,12 @@ class Energy(Polygons):
         count all constraints, even those which are fulfilled implict
         """
         generating_constraints = self.polygon_object.get_generating_constraints()
-        count = 1
+        # +1 -> energy wont be zero -> no divided by zero error
+        count = len(self.polygon_object.polygons) + 1
         for polygon_coord in self.polygons_coords_of_interest:
             if Polygons.is_constraint_fulfilled(polygon_coord, generating_constraints):
-                count -= 1 / len(self.polygon_object.polygons)
-        return (count + 1e-3) ** 2, len(generating_constraints)
+                count -= 1
+        return count, len(generating_constraints)
     
     def __call__(self, qbits_of_interest):
         """
