@@ -144,9 +144,9 @@ class Energy(Polygons):
             sparse_density_penalty = int(sum(self.penalty_for_sparse_plaquette_density()))
         if self.low_noplaqs_penalty:
             low_noplaqs_penalty = int(sum(self.penalty_for_low_number_of_plaquettes()))
-        self.line_factor = line_factor * measure_energy / (1 + line_energy_value)
-        self.sparse_density_factor = sparse_density_factor * measure_energy / (1 + sparse_density_penalty)
-        self.low_noplaqs_factor = low_noplaqs_factor * measure_energy / (1 + low_noplaqs_penalty)
+        self.line_factor = line_factor * measure_energy / (1.1 + line_energy_value)
+        self.sparse_density_factor = sparse_density_factor * measure_energy / (1.1 + sparse_density_penalty)
+        self.low_noplaqs_factor = low_noplaqs_factor * measure_energy / (1.1 + low_noplaqs_penalty)
 
     def scopes_of_polygons(self):
         """return array of the scopes of all changed polygons,"""
