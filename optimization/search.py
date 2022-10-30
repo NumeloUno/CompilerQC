@@ -945,10 +945,14 @@ class MC:
                     list_of_number_of_swap_gates.append((number_of_swap_gates, polygon_coord))
                     if number_of_swap_gates <= 1:
                         break
-            swaps, polygon_coord = sorted(list_of_number_of_swap_gates)[0]
-            total_number_of_swap_gates += swaps
-            generating_constraints = list(map(list,generating_constraints.values())) + [polygon_coord]
-            generating_constraints = self.energy.polygon_object.get_generating_constraints(constraints=generating_constraints)
+            try: 
+                swaps, polygon_coord = sorted(list_of_number_of_swap_gates)[0]
+                total_number_of_swap_gates += swaps
+                generating_constraints = list(map(list,generating_constraints.values())) + [polygon_coord]
+                generating_constraints = self.energy.polygon_object.get_generating_constraints(constraints=generating_constraints)
+            except:
+                print("something went wrong, list is empty, total_number_of_swap_gates is set to None")
+                return None
         return total_number_of_swap_gates
 
 from copy import deepcopy
