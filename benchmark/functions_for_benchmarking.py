@@ -130,7 +130,7 @@ def initialize_MC_object(graph: Graph, mc_schedule: dict, core: bool = False):
 
 
 def evaluate_optimization(
-    graph: Graph,
+    graph_: Graph,
     mc_schedule: dict,
     args: "arguments from parser",
     _id: str=None,
@@ -140,7 +140,16 @@ def evaluate_optimization(
     a success probability -> measure of how good the choosen schedule (temperature,
     configuration distribution, ...) is
     """
+    # actually, mc.remove(ancillas_in_core) at the end of the for loop would be the function to use,
+    # use deepcopy, it is much faster
+    graph = deepcopy(graph_)
+    ancillas_in_core = {}
+    
     for iteration in range(args.batch_size):
+        # also belongs to the deepcopy thing, if ancillas have been added in the last iteration, the graph is contaminated, you can remove them wich mc.remove(ancillas) or deepcopy the graph
+        if ancillas_in_core != {}:
+            graph = deepcopy(graph_)
+            
         mc = initialize_MC_object(graph, mc_schedule)
         if mc.with_core:
             mc_core = initialize_MC_object(graph, mc_schedule, core=True)
@@ -155,8 +164,8 @@ def evaluate_optimization(
                     mc.swap_probability = 0
                     mc.finite_grid_size = True
                     mc.random_qbit = True
-                else:
-                    save_object(mc_core, path_to_results(args) / f'{args.name}/{_id}_{iteration}_CORE_N_K_C_{graph.N}_{graph.K}_{graph.C}_.pkl')
+#                 else:
+#                     save_object(mc_core, path_to_results(args) / f'{args.name}/{_id}_{iteration}_CORE_N_K_C_{graph.N}_{graph.K}_{graph.C}_.pkl')
 
                 # remove ancillas which are already in graph, but not recognized due to removing of short lines in graph
                 # add ancillas first since updates_qbits_from_dict doesnt know them otherwise
@@ -174,9 +183,9 @@ def evaluate_optimization(
         if remaining_qbits > 0:
             mc.apply(mc.n_moves)
         # remove ancillas which dont reduce d.o.f
-        mc.remove_ancillas(
-            mc.energy.polygon_object.nodes_object.propose_ancillas_to_remove()
-        )
+#         mc.remove_ancillas(
+#             mc.energy.polygon_object.nodes_object.propose_ancillas_to_remove()
+#         )
         mc.name, mc.batch_size, mc.run = args.name, args.batch_size, args.run
         save_object(mc, path_to_results(args) / f'{args.name}/{_id}_{iteration}_N_K_C_{graph.N}_{graph.K}_{graph.C}_.pkl')
         
@@ -285,7 +294,7 @@ def create_sh_script(name, number, part):
     with open(paths.parameters_path / f"run_{number}/sh_scripts/run_{name}_part_{part}.sh", 'w') as sh:
             sh.write(('''\
 #!/bin/bash 
-NUM_PARALLEL_JOBS=10 
+NUM_PARALLEL_JOBS=15
 part=%s
 name=%s
 number=%s
@@ -296,7 +305,15 @@ python "%s/benchmark/benchmark_optimization.py --yaml_path={1} --batch_size={2} 
 --problem_folder={8} --run=${number}"  
             ''')%(part, name, number, str(paths.parameters_path), str(paths.cwd)))
 
-def create_and_save_settings(name, number, new_dicts, new_config, problem_folder: str=None, save: bool=True):
+def create_and_save_settings(
+    name,
+    number,
+    new_dicts,
+    new_config,
+    problem_folder: str=None,
+    save: bool=True,
+    number_of_files_in_one_csv: int=15,
+):
     """update default yaml by newdict and save them in mc_parameters_name.yaml
     note: there are absolute paths in use!"""
     filenames = []
@@ -312,9 +329,9 @@ def create_and_save_settings(name, number, new_dicts, new_config, problem_folder
             yaml.dump(dict_to_save, f, default_flow_style=False)
     if save:
         if problem_folder == 'lhz':
-            for part in range(math.ceil(len(filenames) / 30)):
-                df = pd.DataFrame(data = {"filenames":filenames[part * 30 : (part + 1) * 30]})
-                df["batch_size"] =  50
+            for part in range(math.ceil(len(filenames) / number_of_files_in_one_csv)):
+                df = pd.DataFrame(data = {"filenames":filenames[part * number_of_files_in_one_csv : (part + 1) * number_of_files_in_one_csv]})
+                df["batch_size"] =  25
                 df["min_N"] = 4
                 df["max_N"] = 12 
                 df["min_C"] = 3
@@ -324,8 +341,8 @@ def create_and_save_settings(name, number, new_dicts, new_config, problem_folder
                 df.to_csv(paths.parameters_path / f"run_{number}" / "csvs" /  f"{name}_part_{part}.csv", index=False, index_label=False)
                 create_sh_script(name=name, number=number, part=part)
         if problem_folder == 'training_set':
-            for part in range(math.ceil(len(filenames) / 30)):
-                df = pd.DataFrame(data = {"filenames":filenames[part * 30 : (part + 1) * 30]})
+            for part in range(math.ceil(len(filenames) / number_of_files_in_one_csv)):
+                df = pd.DataFrame(data = {"filenames":filenames[part * number_of_files_in_one_csv : (part + 1) * number_of_files_in_one_csv]})
                 df["batch_size"] = 30
                 df["min_N"] = 4
                 df["max_N"] = 20 
