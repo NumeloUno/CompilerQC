@@ -162,7 +162,7 @@ def evaluate_optimization(
                 # if core is empty, dont allow swaps
                 if len(qubit_coord_dict) == 0:
                     mc.swap_probability = 0
-                    mc.finite_grid_size = True
+                    mc.envelop_shell_search = True
                     mc.random_qbit = True
 #                 else:
 #                     save_object(mc_core, path_to_results(args) / f'{args.name}/{_id}_{iteration}_CORE_N_K_C_{graph.N}_{graph.K}_{graph.C}_.pkl')
