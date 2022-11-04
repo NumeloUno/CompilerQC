@@ -596,28 +596,41 @@ class MC:
         corner = self.energy.polygon_object.core_corner
         xy = random.randint(0, 1)
         clusters = self.get_line_clusters(xy)
-        if random.random() < 0.5 or len(clusters) == 1:
-            valid_clusters = [cluster for cluster in clusters if len(cluster) > 1]
-            if valid_clusters:
-                random_cluster = random.choice(valid_clusters)
-                i, j = random.sample(random_cluster, 2)
-                new_line_mapping = {i: j, j: i}
-            else:
-                return None, None, None
-        # cluster_swap
+        valid_clusters = [cluster for cluster in clusters if len(cluster) > 1]
+        if valid_clusters:
+            random_cluster = random.choice(valid_clusters)
+            i, j = random.sample(random_cluster, 2)
+            new_line_mapping = {i: j, j: i}
+            old_qbits = {old: self.qbits_of_coord(old, xy) for old in new_line_mapping}
+            return new_line_mapping, xy, old_qbits
         else:
-            old_nodes_order = [node for cluster in clusters for node in cluster]
-            i, j = random.sample(range(len(clusters)), 2)
-            clusters[i], clusters[j] = clusters[j], clusters[i]
-            new_nodes_order = [node for cluster in clusters for node in cluster]
-            new_line_mapping = {
-                new: old
-                for old, new in zip(old_nodes_order, new_nodes_order)
-                if old != new
-            }
+            return None, None, None
 
-        old_qbits = {old: self.qbits_of_coord(old, xy) for old in new_line_mapping}
-        return new_line_mapping, xy, old_qbits
+#         corner = self.energy.polygon_object.core_corner
+#         xy = random.randint(0, 1)
+#         clusters = self.get_line_clusters(xy)
+#         if random.random() < 0.5 or len(clusters) == 1:
+#             valid_clusters = [cluster for cluster in clusters if len(cluster) > 1]
+#             if valid_clusters:
+#                 random_cluster = random.choice(valid_clusters)
+#                 i, j = random.sample(random_cluster, 2)
+#                 new_line_mapping = {i: j, j: i}
+#             else:
+#                 return None, None, None
+#         # cluster_swap
+#         else:
+#             old_nodes_order = [node for cluster in clusters for node in cluster]
+#             i, j = random.sample(range(len(clusters)), 2)
+#             clusters[i], clusters[j] = clusters[j], clusters[i]
+#             new_nodes_order = [node for cluster in clusters for node in cluster]
+#             new_line_mapping = {
+#                 new: old
+#                 for old, new in zip(old_nodes_order, new_nodes_order)
+#                 if old != new
+#             }
+
+#         old_qbits = {old: self.qbits_of_coord(old, xy) for old in new_line_mapping}
+#         return new_line_mapping, xy, old_qbits
 
     def swap_lines_in_core(self, new_line_mapping, xy, old_qbits):
         """
@@ -931,11 +944,13 @@ class MC:
         counts the number of swap gates
         needed to fulfill all constraints
         this function is just approximated
-        and is an upper bound
+        and is an upper bound, returns also the number 
+        of number of 3 and 4 constraints in constraints created by swap gates
         """
         generating_constraints = self.energy.polygon_object.get_generating_constraints()
         polygons_coords = self.energy.polygon_object.coords_of_polygons(self.energy.polygon_object.polygons)
         total_number_of_swap_gates = 0
+        constraints_coords_created_by_swaps = []
         while len(generating_constraints) < self.energy.polygon_object.nodes_object.qbits.graph.C:
             list_of_number_of_swap_gates = []
             for idx, polygon_coord in enumerate(polygons_coords):
@@ -950,11 +965,38 @@ class MC:
                 total_number_of_swap_gates += swaps
                 generating_constraints = list(map(list,generating_constraints.values())) + [polygon_coord]
                 generating_constraints = self.energy.polygon_object.get_generating_constraints(constraints=generating_constraints)
+                constraints_coords_created_by_swaps.append(polygon_coord)
             except:
                 print("something went wrong, list is empty, total_number_of_swap_gates is set to None")
-                return None
-        return total_number_of_swap_gates
+                return None, None, None
+        # number of 3 and 4 constraints in constraints created by swap gates
+        C_4 = len([constraint for constraint in constraints_coords_created_by_swaps if len(constraint)==4])
+        C_3 = len(constraints_coords_created_by_swaps) - C_4
+        return total_number_of_swap_gates, C_3, C_4
 
+    @staticmethod
+    def number_of_CNOTs_in_LHZ(N):
+        # number of 3 and 4 plaquettes
+        C_4 = (N - 3) * (N - 2) / 2
+        C_3 = N - 2
+        CNOTs_of_plaquettes = int(6 * C_4 + 4 * C_3)
+        return CNOTs_of_plaquettes
+
+    def number_of_CNOTs(self):
+        """
+        count the CNOT gates of a compiled graph
+        return: number of CNOT gates, number_of_swap_gates, number of 3er and 4er plaquettes,
+        """
+        number_of_swap_gates, C_3_by_swaps, C_4_by_swaps = self.number_of_total_swap_gates()
+        plaquettes = (self.energy.polygon_object.nodes_object.qbits.found_plaqs())
+        C_4_plaquettes = len([plaq for plaq in plaquettes if len(plaq)==4])
+        C_3_plaquettes = len(plaquettes) - C_4_plaquettes
+        C_4 = C_4_by_swaps + C_4_plaquettes
+        C_3 = C_3_by_swaps + C_3_plaquettes
+        CNOTs_of_plaquettes = 6 * C_4 + 4 * C_3
+        CNOTs_of_swap_gates = 2 * 3 * number_of_swap_gates
+        return int(CNOTs_of_plaquettes + CNOTs_of_swap_gates), number_of_swap_gates, C_3_plaquettes, C_4_plaquettes
+        
 from copy import deepcopy
 from CompilerQC import Qbits, Polygons, Energy
 
