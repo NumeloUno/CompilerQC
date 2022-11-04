@@ -57,6 +57,33 @@ def visualize_benchmarks(args):
         graph = Graph(adj_matrix=adj_matrix)
         functions_for_benchmarking.visualize_settings(graph, args)
 
+def CNOT_ratio_before_compilation(args):
+    """
+    """
+    df = pd.DataFrame()
+    list_of_graphs_to_benchmark = graphs_to_benchmark(args)
+    for adj_matrix in list_of_graphs_to_benchmark:
+        graph = Graph(adj_matrix=adj_matrix)
+        for _ in range(args.batch_size):
+            qbits = Qbits.init_qbits_from_dict(graph, dict())
+            nodes = Nodes(qbits, place_qbits_in_lines=False)
+            polygons = Polygons(nodes)
+            energy = Energy(polygons)
+            mc = MC(energy)
+            number_of_CNOTs, number_of_SWAPs,_,_ = mc.number_of_CNOTs()
+            CNOT_ratio = number_of_CNOTs / MC.number_of_CNOTs_in_LHZ(graph.N)
+            df = df.append(
+                {
+                    'N':graph.N,
+                    'K':graph.K,
+                    'C':graph.C,
+                    'CNOT_ratio':CNOT_ratio,
+                    'qubit_ratio':graph.K / (graph.N / 2 * (graph.N - 1)),
+                    'number_of_swap_gates': number_of_SWAPs,
+                }
+                , ignore_index=True)
+    df.to_csv(paths.cwd / f"benchmark/plot_scripts/CNOT_ratio_of_{args.problem_folder}_before_compilation.csv", index=False)
+
 
 if __name__ == "__main__":
 
@@ -151,6 +178,12 @@ if __name__ == "__main__":
         type=int,
         default=1000,
     )
+    parser.add_argument(
+        "--CNOT_ratio",
+        type=bool,
+        default=False,
+        help="if true, this function creates a csv of ratios of the number of CNOT gates in a non compiled solution vs the LHZ solution",
+    )
     args = parser.parse_args()
     print("yaml_path", args.yaml_path)
     print("batch_size", args.batch_size)
@@ -160,12 +193,14 @@ if __name__ == "__main__":
     print("max_C", args.max_C)
     print("max_size", args.max_size)
     print("problem_folder", args.problem_folder)
-
-    # save results using id (which is also in filename of mc_parameters.yaml) in filename
-    args.id_of_benchmark = args.yaml_path.split("_")[2]
-    names = args.yaml_path.split(".")[0].split("_")
-    args.name = f"{names[-2]}_{names[-1]}"
-    if args.visualize:
-        visualize_benchmarks(args)
+    if args.CNOT_ratio:
+        CNOT_ratio_before_compilation(args)
     else:
-        benchmark_energy_scaling(args)
+        # save results using id (which is also in filename of mc_parameters.yaml) in filename
+        args.id_of_benchmark = args.yaml_path.split("_")[2]
+        names = args.yaml_path.split(".")[0].split("_")
+        args.name = f"{names[-2]}_{names[-1]}"
+        if args.visualize:
+            visualize_benchmarks(args)
+        else:
+            benchmark_energy_scaling(args)
