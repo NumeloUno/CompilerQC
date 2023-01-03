@@ -109,10 +109,10 @@ class Polygons:
             5,
         )
 
-    def moment_of_inertia(self, polygon_coords):
-        center = np.mean(polygon_coords, axis=0)
+    def moment_of_inertia(self, polygon_coord):
+        center = np.mean(polygon_coord, axis=0)
         return round(
-            sum([dist(coord, center) ** self.exponent for coord in polygon_coords]), 5)
+            sum([dist(coord, center) ** self.exponent for coord in polygon_coord]) / len(polygon_coord), 5)
     
     @staticmethod
     def corner_of_coords(coords):
@@ -216,6 +216,7 @@ class Polygons:
         envelop_rect=None,
         rotate: bool=False,
         radius=0.2,
+        fontsize=None,
     ):
         if ax is None: _, ax = plt.subplots(figsize=figsize)
         ax.set_aspect('equal', 'box')
@@ -277,12 +278,13 @@ class Polygons:
         # color qbits
         for qbit in self.nodes_object.qbits:
             coord = Polygons.rotate_coords_by_45(qbit.coord, rotate)
-            if len(str(qbit.qubit)) - 4 == 2:
-                fontsize = 82 * radius
-            if len(str(qbit.qubit)) - 4 == 3:
-                fontsize = 70 * radius
-            if len(str(qbit.qubit)) - 4 == 4:
-                fontsize = 60 * radius
+            if fontsize is None:
+                if len(str(qbit.qubit)) - 4 == 2:
+                    fontsize = 82 * radius
+                if len(str(qbit.qubit)) - 4 == 3:
+                    fontsize = 70 * radius
+                if len(str(qbit.qubit)) - 4 == 4:
+                    fontsize = 60 * radius
 
             label = ax.annotate(
                 r"{},{}".format(*qbit.qubit),
