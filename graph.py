@@ -26,6 +26,8 @@ class Graph:
         self.N = self.num_nodes()
         self.K = self.num_edges()
         self.C = self.num_constrains()
+#         # wont be overwritten if ancillas are added
+#         self.original_NKC = (self.N, self.K, self.C)
 
     def to_nx_graph(self):
         """converts Graph object to networkx object"""
