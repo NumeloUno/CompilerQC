@@ -25,14 +25,15 @@ def graphs_to_benchmark(args):
         max_N=args.max_N,
         max_size=args.max_size,
     )
-    graphs = []
+    graphs, qubit_to_coord_dicts = [], []
     for file in problems:
         # read graph and qubit to coord translation from file
         graph_adj_matrix, qubit_coord_dict = functions_for_database.problem_from_file(
             file
         )
         graphs.append(graph_adj_matrix)
-    return graphs
+        qubit_to_coord_dicts.append(qubit_coord_dict)
+    return (graphs, qubit_to_coord_dicts)
 
 
 def benchmark_energy_scaling(args):
@@ -41,7 +42,7 @@ def benchmark_energy_scaling(args):
     fully connected logical graphs,
     scale plaqs by prediction of MLP
     """
-    list_of_graphs_to_benchmark = graphs_to_benchmark(args)
+    list_of_graphs_to_benchmark = graphs_to_benchmark(args)[0]
     Path(path_to_results(args) / f'{args.name}').mkdir(parents=True, exist_ok=True)
     for adj_matrix in list_of_graphs_to_benchmark:
         graph = Graph(adj_matrix=adj_matrix)
@@ -53,7 +54,7 @@ def visualize_benchmarks(args):
     fully connected logical graphs,
     scale plaqs by prediction of MLP
     """
-    for adj_matrix in graphs_to_benchmark(args):
+    for adj_matrix in graphs_to_benchmark(args)[0]:
         graph = Graph(adj_matrix=adj_matrix)
         functions_for_benchmarking.visualize_settings(graph, args)
 
@@ -61,7 +62,7 @@ def CNOT_ratio_before_compilation(args):
     """
     """
     df = pd.DataFrame()
-    list_of_graphs_to_benchmark = graphs_to_benchmark(args)
+    list_of_graphs_to_benchmark = graphs_to_benchmark(args)[0]
     for adj_matrix in list_of_graphs_to_benchmark:
         graph = Graph(adj_matrix=adj_matrix)
         for _ in range(args.batch_size):
@@ -83,6 +84,32 @@ def CNOT_ratio_before_compilation(args):
                 }
                 , ignore_index=True)
     df.to_csv(paths.cwd / f"benchmark/plot_scripts/CNOT_ratio_of_{args.problem_folder}_before_compilation.csv", index=False)
+
+def CNOT_ratio_of_compiled_solutions(args):
+    """
+    """
+    df = pd.DataFrame()
+    a, b = graphs_to_benchmark(args)
+    for adj_matrix, qubit_to_coord in zip(a, b):
+        graph = Graph(adj_matrix=adj_matrix)
+        qbits = Qbits.init_qbits_from_dict(graph, qubit_to_coord)
+        nodes = Nodes(qbits, place_qbits_in_lines=False)
+        polygons = Polygons(nodes)
+        energy = Energy(polygons)
+        mc = MC(energy)
+        number_of_CNOTs, number_of_SWAPs,_,_ = mc.number_of_CNOTs()
+        CNOT_ratio = number_of_CNOTs / MC.number_of_CNOTs_in_LHZ(graph.N)
+        df = df.append(
+            {
+                'N':graph.N,
+                'K':graph.K,
+                'C':graph.C,
+                'CNOT_ratio':CNOT_ratio,
+                'qubit_ratio':graph.K / (graph.N / 2 * (graph.N - 1)),
+                'number_of_swap_gates': number_of_SWAPs,
+            }
+            , ignore_index=True)
+    df.to_csv(paths.cwd / f"benchmark/plot_scripts/CNOT_ratio_of_compiled_solutions.csv", index=False)
 
 
 if __name__ == "__main__":
@@ -180,9 +207,12 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--CNOT_ratio",
-        type=bool,
-        default=False,
-        help="if true, this function creates a csv of ratios of the number of CNOT gates in a non compiled solution vs the LHZ solution",
+        type=int,
+        default=0,
+        help="""
+        if 1: creates a csv of ratios of the number of CNOT gates in a non compiled solution vs the LHZ solution
+        if 2: creates a csv of ratios of the number of CNOT gates in a compiled solution vs the LHZ solution
+        """
     )
     args = parser.parse_args()
     print("yaml_path", args.yaml_path)
@@ -193,9 +223,11 @@ if __name__ == "__main__":
     print("max_C", args.max_C)
     print("max_size", args.max_size)
     print("problem_folder", args.problem_folder)
-    if args.CNOT_ratio:
+    if args.CNOT_ratio == 2:
+        CNOT_ratio_of_compiled_solutions(args)
+    if args.CNOT_ratio == 1:
         CNOT_ratio_before_compilation(args)
-    else:
+    if args.CNOT_ratio == 0:
         # save results using id (which is also in filename of mc_parameters.yaml) in filename
         args.id_of_benchmark = args.yaml_path.split("_")[2]
         names = args.yaml_path.split(".")[0].split("_")
