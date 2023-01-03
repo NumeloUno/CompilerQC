@@ -69,6 +69,7 @@ class Energy(Polygons):
         INIT: estimate energy by energy of initial configuration
         """
         predicted_energy = None
+        print('SCALING MODEL', self.scaling_model)
         if self.scaling_model is not None:
             assert self.scaling_model in [
                 "MLP",
@@ -111,6 +112,7 @@ class Energy(Polygons):
             scaling_for_plaq3 = scaling_for_plaq4 = (
                 predicted_energy / self.polygon_object.nodes_object.qbits.graph.C
             )
+            print('#############################', scaling_for_plaq4)
             self.scaling_for_plaq3, self.scaling_for_plaq4 = (
                 scaling_for_plaq3,
                 scaling_for_plaq4,
@@ -382,6 +384,10 @@ class Energy(Polygons):
         weight all constraints, even those which are fulfilled implict
         """
         generating_constraints = self.polygon_object.get_generating_constraints()
+        if self.scaling_for_plaq4 != 0:
+            total_intial_energy = self.scaling_for_plaq4 * self.polygon_object.nodes_object.qbits.graph.C
+            self.scaling_for_plaq4 /= total_intial_energy / len(self.polygon_object.polygons)
+            self.scaling_for_plaq3 = self.scaling_for_plaq4
         energy_to_return = 0 
         for polygon_coord in self.polygons_coords_of_interest:
             if self.polygon_object.scope_measure:
@@ -389,15 +395,10 @@ class Energy(Polygons):
             if not self.polygon_object.scope_measure:
                 measure = self.polygon_object.moment_of_inertia(polygon_coord)
             if Polygons.is_constraint_fulfilled(polygon_coord, generating_constraints):
-                if measure == self.polygon_object.unit_square:
                     energy_to_return -= self.scaling_for_plaq4
-                if measure == self.polygon_object.unit_triangle:
-                    energy_to_return -= self.scaling_for_plaq3
-                else:
-                    energy_to_return -= self.scaling_for_plaq4 / measure
             else:
                 energy_to_return += measure
-                
+        
         return energy_to_return, len(generating_constraints)
     
 
