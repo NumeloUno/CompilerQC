@@ -9,9 +9,8 @@
 # or move to csvs folder in parameters and run sh files, the csvs are created in this script, by calling the function create_... in functions_for_benchmarking, there you can also change settings for all csvs, thats not ideal i know
 
 ########################################################################################
-number = "4"
+number = "5"
 delete = True
-number_of_files_in_one_csv = 15
 ########################################################################################
 
 from pathlib import Path
@@ -21,7 +20,6 @@ import itertools
 import pickle
 import yaml
 from CompilerQC import *
-
 # delete all folder
 if delete:
     print("===========================================================")
@@ -34,57 +32,41 @@ print("========== Create new settings (yamls and csvs) ===========")
 print("===========================================================")
 Path(paths.parameters_path / f"run_{number}").mkdir(parents=True, exist_ok=True)
 Path(paths.parameters_path / f"run_{number}/csvs").mkdir(parents=True, exist_ok=True)
-Path(paths.parameters_path / f"run_{number}/sh_scripts").mkdir(
-    parents=True, exist_ok=True
-)
-Path(paths.parameters_path / f"run_{number}/dictionaries").mkdir(
-    parents=True, exist_ok=True
-)
-
+Path(paths.parameters_path / f"run_{number}/sh_scripts").mkdir(parents=True, exist_ok=True)
+Path(paths.parameters_path / f"run_{number}/dictionaries").mkdir(parents=True, exist_ok=True)
+    
 # open default yaml and update it by general settings
 with open(paths.parameters_path / "Default/default.yaml") as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
-
+    
 default_update = {
+    "energy.polygon_object.scope_measure": False,
     "energy.scaling_model": "INIT",
+    "energy.polygon_object.exponent": 1,
     "with_core": True,
     "envelop_shell_search": True,
+    "shell_time": 20,
     "finite_grid_size": False,
+    "core_energy.only_squares_in_core": False,
+    "min_plaquette_density_in_softcore": 0.75,
+    "core_only_four_cycles_for_ancillas": False,
+
 }
 new_config = functions_for_benchmarking.update(config, default_update)
-name = f"EnergyForDatabase{number}"
-individual_settings1 = [
-    [        
-        {"energy.polygon_object.scope_measure": False,
-        "energy.polygon_object.exponent":2},
-        {"energy.polygon_object.scope_measure": True,
-        "energy.polygon_object.exponent":2},
- 
-    ],
+
+########################################################################################
+    
+name = f"CoreMcForDatabase{number}"
+new_dicts = [
+    {"core_ancilla_insertion_probability": 0.01, "core_ancilla_deletion_probability": 1},
+    {"core_ancilla_insertion_probability": 0.02, "core_ancilla_deletion_probability": 1},
+    {"core_ancilla_insertion_probability": 0.04, "core_ancilla_deletion_probability": 1},
+    {"core_ancilla_insertion_probability": 0.08, "core_ancilla_deletion_probability": 1},
+    {"core_ancilla_insertion_probability": 0.16, "core_ancilla_deletion_probability": 1},
+    {"core_ancilla_insertion_probability": 0.32, "core_ancilla_deletion_probability": 1},
+
 ]
- 
-individual_settings2 = [
-    [
-        {"energy.all_constraints":True,
-         "energy.scaling_for_plaq3": 0,
-         "energy.scaling_for_plaq4": 0,
-         "energy.scaling_model":None},
-        {"energy.all_constraints": True,
-         "energy.scaling_model": 'LHZ'},
-        {"energy.count_constraints": True,
-         "energy.scaling_model":None,
-         "chi_0": 0.001,}
-    ]
-]
-individual_settings1 = list(itertools.product(*individual_settings1))
-individual_settings2 = list(itertools.product(*individual_settings2))
- 
-individual_settings = (individual_settings1 + individual_settings2)
-new_dicts = [{k: v for d in L for k, v in d.items()} for L in individual_settings]
-functions_for_benchmarking.create_and_save_settings(
-    f"{name}", number, new_dicts, new_config, problem_folder='training_set'
-)
+functions_for_benchmarking.create_and_save_settings(name, number, new_dicts, new_config, problem_folder='training_set')
 with open(paths.parameters_path / f"run_{number}/dictionaries/{name}.pkl", "wb") as f:
     pickle.dump(new_dicts, f)
 f.close()
-########################################################################################
