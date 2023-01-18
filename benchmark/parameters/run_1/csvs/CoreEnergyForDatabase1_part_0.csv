@@ -1,0 +1,13 @@
+filenames,batch_size,min_N,max_N,min_C,max_C,max_size,problem_folder
+mc_parameters_CoreEnergyForDatabase1_0.yaml,30,4,20,3,40,50,training_set
+mc_parameters_CoreEnergyForDatabase1_1.yaml,30,4,20,3,40,50,training_set
+mc_parameters_CoreEnergyForDatabase1_2.yaml,30,4,20,3,40,50,training_set
+mc_parameters_CoreEnergyForDatabase1_3.yaml,30,4,20,3,40,50,training_set
+mc_parameters_CoreEnergyForDatabase1_4.yaml,30,4,20,3,40,50,training_set
+mc_parameters_CoreEnergyForDatabase1_5.yaml,30,4,20,3,40,50,training_set
+mc_parameters_CoreEnergyForDatabase1_6.yaml,30,4,20,3,40,50,training_set
+mc_parameters_CoreEnergyForDatabase1_7.yaml,30,4,20,3,40,50,training_set
+mc_parameters_CoreEnergyForDatabase1_8.yaml,30,4,20,3,40,50,training_set
+mc_parameters_CoreEnergyForDatabase1_9.yaml,30,4,20,3,40,50,training_set
+mc_parameters_CoreEnergyForDatabase1_10.yaml,30,4,20,3,40,50,training_set
+mc_parameters_CoreEnergyForDatabase1_11.yaml,30,4,20,3,40,50,training_set

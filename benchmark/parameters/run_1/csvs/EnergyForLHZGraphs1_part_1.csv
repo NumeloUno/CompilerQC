@@ -1,0 +1,3 @@
+filenames,batch_size,min_N,max_N,min_C,max_C,max_size,problem_folder
+mc_parameters_EnergyForLHZGraphs1_30.yaml,50,4,12,3,91,50,lhz
+mc_parameters_EnergyForLHZGraphs1_31.yaml,50,4,12,3,91,50,lhz

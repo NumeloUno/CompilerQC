@@ -1,0 +1,7 @@
+filenames,batch_size,min_N,max_N,min_C,max_C,max_size,problem_folder
+mc_parameters_BestSettings3_0.yaml,30,4,20,3,40,50,training_set
+mc_parameters_BestSettings3_1.yaml,30,4,20,3,40,50,training_set
+mc_parameters_BestSettings3_2.yaml,30,4,20,3,40,50,training_set
+mc_parameters_BestSettings3_3.yaml,30,4,20,3,40,50,training_set
+mc_parameters_BestSettings3_4.yaml,30,4,20,3,40,50,training_set
+mc_parameters_BestSettings3_5.yaml,30,4,20,3,40,50,training_set

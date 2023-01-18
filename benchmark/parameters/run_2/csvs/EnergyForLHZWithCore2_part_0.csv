@@ -1,0 +1,17 @@
+filenames,batch_size,min_N,max_N,min_C,max_C,max_size,problem_folder
+mc_parameters_EnergyForLHZWithCore2_0.yaml,10,4,12,3,91,50,lhz
+mc_parameters_EnergyForLHZWithCore2_1.yaml,0,4,12,3,91,50,lhz
+mc_parameters_EnergyForLHZWithCore2_2.yaml,10,4,12,3,91,50,lhz
+mc_parameters_EnergyForLHZWithCore2_3.yaml,10,4,12,3,91,50,lhz
+mc_parameters_EnergyForLHZWithCore2_4.yaml,10,4,12,3,91,50,lhz
+mc_parameters_EnergyForLHZWithCore2_5.yaml,10,4,12,3,91,50,lhz
+mc_parameters_EnergyForLHZWithCore2_6.yaml,10,4,12,3,91,50,lhz
+mc_parameters_EnergyForLHZWithCore2_7.yaml,0,4,12,3,91,50,lhz
+mc_parameters_EnergyForLHZWithCore2_8.yaml,10,4,12,3,91,50,lhz
+mc_parameters_EnergyForLHZWithCore2_9.yaml,10,4,12,3,91,50,lhz
+mc_parameters_EnergyForLHZWithCore2_10.yaml,0,4,12,3,91,50,lhz
+mc_parameters_EnergyForLHZWithCore2_11.yaml,10,4,12,3,91,50,lhz
+mc_parameters_EnergyForLHZWithCore2_12.yaml,0,4,12,3,91,50,lhz
+mc_parameters_EnergyForLHZWithCore2_13.yaml,0,4,12,3,91,50,lhz
+mc_parameters_EnergyForLHZWithCore2_14.yaml,10,4,12,3,91,50,lhz
+mc_parameters_EnergyForLHZWithCore2_15.yaml,0,4,12,3,91,50,lhz

@@ -1,0 +1,16 @@
+filenames,batch_size,min_N,max_N,min_C,max_C,max_size,problem_folder
+mc_parameters_CoreMcForDatabase2_0.yaml,10,4,20,3,40,50,training_set
+mc_parameters_CoreMcForDatabase2_1.yaml,10,4,20,3,40,50,training_set
+mc_parameters_CoreMcForDatabase2_2.yaml,10,4,20,3,40,50,training_set
+mc_parameters_CoreMcForDatabase2_3.yaml,10,4,20,3,40,50,training_set
+mc_parameters_CoreMcForDatabase2_4.yaml,10,4,20,3,40,50,training_set
+mc_parameters_CoreMcForDatabase2_5.yaml,10,4,20,3,40,50,training_set
+mc_parameters_CoreMcForDatabase2_6.yaml,10,4,20,3,40,50,training_set
+mc_parameters_CoreMcForDatabase2_7.yaml,10,4,20,3,40,50,training_set
+mc_parameters_CoreMcForDatabase2_8.yaml,10,4,20,3,40,50,training_set
+mc_parameters_CoreMcForDatabase2_9.yaml,10,4,20,3,40,50,training_set
+mc_parameters_CoreMcForDatabase2_10.yaml,10,4,20,3,40,50,training_set
+mc_parameters_CoreMcForDatabase2_11.yaml,10,4,20,3,40,50,training_set
+mc_parameters_CoreMcForDatabase2_12.yaml,10,4,20,3,40,50,training_set
+mc_parameters_CoreMcForDatabase2_13.yaml,10,4,20,3,40,50,training_set
+mc_parameters_CoreMcForDatabase2_14.yaml,10,4,20,3,40,50,training_set

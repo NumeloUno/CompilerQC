@@ -1,0 +1,6 @@
+filenames,batch_size,min_N,max_N,min_C,max_C,max_size,problem_folder
+mc_parameters_EnergyForDatabase4_0.yaml,30,4,20,3,40,50,training_set
+mc_parameters_EnergyForDatabase4_1.yaml,30,4,20,3,40,50,training_set
+mc_parameters_EnergyForDatabase4_2.yaml,30,4,20,3,40,50,training_set
+mc_parameters_EnergyForDatabase4_3.yaml,30,4,20,3,40,50,training_set
+mc_parameters_EnergyForDatabase4_4.yaml,30,4,20,3,40,50,training_set
