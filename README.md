@@ -1,2 +1,2 @@
 # CompilerQC
-We will try different ways to speed up the compiling
+Solving the compilation problem in the Parity Architecture using Simulated Annealing.
